@@ -14,8 +14,8 @@ class Storage:
                 return row[0]
             except Exception as error:
                 code=getattr(getattr(error,'diag',None),'message_primary','')
-                if code in {'IMMUTABLE_VERSION','CATALOG_NOT_FOUND','SECRET_REVOKED'}:
-                    raise ExecutionError(code,'Version is immutable; choose a new version' if code=='IMMUTABLE_VERSION' else 'Catalog entry is unavailable','auth' if code=='SECRET_REVOKED' else 'validation',effect='none') from None
+                if code in {'IMMUTABLE_VERSION','CATALOG_NOT_FOUND','SECRET_REVOKED','CONNECTION_VERSION_CONFLICT','CONNECTION_IN_USE','CONNECTION_BUSY'}:
+                    raise ExecutionError(code,'Version is immutable; choose a new version' if code=='IMMUTABLE_VERSION' else 'Connection changed; refresh before saving' if code=='CONNECTION_VERSION_CONFLICT' else 'Connection is still referenced by a Workflow' if code=='CONNECTION_IN_USE' else 'An unfinished Run is still using this connection' if code=='CONNECTION_BUSY' else 'Catalog entry is unavailable','auth' if code=='SECRET_REVOKED' else 'validation',effect='none') from None
                 if code in {'CATALOG_PAYLOAD_TOO_LARGE','CATALOG_QUOTA_EXCEEDED'}: raise ExecutionError(code,'Shared discovery capacity exceeded; ask an operator to review obsolete connection versions','policy',effect='none') from None
                 if code=='EXTERNAL_EFFECT_UNCERTAIN':raise ExecutionError(code,'An accessible source has an uncertain external write; replay is blocked','policy',effect='unknown') from None
                 known={'MEMORY_VERSION_CONFLICT','MEMORY_QUOTA_EXCEEDED','ROUND_BUDGET_EXCEEDED','ATTEMPT_BUDGET_EXCEEDED','RUN_TIMEOUT','LEASE_LOST','RUN_CANCELLED','NODE_BUDGET_EXCEEDED','TOOL_BUDGET_EXCEEDED','EXTERNAL_EFFECT_UNCERTAIN','TASK_RESULT_CONFLICT','STATE_VERSION_CONFLICT'}

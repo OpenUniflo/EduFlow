@@ -16,6 +16,11 @@ export type RunPreflightIssue = {
   fix?: { field: string; type: StructuredOutputFieldType };
 };
 
+/** While the tool catalog is loading or failed, only structural issues are actionable. */
+export function preflightIssuesForReadyCatalog(issues: readonly RunPreflightIssue[], catalogReady: boolean): RunPreflightIssue[] {
+  return catalogReady ? [...issues] : issues.filter(issue => !issue.id.startsWith("tool:"));
+}
+
 export type RunPreflightInput = {
   definition: WorkflowDefinitionV2;
   input: JsonValue;

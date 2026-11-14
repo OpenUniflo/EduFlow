@@ -26,8 +26,8 @@ export type WorkflowLibraryPage = { items: WorkflowSummaryV2[]; total: number; p
 export type WorkflowTemplateSummary = { workflowId: string; name: string; description: string; purpose?: "starter" | "course"; definition?: WorkflowDefinitionV2 };
 export type WorkflowTemplateDetail = WorkflowTemplateSummary & { definition: WorkflowDefinitionV2 };
 export type WorkflowDeleteImpact = { revision: number; revisions: number; runs: number; activeRuns: number };
-export type WorkflowEnvironment = { environmentRef: string; environmentRevision: string; name: string; access?: "owners" | "authenticated"; capabilities: string[]; providers: { ref: string; name: string; modelRefs: string[]; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; connectors: { ref: string; name: string; transport: string; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; limits?: JsonValue; variables?: Record<string,string|number|boolean>; configurationRevision?: number };
-export type WorkflowTool = { ref: string; name: string; description?: string; contractDigest: string; inputSchema: JsonSchema; outputSchema?: JsonSchema; available?: boolean; adapter?: string; sideEffect?: string; diagnostics?: WorkflowDiagnostic[]; connectorRef?: string; origin?: "environment" | "user"; connectionRef?: string; version?: number; group?: string };
+export type WorkflowEnvironment = { environmentRef: string; environmentRevision: string; name: string; access?: "owners" | "authenticated"; capabilities: string[]; providers: { ref: string; name: string; modelRefs: string[]; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; connectors: { ref: string; name: string; transport: string; origin?: "environment" | "user"; connectionRef?: string; version?: number; discoveredToolNames?: string[] }[]; limits?: JsonValue; variables?: Record<string,string|number|boolean>; configurationRevision?: number };
+export type WorkflowTool = { ref: string; name: string; description?: string; contractDigest: string; inputSchema: JsonSchema; outputSchema?: JsonSchema; available?: boolean; adapter?: string; sideEffect?: string; declaredReadOnly?: boolean; declaredDestructive?: boolean; diagnostics?: WorkflowDiagnostic[]; connectorRef?: string; origin?: "environment" | "user"; connectionRef?: string; version?: number; group?: string };
 export type WorkflowExecutionError = { code: string; category?: string; message: string; retryable?: boolean; externalStatus?: number; httpStatus?: number; reason?: string; provider?: string; model?: string; host?: string; tool?: string; effect?: string; elapsedMs?: number; timeoutMs?: number; graphPath?:string[]; nodeId?: string; invocation?: number; stage?: "input_resolution"; pointer?: string; field?: string; expectedType?: string; actualType?: string; expectedLabel?: string; actualLabel?: string; valueSource?: string };
 export type WorkflowRunV2 = {
   operation?: "initial" | "next" | "branch" | null;
@@ -62,5 +62,20 @@ export type StructuredOutputFieldType = "string" | "number" | "boolean" | "array
 /** One model structured-output field; the runtime returns it as a top-level output item. */
 export type StructuredOutputField = { name: string; type: StructuredOutputFieldType; description?: string };
 export type LlmConfigV2 = { providerRef: string; modelRef: string; modelParameters: Record<string, JsonValue>; allowedToolRefs: string[]; prompt: { system: PromptSegment[]; messages: PromptMessageV2[] }; structuredOutput?: { fields: StructuredOutputField[] } };
-export type ConnectionTestResult = { ok: boolean; elapsedMs?: number; status?: number; preview?: string; models?: string[]; reply?: string; output?: JsonValue; tools?: { name: string; description?: string }[]; error?: { code: string; message: string } };
+/** P1 MCP market DTOs. Catalog rows come from the official Registry or an administrator supplement. */
+export type McpMarketCategory = { key: string; label: string; count: number };
+export type McpMarketHeaderHint = { name: string; description?: string; isSecret?: boolean; isRequired?: boolean };
+export type McpMarketItem = {
+  id: string; source: "registry" | "admin"; sourceId: string; name: string; title: string; description: string;
+  version: string; url: string; transport: "streamable-http" | "sse"; authHint: "none" | "oauth" | "api-key" | "bearer" | "unknown";
+  headerHints: McpMarketHeaderHint[]; category: string; categoryLabel: string; iconUrl?: string; websiteUrl?: string;
+  repositoryUrl?: string; featured: boolean; registryStatus?: string; publishedAt?: string; updatedAt?: string;
+  suggestedRef: string; recommended: boolean;
+};
+export type McpMarketSync = { status: "idle" | "running" | "ok" | "error"; cursor: string | null; hasMore: boolean; pageCount: number; serverCount: number; fullSyncCompleted: boolean; lastSuccessAt: string | null; lastAttemptAt: string | null; error: string | null };
+export type McpMarketPage = { items: McpMarketItem[]; page: number; limit: number; total: number; hasMore: boolean; categories: McpMarketCategory[]; recommendedIds: string[]; sync: McpMarketSync; canAdmin: boolean };
+export type McpConnectionAuthType = "none" | "bearer" | "api-key" | "oauth" | "legacy";
+export type McpOAuthDiscovery = { issuer: string; authorizationEndpoint: string; tokenEndpoint: string; resource: string; resourceMetadataUrl?: string; scopes: string[] };
+
+export type ConnectionTestResult = { ok: boolean; elapsedMs?: number; status?: number; preview?: string; models?: string[]; reply?: string; output?: JsonValue; tools?: { name: string; description?: string; allowed?: boolean; inputSchema?: JsonSchema }[]; discoveredToolNames?: string[]; error?: { code: string; message: string } };
 export type ResourceReferenceRow = { workflowId: string; workflowName: string; revision: number; graphPath: string[]; nodeId: string; nodeLabel: string; version?: number; modelRef?: string; variableKey?: string };

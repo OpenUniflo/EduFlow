@@ -50,7 +50,7 @@ begin
   end if;
 
   -- Grouped preview counts: one query per table, no per-user loop.
-  foreach v_table in array v_tables loop
+  for v_table in select unnest(v_tables) loop
     execute format($query$
       select coalesce(jsonb_agg(jsonb_build_object('table', %L, 'userId', user_id, 'rows', rows)), '[]'::jsonb)
       from (select user_id, count(*)::bigint as rows from public.%I where user_id = any($1) group by user_id) counted
@@ -84,12 +84,12 @@ begin
         where session.user_id = any(v_ids)
       );
 
-    foreach v_table in array v_tables loop
+    for v_table in select unnest(v_tables) loop
       execute format('delete from public.%I where user_id = any($1)', v_table) using v_ids;
     end loop;
 
     -- Verify the whole transaction; any residue raises and rolls everything back.
-    foreach v_table in array v_tables loop
+    for v_table in select unnest(v_tables) loop
       execute format('select count(*) from public.%I where user_id = any($1)', v_table) into v_count using v_ids;
       if v_count <> 0 then raise exception 'reset verification failed for %', v_table; end if;
       v_remaining := v_remaining || jsonb_build_array(jsonb_build_object('table', v_table, 'rows', v_count));

@@ -93,9 +93,9 @@ def test_runtime_authority_not_browser_callable():
     run_sql("""
     begin;
     do $$ declare t text; begin
-      if has_function_privilege('authenticated','public.workflow_v2_enqueue(uuid,text,integer,jsonb,text,text,jsonb,text,text,text,text,jsonb)','execute') then raise exception 'FAILED browser enqueue authority';end if;
+      if has_function_privilege('authenticated','public.workflow_v2_enqueue(uuid,text,integer,jsonb,text,text,jsonb,text,text,text,text,jsonb,uuid)','execute') then raise exception 'FAILED browser enqueue authority';end if;
       if has_function_privilege('anon','workflow_private.claim(text)','execute') then raise exception 'FAILED anonymous claim authority';end if;
-      if has_function_privilege('workflow_worker','public.workflow_v2_save(uuid,text,integer,integer,jsonb,jsonb,text,jsonb)','execute') then raise exception 'FAILED worker authoring authority';end if;
+      if has_function_privilege('workflow_worker','public.workflow_v2_save(uuid,text,integer,integer,jsonb,jsonb,text,jsonb,text)','execute') then raise exception 'FAILED worker authoring authority';end if;
       foreach t in array array['workflow_live_runs','workflow_run_steps','workflow_run_events'] loop
         if has_table_privilege('authenticated','public.'||t,'insert') or has_table_privilege('anon','public.'||t,'select') then raise exception 'FAILED browser raw run authority';end if;
       end loop;
@@ -452,6 +452,377 @@ def test_queue_claim_functions_are_worker_only_and_seal_is_private():
         or not has_function_privilege('workflow_worker','workflow_private.expire_wait(uuid)','execute') then raise exception 'FAILED worker queue authority';end if;
       if has_function_privilege('workflow_worker','workflow_private.seal_run(uuid,text,text,text,text,boolean)','execute') then raise exception 'FAILED seal authority';end if;
       if not has_function_privilege('workflow_worker','workflow_private.watchdog()','execute') or not has_function_privilege('workflow_worker','workflow_private.p5_sweep()','execute') then raise exception 'FAILED worker watchdog authority';end if;
+    end $$;
+    rollback;
+    """)
+
+
+def test_connection_delete_rechecks_all_versions_and_nested_references_in_one_transaction():
+    owner = str(uuid.uuid4())
+    workflow = "connection-refs-" + str(uuid.uuid4())
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select workflow_private.p4_connection_save('{owner}','local','probe',1,
+      jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),
+      'synthetic-key-one');
+    select workflow_private.p4_connection_save('{owner}','local','probe',2,
+      jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m2')),
+      'synthetic-key-two');
+    create temp table probe_secret_ids on commit drop as
+      select substring(content->>'secretRef' from 7)::uuid id
+      from workflow_private.p4_catalog
+      where owner_user_id='{owner}' and ref='probe' and content ? 'secretRef';
+    select workflow_v2_save('{owner}','{workflow}',null,null,
+      jsonb_build_object(
+        'name','Reference Check','revision',1,
+        'nodes',jsonb_build_array(
+          jsonb_build_object(
+            'id','model','type','core.llm',
+            'config',jsonb_build_object(
+              'providerRef','p4:{owner}:probe:1','modelRef','m1',
+              'allowedToolRefs',jsonb_build_array('p4:{owner}:probe:1'))),
+          jsonb_build_object(
+            'id','sub','type','core.subgraph',
+            'config',jsonb_build_object(
+              'graph',jsonb_build_object(
+                'nodes',jsonb_build_array(
+                  jsonb_build_object(
+                    'id','tool','type','core.tool',
+                    'config',jsonb_build_object('toolRef','p4:{owner}:probe:2'))))))),
+        'transitions',jsonb_build_array()),
+      jsonb_build_object(
+        'schemaVersion',1,'workflowId','{workflow}','editorRevision',1,'definitionRevision',1,
+        'nodes',jsonb_build_object(),'edges',jsonb_build_object()),
+      'hash',null);
+    do $$ declare n integer; begin
+      select workflow_private.p4_connection_reference_count('{owner}','probe') into n;
+      if n<>3 then raise exception 'FAILED nested reference count %',n; end if;
+      begin perform workflow_private.p4_connection_delete('{owner}','local','probe',2);
+        raise exception 'FAILED delete with nested references';
+      exception when others then
+        if sqlerrm not like '%CONNECTION_IN_USE%' then raise; end if;
+      end;
+    end $$;
+    update workflow_revisions set definition=jsonb_set(definition,'{{nodes}}','[]'::jsonb)
+      where owner_user_id='{owner}' and workflow_id='{workflow}' and revision=1;
+    do $$ declare result jsonb; begin
+      result:=workflow_private.p4_connection_delete('{owner}','local','probe',2);
+      if (result->>'deleted')::integer<>2 then raise exception 'FAILED all-version delete'; end if;
+      if (result->>'credentialsDeleted')::integer<>2 then raise exception 'FAILED credential cleanup'; end if;
+      if exists(select from workflow_private.p4_catalog where owner_user_id='{owner}' and ref='probe') then
+        raise exception 'FAILED catalog rows remain';
+      end if;
+      if exists(select from vault.secrets where id in (select id from probe_secret_ids)) then
+        raise exception 'FAILED vault secrets remain';
+      end if;
+      if has_function_privilege('authenticated','workflow_private.p4_connection_delete(uuid,text,text,integer)','execute')
+        or has_function_privilege('anon','workflow_private.p4_connection_delete(uuid,text,text,integer)','execute') then
+        raise exception 'FAILED delete privilege exposed';
+      end if;
+    end $$;
+    do $$ begin
+      -- A browser that read a pre-delete version cannot append a stale v3 and
+      -- resurrect the logical connection after all versions were removed.
+      begin
+        perform workflow_private.p4_catalog_save('{owner}','local','connection','probe',3,
+          jsonb_build_object('type','openai-compatible','name','Resurrected','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),false);
+        raise exception 'FAILED stale connection resurrected';
+      exception when others then
+        if sqlerrm not like '%CONNECTION_VERSION_CONFLICT%' then raise; end if;
+      end;
+    end $$;
+    rollback;
+    """)
+
+
+def test_connection_delete_waits_for_an_inflight_workflow_save_and_then_rechecks():
+    import time
+    owner = str(uuid.uuid4())
+    container = os.environ.get("WORKFLOW_LOCAL_DB_CONTAINER", "supabase_db_EduFlow")
+    try:
+        run_sql(f"""
+        insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+        select workflow_private.p4_connection_save('{owner}','local','lock_probe',1,
+          jsonb_build_object('type','openai-compatible','name','Lock Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),
+          '');
+        """)
+        # Hold the shared side of the same lock a definition save takes. The
+        # delete must wait instead of scanning before this transaction ends.
+        holder = subprocess.Popen(
+            ["docker", "exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-qAt"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        holder.stdin.write("begin; select pg_advisory_xact_lock_shared(hashtextextended('workflow:p4:connection-lifecycle',0)); select pg_sleep(2); rollback;\n")
+        holder.stdin.close()
+        time.sleep(0.4)
+        blocked = subprocess.run(
+            ["docker", "exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-qAtc",
+             f"set lock_timeout='300ms'; select workflow_private.p4_connection_delete('{owner}','local','lock_probe',1);"],
+            text=True, capture_output=True, timeout=10,
+        )
+        assert blocked.returncode != 0
+        assert "lock timeout" in (blocked.stderr + blocked.stdout).lower()
+        assert holder.wait(timeout=10) == 0
+        retried = subprocess.run(
+            ["docker", "exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-qAtc",
+             f"select workflow_private.p4_connection_delete('{owner}','local','lock_probe',1);"],
+            text=True, capture_output=True, timeout=10,
+        )
+        assert retried.returncode == 0, retried.stderr
+        assert '"deleted": 1' in retried.stdout
+    finally:
+        run_sql(f"delete from auth.users where id='{owner}';")
+
+
+def _provider_definition(owner, workflow, provider_ref, *, include_provider=True, revision=1):
+    nodes = []
+    if include_provider:
+        nodes.append(f"""jsonb_build_object('id','model','type','core.llm','config',jsonb_build_object(
+          'providerRef','p4:{owner}:{provider_ref}:1','modelRef','m1'))""")
+    return f"""jsonb_build_object(
+      'name','Reference Save','revision',{revision},
+      'nodes',jsonb_build_array({','.join(nodes)}),'transitions',jsonb_build_array())"""
+
+
+def _editor(workflow, revision=1):
+    return f"""jsonb_build_object('schemaVersion',1,'workflowId','{workflow}',
+      'editorRevision',{revision},'definitionRevision',{revision},
+      'nodes',jsonb_build_object(),'edges',jsonb_build_object())"""
+
+
+def test_workflow_save_rejects_connection_deleted_before_stale_save_commit():
+    owner, workflow = str(uuid.uuid4()), "stale-save-" + str(uuid.uuid4())
+    try:
+        run_sql(f"""
+        insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+        select workflow_private.p4_connection_save('{owner}','local','probe',1,
+          jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),'');
+        select workflow_private.p4_connection_delete('{owner}','local','probe',1);
+        """)
+        run_sql(f"""
+        do $$ begin
+          begin
+            perform public.workflow_v2_save('{owner}','{workflow}',null,null,{_provider_definition(owner,workflow,'probe')},{_editor(workflow)},'hash',null,'local');
+            raise exception 'FAILED stale save after delete';
+          exception when others then
+            if sqlerrm not like '%CONNECTION_UNAVAILABLE%' then raise; end if;
+          end;
+        end $$;
+        """)
+        rows = subprocess.run(
+            ["docker", "exec", "-i", os.environ.get("WORKFLOW_LOCAL_DB_CONTAINER", "supabase_db_EduFlow"),
+             "psql", "-U", "postgres", "-d", "postgres", "-qAtc",
+             f"select count(*) from public.workflow_v2_definitions where owner_user_id='{owner}' and workflow_id='{workflow}';"],
+            text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        assert rows == "0"
+    finally:
+        run_sql(f"delete from auth.users where id='{owner}';")
+
+
+def test_committed_workflow_save_reference_blocks_connection_delete():
+    owner, workflow = str(uuid.uuid4()), "save-first-" + str(uuid.uuid4())
+    try:
+        run_sql(f"""
+        insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+        select workflow_private.p4_connection_save('{owner}','local','probe',1,
+          jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),'');
+        select public.workflow_v2_save('{owner}','{workflow}',null,null,{_provider_definition(owner,workflow,'probe')},{_editor(workflow)},'hash',null,'local');
+        """)
+        run_sql(f"""
+        do $$ begin
+          begin perform workflow_private.p4_connection_delete('{owner}','local','probe',1);
+            raise exception 'FAILED delete of committed reference';
+          exception when others then
+            if sqlerrm not like '%CONNECTION_IN_USE%' then raise; end if;
+          end;
+        end $$;
+        """)
+    finally:
+        run_sql(f"""
+        delete from public.workflow_editor_documents where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from public.workflow_revisions where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from public.workflow_v2_definitions where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from auth.users where id='{owner}';
+        """)
+
+
+def test_active_run_blocks_delete_and_run_insert_revalidates_after_delete():
+    owner, workflow, run = str(uuid.uuid4()), "active-run-" + str(uuid.uuid4()), str(uuid.uuid4())
+    try:
+        run_sql(f"""
+        insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+        select workflow_private.p4_connection_save('{owner}','local','probe',1,
+          jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),'');
+        select public.workflow_v2_save('{owner}','{workflow}',null,null,{_provider_definition(owner,workflow,'probe')},{_editor(workflow)},'hash',null,'local');
+        insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot)
+        values('{run}','{owner}','{workflow}',1,'running','d','s','c','local','1','{{}}','{{}}');
+        select public.workflow_v2_save('{owner}','{workflow}',1,1,{_provider_definition(owner,workflow,'probe',include_provider=False,revision=2)},{_editor(workflow,2)},'hash2',null,'local');
+        """)
+        run_sql(f"""
+        do $$ begin
+          begin perform workflow_private.p4_connection_delete('{owner}','local','probe',1);
+            raise exception 'FAILED delete with active run';
+          exception when others then
+            if sqlerrm not like '%CONNECTION_BUSY%' then raise; end if;
+          end;
+        end $$;
+        """)
+        run_sql(f"update public.workflow_live_runs set status='waiting' where run_id='{run}';")
+        run_sql(f"""
+        do $$ begin
+          begin perform workflow_private.p4_connection_delete('{owner}','local','probe',1);
+            raise exception 'FAILED delete with waiting run';
+          exception when others then
+            if sqlerrm not like '%CONNECTION_BUSY%' then raise; end if;
+          end;
+        end $$;
+        """)
+        run_sql(f"update public.workflow_live_runs set status='success',finished_at=now() where run_id='{run}';")
+        run_sql(f"select workflow_private.p4_connection_delete('{owner}','local','probe',1);")
+        run_sql(f"""
+        do $$ begin
+          begin
+            insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot)
+            values(gen_random_uuid(),'{owner}','{workflow}',1,'queued','d','s','c','local','1','{{}}','{{}}');
+            raise exception 'FAILED run insert after connection delete';
+          exception when others then
+            if sqlerrm not like '%CONNECTION_UNAVAILABLE%' then raise; end if;
+          end;
+        end $$;
+        """)
+    finally:
+        run_sql(f"""
+        delete from public.workflow_run_steps where run_id='{run}';
+        delete from public.workflow_run_events where run_id='{run}';
+        delete from public.workflow_run_jobs where run_id='{run}';
+        delete from public.workflow_live_runs where run_id='{run}';
+        delete from public.workflow_editor_documents where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from public.workflow_revisions where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from public.workflow_v2_definitions where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from auth.users where id='{owner}';
+        """)
+
+
+def test_restoring_a_historical_revision_revalidates_the_deleted_connection():
+    owner, workflow = str(uuid.uuid4()), "history-restore-" + str(uuid.uuid4())
+    try:
+        run_sql(f"""
+        insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+        select workflow_private.p4_connection_save('{owner}','local','probe',1,
+          jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),'');
+        select public.workflow_v2_save('{owner}','{workflow}',null,null,{_provider_definition(owner,workflow,'probe')},{_editor(workflow)},'hash1',null,'local');
+        select public.workflow_v2_save('{owner}','{workflow}',1,1,{_provider_definition(owner,workflow,'probe',include_provider=False,revision=2)},{_editor(workflow,2)},'hash2',null,'local');
+        select workflow_private.p4_connection_delete('{owner}','local','probe',1);
+        """)
+        run_sql(f"""
+        do $$ begin
+          begin
+            -- Simulates restoring revision 1 as a new revision after the
+            -- referenced connection was deleted.
+            perform public.workflow_v2_save('{owner}','{workflow}',2,2,{_provider_definition(owner,workflow,'probe',revision=3)},{_editor(workflow,3)},'hash3',null,'local');
+            raise exception 'FAILED historical restore revived deleted connection';
+          exception when others then
+            if sqlerrm not like '%CONNECTION_UNAVAILABLE%' then raise; end if;
+          end;
+        end $$;
+        """)
+    finally:
+        run_sql(f"""
+        delete from public.workflow_editor_documents where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from public.workflow_revisions where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from public.workflow_v2_definitions where owner_user_id='{owner}' and workflow_id='{workflow}';
+        delete from auth.users where id='{owner}';
+        """)
+
+
+def test_save_connection_validation_distinguishes_functions_and_platform_refs():
+    owner = str(uuid.uuid4())
+    function_workflow = "function-ref-" + str(uuid.uuid4())
+    platform_workflow = "platform-ref-" + str(uuid.uuid4())
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select workflow_private.p4_catalog_save('{owner}','local','function','probe',1,
+      jsonb_build_object('name','Probe function','language','python','code','def process(input, context): return {{}}'),false);
+    do $$ begin
+      begin
+        perform public.workflow_v2_save('{owner}','{function_workflow}',null,null,
+          jsonb_build_object('name','Function Ref','revision',1,'nodes',jsonb_build_array(
+            jsonb_build_object('id','model','type','core.llm','config',jsonb_build_object(
+              'providerRef','p4:{owner}:probe:1','modelRef','m1'))),'transitions',jsonb_build_array()),
+          jsonb_build_object('schemaVersion',1,'workflowId','{function_workflow}','editorRevision',1,'definitionRevision',1,
+            'nodes',jsonb_build_object(),'edges',jsonb_build_object()),'hash',null,'local');
+        raise exception 'FAILED function ref accepted as connection';
+      exception when others then
+        if sqlerrm not like '%CONNECTION_UNAVAILABLE%' then raise; end if;
+      end;
+    end $$;
+    select public.workflow_v2_save('{owner}','{platform_workflow}',null,null,
+      jsonb_build_object('name','Platform Refs','revision',1,'nodes',jsonb_build_array(
+        jsonb_build_object('id','model','type','core.llm','config',jsonb_build_object(
+          'providerRef','deepseek','modelRef','deepseek-chat','allowedToolRefs',jsonb_build_array('hn_search'))),
+        jsonb_build_object('id','tool','type','core.tool','config',jsonb_build_object(
+          'toolRef','hn_search','contractDigest','digest'))),'transitions',jsonb_build_array()),
+      jsonb_build_object('schemaVersion',1,'workflowId','{platform_workflow}','editorRevision',1,'definitionRevision',1,
+        'nodes',jsonb_build_object(),'edges',jsonb_build_object()),'hash',null,'local');
+    rollback;
+    """)
+
+
+def test_platform_deepseek_does_not_block_same_named_user_connection_but_real_p4_refs_do():
+    platform_owner = str(uuid.uuid4())
+    platform_workflow = "platform-name-" + str(uuid.uuid4())
+    user_owner = str(uuid.uuid4())
+    user_workflow = "user-name-" + str(uuid.uuid4())
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{platform_owner}','authenticated','authenticated','{platform_owner}@integration.invalid');
+    select workflow_private.p4_connection_save('{platform_owner}','local','deepseek',1,
+      jsonb_build_object('type','deepseek','name','User DeepSeek','baseUrl','https://api.deepseek.com','modelRefs',jsonb_build_array('deepseek-chat')),'');
+    select public.workflow_v2_save('{platform_owner}','{platform_workflow}',null,null,
+      jsonb_build_object('name','Platform DeepSeek','revision',1,'nodes',jsonb_build_array(
+        jsonb_build_object('id','model','type','core.llm','config',jsonb_build_object(
+          'providerRef','deepseek','modelRef','deepseek-chat','allowedToolRefs',jsonb_build_array()))),'transitions',jsonb_build_array()),
+      jsonb_build_object('schemaVersion',1,'workflowId','{platform_workflow}','editorRevision',1,'definitionRevision',1,
+        'nodes',jsonb_build_object(),'edges',jsonb_build_object()),'hash',null,'local');
+    do $$ begin
+      if workflow_private.p4_connection_reference_count('{platform_owner}','deepseek')<>0 then
+        raise exception 'FAILED platform deepseek counted as user connection';
+      end if;
+    end $$;
+    select workflow_private.p4_connection_delete('{platform_owner}','local','deepseek',1);
+    rollback;
+
+    begin;
+    insert into auth.users(id,aud,role,email) values('{user_owner}','authenticated','authenticated','{user_owner}@integration.invalid');
+    select workflow_private.p4_connection_save('{user_owner}','local','deepseek',1,
+      jsonb_build_object('type','deepseek','name','User DeepSeek','baseUrl','https://api.deepseek.com','modelRefs',jsonb_build_array('deepseek-chat')),'');
+    select workflow_private.p4_connection_save('{user_owner}','local','deepseek',2,
+      jsonb_build_object('type','deepseek','name','User DeepSeek','baseUrl','https://api.deepseek.com','modelRefs',jsonb_build_array('deepseek-reasoner')),'');
+    select public.workflow_v2_save('{user_owner}','{user_workflow}',null,null,
+      jsonb_build_object('name','User DeepSeek Refs','revision',1,'nodes',jsonb_build_array(
+        jsonb_build_object('id','platform','type','core.llm','config',jsonb_build_object(
+          'providerRef','deepseek','modelRef','deepseek-chat','allowedToolRefs',jsonb_build_array())),
+        jsonb_build_object('id','model','type','core.llm','config',jsonb_build_object(
+          'providerRef','p4:{user_owner}:deepseek:1','modelRef','deepseek-chat',
+          'allowedToolRefs',jsonb_build_array('p4:{user_owner}:deepseek:1'))),
+        jsonb_build_object('id','sub','type','core.subgraph','config',jsonb_build_object(
+          'graph',jsonb_build_object('nodes',jsonb_build_array(
+            jsonb_build_object('id','tool','type','core.tool','config',jsonb_build_object(
+              'toolRef','p4:{user_owner}:deepseek:2'))))))),'transitions',jsonb_build_array()),
+      jsonb_build_object('schemaVersion',1,'workflowId','{user_workflow}','editorRevision',1,'definitionRevision',1,
+        'nodes',jsonb_build_object(),'edges',jsonb_build_object()),'hash',null,'local');
+    do $$ begin
+      if workflow_private.p4_connection_reference_count('{user_owner}','deepseek')<>3 then
+        raise exception 'FAILED real p4 refs not counted';
+      end if;
+      begin perform workflow_private.p4_connection_delete('{user_owner}','local','deepseek',2);
+        raise exception 'FAILED delete with real p4 refs';
+      exception when others then
+        if sqlerrm not like '%CONNECTION_IN_USE%' then raise; end if;
+      end;
     end $$;
     rollback;
     """)

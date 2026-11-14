@@ -81,6 +81,20 @@ describe("Workflow request failures", () => {
     expect(rejection.details).toBe(details); expect(rejection.message).toBe("Internal English detail");
   });
 
+  it("sends the selected environment with a definition save", async () => {
+    request.mockResolvedValueOnce({ workflowId: "workflow", revision: 2, editorRevision: 2 });
+    await new WorkflowApiV2().save({ workflowId: "workflow" } as never, {} as never, 1, 1, "local");
+    expect(request.mock.calls[0][0]).toContain("resource=definitions");
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ definition: { workflowId: "workflow" }, editor: {}, baseRevision: 1, baseEditorRevision: 1, environmentRef: "local" });
+  });
+
+  it("gives deleted connections and active-run deletion a recoverable next step", () => {
+    expect(workflowErrorMessage(new ApiRequestError("CONNECTION_UNAVAILABLE", "gone", 409))).toContain("刷新资源");
+    expect(workflowErrorMessage(new ApiRequestError("CONNECTION_BUSY", "busy", 409))).toContain("等待运行结束或取消运行");
+    expect(workflowErrorMessage(new ApiRequestError("INVALID_CONNECTION_REFERENCE", "bad", 400))).toContain("重新选择连接");
+    expect(workflowErrorMessage(new ApiRequestError("INVALID_CONNECTION_REFERENCE", "bad", 400))).toContain("打开原工作流");
+  });
+
   it("distinguishes a save revision conflict from an Assignment state conflict", () => {
     expect(workflowErrorMessage(new ApiRequestError("REVISION_CONFLICT", "Conflict", 409))).toContain("保存冲突");
     const message = workflowErrorMessage(new ApiRequestError("ASSIGNMENT_STATE_CONFLICT", "Conflict", 409));

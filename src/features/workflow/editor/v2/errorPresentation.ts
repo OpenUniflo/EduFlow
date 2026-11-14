@@ -88,6 +88,9 @@ function baseTitle(error: WorkflowExecutionError): { title: string; actions: Err
   if (error.code === "INVALID_STATE_UPDATE" && error.actualType && error.field) return { title: "写入的数据类型不符", actions: [{ label: `把字段改为${error.actualLabel ?? "新类型"}`, hint: "fix-field-type" }, { label: "定位字段", hint: "field" }] };
   if (error.code === "INVALID_STATE_UPDATE" || error.code === "INVALID_NODE_OUTPUT") return { title: "写入数据不符合要求", actions: [{ label: "定位出错字段", hint: "field" }] };
   if (error.code === "INVALID_NODE_INPUT") return { title: "节点输入不符合要求", actions: [{ label: "定位出错字段", hint: "field" }] };
+  if (["MCP_AUTH_REQUIRED", "MCP_CONNECTION_FAILED", "MCP_CONNECTION_DISABLED", "CONNECTOR_FORBIDDEN", "CONNECTOR_UNAVAILABLE"].includes(error.code)) {
+    return { title: "MCP 连接不可用", actions: [{ label: "检查 MCP 连接", hint: "tool-settings" }, { label: "重新运行", hint: "run" }] };
+  }
   if (error.code.startsWith("TOOL") || error.code.startsWith("HTTP_TOOL") || error.code.startsWith("MCP_TOOL")) {
     return { title: "工具请求失败", actions: [{ label: "检查工具设置", hint: "tool-settings" }, { label: "重新运行", hint: "run" }] };
   }
@@ -123,9 +126,11 @@ export function presentExecutionError(error: WorkflowExecutionError | undefined,
   const base = baseTitle(error);
   const modelFailure = ["MODEL_REQUEST_FAILED", "MODEL_ADAPTER_FAILED", "MODEL_FORBIDDEN", "MODEL_TIMEOUT", "MODEL_STREAM_INTERRUPTED", "MODEL_OUTPUT_TRUNCATED"].includes(error.code);
   const toolFailure = error.code.startsWith("TOOL") || error.code.startsWith("HTTP_TOOL") || error.code.startsWith("MCP_TOOL");
+  const mcpFailure = ["MCP_AUTH_REQUIRED", "MCP_CONNECTION_FAILED", "MCP_CONNECTION_DISABLED", "CONNECTOR_FORBIDDEN", "CONNECTOR_UNAVAILABLE"].includes(error.code);
   const message = writeMismatchMessage(error)
     ?? (error.reason ? executionErrorReason(error)
     : modelFailure ? "模型服务暂时不可用，请检查模型设置与网络连接。"
+    : mcpFailure ? "MCP 连接授权失效或不可用。请在资源中心检查连接或重新授权后重试。"
     : toolFailure ? "工具服务暂时不可用，请检查工具设置与网络连接。"
     : reasonForBinding(error));
   const savedAt = options.savedAt ? new Date(options.savedAt) : undefined;

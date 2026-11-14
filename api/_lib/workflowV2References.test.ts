@@ -323,6 +323,37 @@ describe("variable configuration", () => {
   });
 });
 
+describe("provider lifecycle endpoints", () => {
+  const body = (action: string, extra: Row = {}) => ({
+    environmentRef: "local-env", action, kind: "connection", ref: "price", version: 2, ...extra,
+  });
+
+  it("blocks deletion while a current Workflow still references the connection", async () => {
+    const { client } = mockClient([{ workflowId: "wf-a", currentRevision: 4, definition: { name: "流程 A", revision: 4, nodes: [{ id: "model", label: "模型", type: "core.llm", config: { providerRef: "p4:owner:price:2" } }] } }]);
+    await expect(handleWorkflowV2(request("POST", "extensions", {}, body("delete")), vercelResponse().response, "owner", client))
+      .rejects.toMatchObject({ status: 409, code: "CONNECTION_IN_USE", details: { referenceCount: 1, workflowCount: 1 } });
+    expect(dependencies.compiler).not.toHaveBeenCalled();
+  });
+
+  it("delegates deletion to the Worker after the owner-scoped reference scan is clear", async () => {
+    const { client } = mockClient([]);
+    dependencies.compiler.mockResolvedValue({ ref: "price", deleted: 2, version: 2 });
+    const state = vercelResponse();
+    await handleWorkflowV2(request("POST", "extensions", {}, body("delete")), state.response, "owner", client);
+    expect(dependencies.compiler).toHaveBeenCalledWith("/v1/extensions", { ...body("delete"), ownerId: "owner" });
+    expect(state.output()).toEqual({ ref: "price", deleted: 2, version: 2 });
+  });
+
+  it("passes rename and restore through without changing the stable ref", async () => {
+    const { client } = mockClient([]);
+    dependencies.compiler.mockResolvedValue({ ok: true });
+    await handleWorkflowV2(request("POST", "extensions", {}, body("rename", { version: 3, content: { name: "Team Gateway" } })), vercelResponse().response, "owner", client);
+    await handleWorkflowV2(request("POST", "extensions", {}, body("restore", { version: 3 })), vercelResponse().response, "owner", client);
+    expect(dependencies.compiler).toHaveBeenNthCalledWith(1, "/v1/extensions", { ...body("rename", { version: 3, content: { name: "Team Gateway" } }), ownerId: "owner" });
+    expect(dependencies.compiler).toHaveBeenNthCalledWith(2, "/v1/extensions", { ...body("restore", { version: 3 }), ownerId: "owner" });
+  });
+});
+
 describe("extension test response", () => {
   it("passes Worker test fields through without trimming models, tools or preview", async () => {
     const result = { ok: true, elapsedMs: 321, status: 200, preview: "{\"answer\":42}", models: ["deepseek-chat", "deepseek-reasoner"], tools: [{ name: "lookup", description: "查询价格" }] };

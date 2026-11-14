@@ -145,6 +145,64 @@ describe("provider editor", () => {
     });
   });
 
+  it("edits only the display name while keeping the stable ref and saved key", async () => {
+    const { tree: initial } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(input(initial, "供应商显示名称").props.value).toBe("团队网关");
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "团队网关（生产）" } });
+    const afterName = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(textOf(afterName.tree)).toContain("team_gateway");
+    const save = saveButton(afterName.tree);
+    expect(save.props.disabled).toBe(false);
+    (save.props.onClick as () => void)();
+    await flush();
+    expect(api.extension).toHaveBeenCalledWith("local", expect.objectContaining({
+      action: "publish", kind: "connection", ref: "team_gateway", version: 2, credential: "",
+      content: expect.objectContaining({ name: "团队网关（生产）", modelRefs: ["team-model"] }),
+    }));
+  });
+
+  it("lets a new provider set its display name without changing the preset ref", async () => {
+    const { tree: initial, onSaved, onClose } = render({ kind: "provider", mode: "create", presetId: "deepseek" });
+    expect(input(initial, "供应商显示名称").props.value).toBe("DeepSeek");
+    expect(textOf(initial)).toContain("deepseek");
+
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "  团队 DeepSeek  " } });
+    (input(initial, "模型 API Key").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "sk-create" } });
+    const after = render({ kind: "provider", mode: "create", presetId: "deepseek" }, onSaved, onClose);
+    expect(input(after.tree, "供应商显示名称").props.value).toBe("  团队 DeepSeek  ");
+    const save = saveButton(after.tree);
+    expect(save.props.disabled).toBe(false);
+    (save.props.onClick as () => void)();
+    await flush();
+    expect(api.extension).toHaveBeenCalledWith("local", expect.objectContaining({
+      action: "publish", kind: "connection", ref: "deepseek", version: 1, credential: "sk-create",
+      content: expect.objectContaining({ name: "团队 DeepSeek", type: "deepseek", modelRefs: ["deepseek-flash", "deepseek-reasoner"] }),
+    }));
+    expect(onSaved).toHaveBeenCalledWith("deepseek", 1, expect.objectContaining({ name: "团队 DeepSeek" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("blocks a blank name on a new provider too", () => {
+    const { tree: initial } = render({ kind: "provider", mode: "create", presetId: "deepseek" });
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "   " } });
+    const blank = render({ kind: "provider", mode: "create", presetId: "deepseek" });
+    expect(textOf(blank.tree)).toContain("请填写显示名称");
+    expect(saveButton(blank.tree).props.disabled).toBe(true);
+  });
+
+  it("blocks an empty or over-long display name", () => {
+    const { tree: initial } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: " " } });
+    const empty = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(textOf(empty.tree)).toContain("请填写显示名称");
+    expect(saveButton(empty.tree).props.disabled).toBe(true);
+
+    (input(empty.tree, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "x".repeat(121) } });
+    const tooLong = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(textOf(tooLong.tree)).toContain("显示名称应为 1–120 个字符");
+    expect(saveButton(tooLong.tree).props.disabled).toBe(true);
+  });
+
   it("writes an edited existing address into the next version", async () => {
     const { tree: initial, onSaved, onClose } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
     expect(input(initial, "模型 Base URL").props.value).toBe("https://old.example.com/v1");

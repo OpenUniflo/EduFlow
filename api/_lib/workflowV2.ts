@@ -9,13 +9,15 @@ import { readAssignmentEligibility } from "./assignmentEligibility.js";
 import { connectionReferenceRows, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References.js";
 import { cleanVariableOverrides, configurationSaveIssue, configurationSaveSchema, frozenVariableEnvironment, normalizeConfiguration, resolveDefaultEnvironmentId, withFrozenVariableEnvironment } from "./workflowVariableEnvironments.js";
 import { dispatchQueuedWorkflow } from "./workflowQueue.js";
+import { readMcpMarket, removeAdminMarketServer, supplementMcpMarketServer, syncMcpMarket } from "./mcpRegistry.js";
+import { discoverMcpOAuth, startMcpOAuth } from "./mcpAuth.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
 function result<T>(query: Result<T>): T {
   if (query.error) {
     const message = query.error.message;
-    const code = ["REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_ARCHIVED", "WORKFLOW_BUSY", "SOURCE_CHANGED", "RUN_QUOTA_EXCEEDED", "LAUNCH_CONTEXT_CHANGED", "THREAD_QUOTA_EXCEEDED", "THREAD_STATE_CONFLICT", "THREAD_NOT_RESUMABLE", "WAIT_EXPIRED", "INTERRUPT_ID_CONFLICT", "INVALID_CONFIGURATION", "VARIABLE_ENVIRONMENT_NOT_FOUND", "NOT_FOUND"].find((code) => message.includes(code));
-    if (code) throw new ApiError(code === "NOT_FOUND" ? 404 : ["INVALID_CONFIGURATION", "VARIABLE_ENVIRONMENT_NOT_FOUND"].includes(code) ? 400 : ["RUN_QUOTA_EXCEEDED","THREAD_QUOTA_EXCEEDED"].includes(code) ? 429 : 409, code, code.split("_").join(" "));
+    const code = ["REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_ARCHIVED", "WORKFLOW_BUSY", "SOURCE_CHANGED", "RUN_QUOTA_EXCEEDED", "LAUNCH_CONTEXT_CHANGED", "THREAD_QUOTA_EXCEEDED", "THREAD_STATE_CONFLICT", "THREAD_NOT_RESUMABLE", "WAIT_EXPIRED", "INTERRUPT_ID_CONFLICT", "INVALID_CONFIGURATION", "VARIABLE_ENVIRONMENT_NOT_FOUND", "CONNECTION_UNAVAILABLE", "CONNECTION_BUSY", "INVALID_CONNECTION_REFERENCE", "NOT_FOUND"].find((code) => message.includes(code));
+    if (code) throw new ApiError(code === "NOT_FOUND" ? 404 : ["INVALID_CONFIGURATION", "VARIABLE_ENVIRONMENT_NOT_FOUND", "INVALID_CONNECTION_REFERENCE"].includes(code) ? 400 : ["RUN_QUOTA_EXCEEDED","THREAD_QUOTA_EXCEEDED"].includes(code) ? 429 : 409, code, code.split("_").join(" "));
     throw new ApiError(500, "WORKFLOW_STORAGE_ERROR", "Workflow persistence request failed");
   }
   return query.data as T;
@@ -85,7 +87,7 @@ function libraryName(value: unknown) {
   if (!name || name.length > 120) throw new ApiError(400, "INVALID_NAME", "Name must contain 1 to 120 characters");
   return name;
 }
-async function saveCreation(client: SupabaseClient, owner: string, definition: WorkflowRow, editor: WorkflowRow, hash: unknown, provenance: WorkflowRow = {}) {
+async function saveCreation(client: SupabaseClient, owner: string, definition: WorkflowRow, editor: WorkflowRow, hash: unknown, provenance: WorkflowRow = {}, environmentRef?: string) {
   const workflowId = String(definition.workflowId);
   const creationHash = await workflowDigest({ definition, editor });
   async function previous() {
@@ -95,7 +97,7 @@ async function saveCreation(client: SupabaseClient, owner: string, definition: W
     return { workflowId, revision: existing.current_revision, editorRevision: existing.editor_revision };
   }
   const replay = await previous(); if (replay) return replay;
-  try { return await rpc(client,"workflow_v2_save",{p_owner:owner,p_workflow:workflowId,p_base:null,p_editor_base:null,p_definition:definition,p_editor:editor,p_definition_hash:hash,p_provenance:{...provenance,creationHash}}); }
+  try { return await rpc(client,"workflow_v2_save",{p_owner:owner,p_workflow:workflowId,p_base:null,p_editor_base:null,p_definition:definition,p_editor:editor,p_definition_hash:hash,p_provenance:{...provenance,creationHash},p_environment:environmentRef}); }
   catch (error) { if (error instanceof ApiError && error.code === "REVISION_CONFLICT") { const receipt = await previous(); if (receipt) return receipt; } throw error; }
 }
 async function liveRun(client: SupabaseClient, owner: string, id: string) {
@@ -189,9 +191,57 @@ async function validateLaunch(client: SupabaseClient, owner: string, workflowId:
   return { context, workflowInput: assignment.workflow_input === null || assignment.workflow_input === undefined ? undefined : assignment.workflow_input };
 }
 
+/** Administrator authority is read from the server-side profile, never from a request claim. */
+async function mcpAdministrator(client: SupabaseClient, owner: string) {
+  const row = result(await client.from("profiles").select("role,capabilities").eq("id", owner).maybeSingle()) as WorkflowRow | null;
+  return row?.role === "admin" || (Array.isArray(row?.capabilities) && row.capabilities.includes("global-domain-admin"));
+}
+
 export async function handleWorkflowV2(request: VercelRequest, response: VercelResponse, owner: string, userClient?: SupabaseClient) {
   const resource = queryString(request, "resource"); if (!resource) return false;
   const op = queryString(request, "op"); const id = queryString(request, "id"); const client = createServerSupabase();
+  if (resource === "mcp-market") {
+    if (request.method === "GET" && (request.query.view ?? "catalog") === "catalog") {
+      const market = await readMcpMarket({ query: queryString(request, "q"), category: queryString(request, "category"), page: Number(queryString(request, "page") ?? 1), limit: Number(queryString(request, "limit") ?? 120) });
+      json(response, 200, { ...market, canAdmin: await mcpAdministrator(client, owner) }); return true;
+    }
+    if (request.method === "POST") {
+      const body = workflowStrictBody(request.body, ["action", "maxPages", "title", "name", "description", "url", "category", "sourceId", "transport", "authHint", "version", "iconUrl", "websiteUrl", "repositoryUrl", "featured", "id"], ["action"]);
+      if (body.action === "sync") {
+        const admin = await mcpAdministrator(client, owner);
+        const maxPages = admin && body.maxPages !== undefined ? Math.max(1, Math.min(Number(body.maxPages) || 4, 20)) : 4;
+        json(response, 200, await syncMcpMarket({ maxPages })); return true;
+      }
+      if (!await mcpAdministrator(client, owner)) throw new ApiError(403, "MCP_MARKET_ADMIN_REQUIRED", "仅管理员可以维护补充目录");
+      if (body.action === "supplement") { json(response, 200, await supplementMcpMarketServer(body)); return true; }
+      if (body.action === "remove") { await removeAdminMarketServer(workflowString(body.id)); json(response, 200, { ok: true }); return true; }
+      throw new ApiError(400, "INVALID_MARKET_ACTION", "未知的 MCP 目录操作");
+    }
+    throw new ApiError(405, "METHOD_NOT_ALLOWED", "Unsupported MCP market operation");
+  }
+  if (resource === "mcp-auth" && request.method === "POST" && op === "discover") {
+    const body = workflowStrictBody(request.body, ["url", "resourceMetadataUrl"], ["url"]);
+    json(response, 200, await discoverMcpOAuth({
+      url: workflowString(body.url),
+      ...(body.resourceMetadataUrl === undefined ? {} : { resourceMetadataUrl: workflowString(body.resourceMetadataUrl) }),
+    })); return true;
+  }
+  if (resource === "mcp-auth" && request.method === "POST" && op === "start") {
+    const body = workflowStrictBody(request.body, ["environmentRef", "ref", "version", "name", "url", "transport", "sourceId", "serverTitle", "returnTo", "scopes", "resourceMetadataUrl"], ["environmentRef", "ref", "version", "name", "url"]);
+    const scopes = body.scopes === undefined ? undefined : Array.isArray(body.scopes) ? body.scopes.map((item) => workflowString(item)) : null;
+    if (scopes === null) throw new ApiError(400, "MCP_OAUTH_SCOPE", "授权范围无效");
+    json(response, 200, await startMcpOAuth({
+      request, ownerId: owner, environmentRef: workflowString(body.environmentRef), ref: workflowString(body.ref),
+      version: workflowInteger(body.version), name: workflowString(body.name), url: workflowString(body.url),
+      transport: body.transport === "sse" ? "sse" : "streamable-http",
+      sourceId: body.sourceId === undefined ? undefined : workflowString(body.sourceId),
+      serverTitle: body.serverTitle === undefined ? undefined : workflowString(body.serverTitle),
+      returnTo: body.returnTo === undefined ? undefined : workflowString(body.returnTo),
+      ...(scopes === undefined ? {} : { scopes }),
+      ...(body.resourceMetadataUrl === undefined ? {} : { resourceMetadataUrl: workflowString(body.resourceMetadataUrl) }),
+    })); return true;
+  }
+
   if (resource === "capabilities" && request.method === "GET") { json(response, 200, await workflowCompiler("/capabilities")); return true; }
   if (resource === "templates" && request.method === "GET") {
     const requestedPurpose = queryString(request, "purpose");
@@ -227,8 +277,20 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     }
     if(request.method === "GET") json(response,200,await workflowCompiler("/v1/extensions",{ownerId:owner,environmentRef:workflowString(queryString(request,"environmentRef"))}));
     else if(request.method === "POST") {
-      const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect","testModel","testMessage"],["environmentRef","action","kind","ref","version"]);
-      workflowString(body.environmentRef);json(response,200,await workflowCompiler("/v1/extensions",{...body,ownerId:owner}));
+      const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect","testModel","testMessage"],["environmentRef","action","kind",...(request.body?.action==="inspect"?["content"]:["ref","version"])]);
+      workflowString(body.environmentRef);if(body.action!=="inspect")workflowString(body.ref);
+      if(body.action==="delete" && body.kind==="connection") {
+        // Fast owner-scoped preflight that returns actionable reference rows.
+        // The Worker repeats this check inside the deleting transaction, where
+        // it is serialized with definition saves; this scan is not authority.
+        const references=connectionReferenceRows(await loadReferenceWorkflows(userClient??client,owner),body.ref);
+        if(references.length) throw new ApiError(409,"CONNECTION_IN_USE","This connection is referenced by a current Workflow",{
+          referenceCount:references.length,
+          workflowCount:new Set(references.map(row=>row.workflowId)).size,
+          references:references.slice(0,50),
+        });
+      }
+      json(response,200,await workflowCompiler("/v1/extensions",{...body,ownerId:owner}));
     } else throw new ApiError(405,"METHOD_NOT_ALLOWED","Unsupported extension operation");
     return true;
   }
@@ -286,6 +348,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const existing = body.fresh === true ? null : result(await client.from("workflow_v2_definitions").select("workflow_id,current_revision").eq("owner_user_id",owner).eq("workflow_id",templateId).maybeSingle()) as WorkflowRow | null;
       if(existing) { json(response,200,{workflowId:templateId,revision:existing.current_revision}); return true; }
       const definition: WorkflowRow = { ...workflowObject(template.definition), workflowId, revision:1, ...(body.name !== undefined ? {name:libraryName(body.name)} : {}) };
+      const saveEnvironment = body.environmentRef === undefined ? undefined : workflowString(body.environmentRef);
       const bindings = z.array(z.object({
         nodeId: z.string().min(1).max(200),
         graphPath: z.array(z.string().max(200)).max(8),
@@ -315,7 +378,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const nodes = boundDefinition.nodes as WorkflowRow[];
       const editor = { schemaVersion:1,workflowId,editorRevision:1,definitionRevision:1,nodes:Object.fromEntries(nodes.map((node,index)=>[String(node.id),{x:80+index*280,y:180}])),edges:{} };
       const validation = await workflowCompiler("/v1/document",{definition:boundDefinition});
-      json(response,201,await saveCreation(client,owner,boundDefinition,editor,validation.definitionHash,{sourceTemplateId:templateId,sourceTemplatePurpose:template.purpose,libraryGroup:"general"})); return true;
+      json(response,201,await saveCreation(client,owner,boundDefinition,editor,validation.definitionHash,{sourceTemplateId:templateId,sourceTemplatePurpose:template.purpose,libraryGroup:"general"},saveEnvironment)); return true;
     }
     if (request.method === "GET" && op === "library") {
       const params = z.object({search:z.string().max(200),scope:z.enum(["all","personal","course"]),sort:z.enum(["updated","name"]),page:z.coerce.number().int().min(1).max(1000000),pageSize:z.coerce.number().int().min(1).max(48)}).safeParse({search:queryString(request,"search")??"",scope:queryString(request,"scope")??"all",sort:queryString(request,"sort")??"updated",page:queryString(request,"page")??1,pageSize:queryString(request,"pageSize")??12});
@@ -372,7 +435,9 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       json(response, 201, body.creationId !== undefined ? await saveCreation(client,owner,definition,editor,hash,provenance) : await rpc(client, "workflow_v2_save", { p_owner: owner, p_workflow: workflowId, p_base: null, p_editor_base: null, p_definition: definition, p_editor: editor, p_definition_hash: hash, p_provenance: provenance })); return true;
     }
     if (["POST", "PUT"].includes(request.method ?? "")) {
-      const create = request.method === "POST"; const body = workflowStrictBody(request.body, ["definition", "editor", "baseRevision", "baseEditorRevision", "creationId"], ["definition", "editor", ...(create ? [] : ["baseRevision", "baseEditorRevision"])]);
+      const create = request.method === "POST"; const body = workflowStrictBody(request.body, ["definition", "editor", "baseRevision", "baseEditorRevision", "creationId", "environmentRef"], ["definition", "editor", ...(create ? [] : ["baseRevision", "baseEditorRevision"])]);
+      const saveEnvironment = body.environmentRef === undefined ? undefined : workflowString(body.environmentRef);
+      if (!create && !saveEnvironment) throw new ApiError(400, "ENVIRONMENT_REQUIRED", "Choose the environment that owns the referenced connections before saving");
       const definition = workflowObject(body.definition); const editor = workflowObject(body.editor); const workflowId = create ? (body.creationId !== undefined ? workflowUuid(body.creationId) : workflowNewId()) : workflowString(id);
       if (!create && definition.workflowId !== workflowId) throw new ApiError(400, "IDENTITY_MISMATCH", "Workflow identity mismatch");
       if (JSON.stringify(definition) !== JSON.stringify(workflowSecretProjection(definition))) throw new ApiError(400, "SECRET_IN_DEFINITION", "Secret values cannot be stored in a Workflow definition");
@@ -380,7 +445,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const saved = { ...definition, name: libraryName(definition.name), workflowId, revision: next }; const validation = await workflowCompiler("/v1/document", { definition: saved });
       const previous = create ? undefined : (await readWorkflowDocument(client, owner, workflowId)).editor;
       validateWorkflowEditor(editor, saved, previous);
-      json(response, create ? 201 : 200, create ? await saveCreation(client,owner,saved,editor,validation.definitionHash) : await rpc(client, "workflow_v2_save", { p_owner: owner, p_workflow: workflowId, p_base: create ? null : body.baseRevision, p_editor_base: create ? null : workflowInteger(body.baseEditorRevision), p_definition: saved, p_editor: editor, p_definition_hash: validation.definitionHash })); return true;
+      json(response, create ? 201 : 200, create ? await saveCreation(client,owner,saved,editor,validation.definitionHash,{},saveEnvironment) : await rpc(client, "workflow_v2_save", { p_owner: owner, p_workflow: workflowId, p_base: body.baseRevision, p_editor_base: workflowInteger(body.baseEditorRevision), p_definition: saved, p_editor: editor, p_definition_hash: validation.definitionHash, p_environment: saveEnvironment })); return true;
     }
   }
   if (resource === "editor" && request.method === "PUT" && id) {

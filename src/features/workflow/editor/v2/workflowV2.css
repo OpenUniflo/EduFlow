@@ -1214,6 +1214,14 @@ main.atlas-page-shell.wf-library-page{padding:0}
   .wf-start-blank{width:100%;margin-top:12px}
 }
 
+/* On narrow screens the full-width inspector is the modal workspace; the floating
+   Assistant trigger must not cover its bottom save/retry actions. */
+@media(max-width:900px){
+  .wf-v2-inspector[data-tab="evaluation"] .wf-v2-inspector-scroll{padding-bottom:calc(104px + env(safe-area-inset-bottom));scroll-padding-bottom:104px}
+  .wf-eval-settings-actions{padding-bottom:calc(var(--sp-12) + env(safe-area-inset-bottom))}
+  .wf-eval-report .wf-eval-actions{padding-bottom:calc(var(--sp-12) + env(safe-area-inset-bottom))}
+}
+
 /* Narrow-screen chrome: the actual global Assistant lives outside .wf-unified,
    and the fixed learner nav owns the bottom safe area. Never let either cover
    the evaluation form, history dock or report actions. */

@@ -156,7 +156,7 @@ async def stream_model(execution,model,messages):
         except Exception:pass
         raise
 
-async def load(owner,thread,registry):
+async def load(owner,thread,registry,*,allow_stale=False):
     from .storage import Storage
     data=await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p5_read',owner,'thread',thread)
     t=data['thread'];definition=data['definition'];env=registry.environment(t['snapshot']['environment_ref'],owner)
@@ -167,9 +167,10 @@ async def load(owner,thread,registry):
     if data['archived']:fail('WORKFLOW_ARCHIVED','Workflow is archived')
     from .compiler import compile_definition
     accepted=compile_definition(definition,registry.snapshot(env))
-    if not accepted['valid'] or accepted['compileFingerprint']!=t['snapshot']['compile_fingerprint']:fail('COMPILE_FINGERPRINT_CHANGED','Execution version or authorization changed','auth')
+    eligible=accepted['valid'] and accepted['compileFingerprint']==t['snapshot']['compile_fingerprint']
+    if not eligible and not allow_stale:fail('COMPILE_FINGERPRINT_CHANGED','Execution version or authorization changed','auth')
     if datetime.now(timezone.utc)-datetime.fromisoformat(t['updated_at'])>__import__('datetime').timedelta(days=7):fail('THREAD_EXPIRED','Thread retention has expired')
-    return data,env
+    return data,env,eligible
 
 def config(t,namespace='',checkpoint=None):
     return {'configurable':{'thread_id':str(t),'checkpoint_ns':namespace,**({'checkpoint_id':checkpoint} if checkpoint else {})}}
@@ -261,7 +262,31 @@ async def operation(body,registry):
     owner=body['ownerId'];action=body.get('action');storage=Storage(os.environ['WORKFLOW_DATABASE_URL'])
     if action=='threads':
         items=await storage.call('p5_read',owner,'threads',body['workflowId'])
-        return {'items':items,'limits':LIMITS}
+        annotated=[]
+        for item in items:
+            row={**item,'resumable':False,'blockedCode':None,'blockedReason':None}
+            status=item.get('status')
+            if status in ('waiting','active'):
+                row['resumable']=status=='waiting'
+                row['blockedReason']=None if status=='waiting' else '会话正在执行；请等待本轮结束'
+                annotated.append(row);continue
+            try:
+                data,_,eligible=await load(owner,item['thread_id'],registry,allow_stale=True)
+                t=data['thread'];run=data.get('run') or {}
+                if not eligible:
+                    row.update(blockedCode='COMPILE_FINGERPRINT_CHANGED',blockedReason='执行版本或授权已变化，只能只读查看历史检查点')
+                elif t.get('last_error'):
+                    row.update(blockedCode='THREAD_STATE',blockedReason='上一轮存在未完成或失败状态，不能直接继续')
+                elif run.get('status')!='success':
+                    row.update(blockedCode='THREAD_STATE',blockedReason='上一轮尚未成功完成，不能直接继续')
+                elif int(t.get('round_number') or 0)>=LIMITS['rounds']:
+                    row.update(blockedCode='ROUND_BUDGET_EXCEEDED',blockedReason='会话已达到轮次上限')
+                else:
+                    row['resumable']=True
+            except ExecutionError as error:
+                row.update(blockedCode=error.code,blockedReason='会话不可继续：'+str(error))
+            annotated.append(row)
+        return {'items':annotated,'limits':LIMITS}
     if action in ('memory.list','memory.put','memory.delete'):
         from .registry import requested_variable_environment
         env=registry.environment(body['environmentRef'],owner,requested_variable_environment(body))
@@ -291,7 +316,8 @@ async def operation(body,registry):
                 result=await memory_write(conn,ns,key,body.get('value'),body['expectedVersion'],'put' if action=='memory.put' else 'delete',ttl)
                 await conn.execute('insert into workflow_private.p5_requests(owner_user_id,key,hash,result) values(%s,%s,%s,%s)',(owner,request_key,hash_,Jsonb(result)))
                 return result
-    data,env=await load(owner,body['threadId'],registry);t=data['thread'];d=data['definition']
+    allow_stale=body.get('action')=='history'
+    data,env,fingerprint_ok=await load(owner,body['threadId'],registry,allow_stale=allow_stale);t=data['thread'];d=data['definition']
     if action=='next':
         value=body['input'];assert_no_secrets(value,env);validate_value(d['inputSchema'],value,'INVALID_RUN_INPUT')
         if len(canonical(value))>d['policy']['maxInputBytes']:fail('INPUT_TOO_LARGE','Input exceeds budget')
@@ -310,7 +336,8 @@ async def operation(body,registry):
             scope_items=[]
             for row in scopes:
                 _,path=scope_definition(d,row['checkpoint_ns']);scope_items.append({'namespace':row['checkpoint_ns'],'graphPath':path})
-            return {'interface':{'inputSchema':d['inputSchema'],'stateSchema':sd['state']['schema'],'nodes':[{'id':n['id'],'label':n['label']} for n in sd['nodes']]},'scopes':scope_items,'items':records[:20],'nextCursor':records[19]['checkpointId'] if len(records)>20 else None,'thread':{k:v for k,v in t.items() if k not in ('snapshot','launch_context')}}
+            blocked=None if fingerprint_ok else {'code':'COMPILE_FINGERPRINT_CHANGED','reason':'执行版本或授权已变化，只能只读查看历史检查点；继续、分支和恢复不会绕过版本校验。'}
+            return {'interface':{'inputSchema':d['inputSchema'],'stateSchema':sd['state']['schema'],'nodes':[{'id':n['id'],'label':n['label']} for n in sd['nodes']]},'scopes':scope_items,'items':records[:20],'nextCursor':records[19]['checkpointId'] if len(records)>20 else None,'thread':{k:v for k,v in t.items() if k not in ('snapshot','launch_context')},'readOnly':blocked is not None,'blockedCode':blocked['code'] if blocked else None,'blockedReason':blocked['reason'] if blocked else None}
         if action=='prepare':
             # An already accepted preview remains idempotent when new-start
             # preconditions (active source or uncertain effects) later change.

@@ -59,20 +59,25 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     const value = typeof update === "function" ? update(environmentChoice.current) : update;
     environmentChoice.current = value; publishEnvironment(value);
   }
-  function changeEnvironment(value: string) { setEnvironmentRef(value); edits.current += 1; setDiagnostics([]); setNotice(""); }
+  function changeEnvironment(value: string) { setEnvironmentRef(value); setToolsLoaded(false); setToolsError(""); edits.current += 1; setDiagnostics([]); setNotice(""); }
   const [tools, setTools] = useState<WorkflowTool[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
+  const [toolsLoaded, setToolsLoaded] = useState(false);
+  const [toolsError, setToolsError] = useState("");
   const toolsRequest = useRef(0);
   const loadTools = useCallback(async (ref: string) => {
     const request = toolsRequest.current + 1;
     toolsRequest.current = request;
-    if (!ref) { setTools([]); setToolsLoading(false); return; }
-    setToolsLoading(true);
+    if (!ref) { setTools([]); setToolsLoading(false); setToolsLoaded(false); setToolsError(""); return; }
+    setToolsLoading(true); setToolsLoaded(false); setToolsError("");
     try {
       const data = await workflowApiV2.tools(ref);
-      if (request === toolsRequest.current) setTools(data.items);
+      if (request === toolsRequest.current) { setTools(data.items); setToolsLoaded(true); }
     } catch (reason) {
-      if (request === toolsRequest.current) setError(workflowErrorMessage(reason));
+      if (request === toolsRequest.current) {
+        const message = workflowErrorMessage(reason);
+        setToolsError(message); setError(message);
+      }
     } finally {
       if (request === toolsRequest.current) setToolsLoading(false);
     }
@@ -226,6 +231,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [runId, activeWorkflowId, observationEpoch]);
 
+
   function publish(snapshot: EditorSnapshot) {
     setDefinition(snapshot.definition); setEditor(snapshot.editor);
     const changes = snapshotChanges(snapshot, savedDocument.current);
@@ -264,7 +270,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   const save = useCallback(async (snapshot = timeline.current.present) => {
     requireAuthentication();
     const changed = snapshotChanges(snapshot, savedDocument.current).definitionDirty;
-    const saved = changed ? await workflowApiV2.save(snapshot.definition, snapshot.editor, base.current.revision, base.current.editorRevision) : { ...(await workflowApiV2.saveEditor(snapshot.editor, base.current.editorRevision)), workflowId: snapshot.definition.workflowId, revision: base.current.revision };
+    const saved = changed ? await workflowApiV2.save(snapshot.definition, snapshot.editor, base.current.revision, base.current.editorRevision, environmentChoice.current) : { ...(await workflowApiV2.saveEditor(snapshot.editor, base.current.editorRevision)), workflowId: snapshot.definition.workflowId, revision: base.current.revision };
     base.current = { revision: saved.revision, editorRevision: saved.editorRevision };
     savedDocument.current = rebaseSnapshot(snapshot, saved.revision, saved.editorRevision);
     timeline.current = { ...timeline.current, present: rebaseSnapshot(timeline.current.present, saved.revision, saved.editorRevision), group: undefined };
@@ -282,7 +288,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     requireAuthentication();
     // Restore is always a new immutable Definition revision. Do not publish the
     // candidate, clear redo, or move the saved baseline until the server accepts it.
-    const saved = await workflowApiV2.save(candidate.definition, candidate.editor, base.current.revision, base.current.editorRevision);
+    const saved = await workflowApiV2.save(candidate.definition, candidate.editor, base.current.revision, base.current.editorRevision, environmentChoice.current);
     base.current = { revision: saved.revision, editorRevision: saved.editorRevision };
     savedDocument.current = rebaseSnapshot(candidate, saved.revision, saved.editorRevision);
     const newerDraft = timeline.current.present !== previous;
@@ -303,6 +309,8 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   }); }
   function startRun(saveChanges = false) { return operation(async () => {
     if (submitUnknown || pendingRunRequest.current) { setError("上次提交状态尚未确认，请先确认原请求再提交新的输入。"); return; }
+    if (toolsError) { rejectRunPreparation("工具目录加载失败，请重试加载后再运行。"); return; }
+    if (initialLoadStatus !== "ready" || toolsLoading || !toolsLoaded) { rejectRunPreparation("正在加载资源与工具目录，完成后即可运行。"); return; }
     if (inputInvalid) { rejectRunPreparation(inputInvalid); return; }
     if (dirty && !saveChanges) { rejectRunPreparation("当前有未保存修改，请选择保存并运行。"); return; }
     const snapshot = timeline.current.present;
@@ -347,6 +355,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     pendingRunRequest.current = null; setSubmitUnknown(false); clearRunObservation("current"); setObservedRunId(created.historyExpired ? null : created.runId); setObservationEpoch(current => current + 1); if(created.historyExpired)setNotice("原提交的运行历史已清理；没有重复执行。");else setRunNotice({runId:created.runId,text:"已确认原提交；没有创建重复运行。"});
   }); }
   function selectRun(record: WorkflowRunV2) { if (cancelPendingRunId) setNotice(""); clearRunObservation("history"); setRun(record); setObservedRunId(record.runId); observationThread.current=record.threadId??null; setObservationEpoch(current => current + 1); }
+
   function selectThread(thread:WorkflowThreadV2){
     clearRunObservation('current');observationThread.current=thread.threadId;setThreadView(thread);setObservedRunId(thread.currentRunId);setObservationEpoch(value=>value+1);
   }
@@ -401,5 +410,5 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     await reloadEnvironments();
     await loadTools(environmentChoice.current);
   });
-  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, toolsLoading, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, setVariableEnvironment, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
+  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, toolsLoading, toolsLoaded, toolsError, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, setVariableEnvironment, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
 }

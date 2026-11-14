@@ -7,7 +7,7 @@ export function formatElapsed(ms: number | undefined): string {
 }
 
 /** Shared result panel for model, API and MCP connection tests. */
-export function ResourceTestPanel({ result, hint = "尚未测试连接。" }: { result?: ConnectionTestResult | null; hint?: string }) {
+export function ResourceTestPanel({ result, hint = "尚未测试连接。", toolsLabel = "可发现的工具" }: { result?: ConnectionTestResult | null; hint?: string; toolsLabel?: string }) {
   if (!result) return <p className="wf-resource-test-empty">{hint}</p>;
   const elapsed = formatElapsed(result.elapsedMs);
   const models = result.models ?? [];
@@ -20,7 +20,7 @@ export function ResourceTestPanel({ result, hint = "尚未测试连接。" }: { 
     </header>
     {result.error ? <p role="alert">{[result.error.code, result.error.message].filter(Boolean).join(" · ")}</p> : null}
     {models.length ? <div className="wf-resource-test-models"><h4>可用模型（{models.length}）</h4><ul>{models.map(model => <li key={model}>{model}</li>)}</ul></div> : null}
-    {tools.length ? <div className="wf-resource-test-tools"><h4>可发现的工具（{tools.length}）</h4><ul>{tools.map(tool => <li key={tool.name}><strong>{tool.name}</strong>{tool.description ? <small>{tool.description}</small> : null}</li>)}</ul></div> : null}
+    {tools.length ? <div className="wf-resource-test-tools"><h4>{toolsLabel}（{tools.length}）</h4><ul>{tools.map(tool => <li key={tool.name}><strong>{tool.name}</strong>{tool.description ? <small>{tool.description}</small> : null}</li>)}</ul></div> : null}
     {result.preview ? <details className="wf-resource-test-preview"><summary>响应预览（已脱敏，最多 4KB）</summary><pre>{result.preview}</pre></details> : null}
     {result.ok && !models.length && !tools.length && !result.preview ? <p className="wf-field-note">连接可用，但没有返回可展示的详细信息。</p> : null}
   </section>;

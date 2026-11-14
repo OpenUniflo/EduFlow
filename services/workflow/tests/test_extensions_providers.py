@@ -374,10 +374,11 @@ async def test_model_adapter_routes_deepseek_by_default_and_never_constructs_ope
     monkeypatch.setattr('eduflow_workflow.runtime.ChatDeepSeek', lambda **kwargs: FakeModel(**kwargs))
     monkeypatch.setenv('MODEL_CONNECTION_KEY', 'synthetic-model-key')
     run = execution()
-    run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['deepseek-flash'], 'secretRef': 'MODEL_CONNECTION_KEY'}]
+    run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['deepseek-flash'], 'secretRef': 'MODEL_CONNECTION_KEY', 'headers': {'x-opencode-session': 'eduflow-test', 'ignored': 3}}]
     adapter = run.model_adapter(llm_config(modelRef='deepseek-flash'))
     assert adapter.kwargs['api_key'] == 'synthetic-model-key'
     assert adapter.kwargs['api_base'] == 'https://api.deepseek.com'
+    assert adapter.kwargs['default_headers'] == {'x-opencode-session': 'eduflow-test'}
 
 
 async def test_openai_compatible_provider_binds_authorized_tools(monkeypatch):
@@ -483,6 +484,87 @@ async def test_publish_reuses_the_saved_provider_secret_when_only_models_change(
     assert storage.saved[5] == ''
 
 
+class LifecycleStorage:
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls = []
+
+    async def call(self, name, *args):
+        if name == 'p4_catalog_read':
+            return copy.deepcopy(self.rows)
+        self.calls.append((name, args))
+        return {'ok': True}
+
+
+def install_lifecycle_storage(monkeypatch, rows):
+    storage = LifecycleStorage(rows)
+    monkeypatch.setattr(extensions, 'Storage', lambda url: storage)
+    monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'postgresql://fixture')
+    return storage
+
+
+def lifecycle_body(action, version, **extra):
+    return {'ownerId': 'a', 'environmentRef': 'local', 'action': action, 'kind': 'connection', 'ref': 'models', 'version': version, **extra}
+
+
+def provider_rows(disabled=False):
+    return [{'kind': 'connection', 'ref': 'models', 'version': 2, 'disabled': disabled, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1', 'modelRefs': ['model-a'], 'secretRef': 'vault:one'}}]
+
+
+async def test_rename_publishes_a_new_version_with_the_same_ref_and_secret(monkeypatch):
+    storage = install_lifecycle_storage(monkeypatch, provider_rows())
+    result = await extensions.catalog_operation(lifecycle_body('rename', 3, content={'name': '  Team Gateway  '}), FakeRegistry(local_env()))
+    assert result == {'ok': True}
+    name, args = storage.calls[0]
+    assert name == 'p4_catalog_save'
+    assert args == ('a', 'local', 'connection', 'models', 3, {
+        'type': 'openai-compatible', 'name': 'Team Gateway', 'baseUrl': 'https://models.example/v1',
+        'modelRefs': ['model-a'], 'secretRef': 'vault:one',
+    }, False)
+
+
+async def test_rename_rejects_stale_versions_disabled_connections_and_extra_fields(monkeypatch):
+    install_lifecycle_storage(monkeypatch, provider_rows())
+    with pytest.raises(ExecutionError) as stale:
+        await extensions.catalog_operation(lifecycle_body('rename', 2, content={'name': 'Nope'}), FakeRegistry(local_env()))
+    assert stale.value.code == 'CONNECTION_VERSION_CONFLICT'
+
+    install_lifecycle_storage(monkeypatch, provider_rows(disabled=True))
+    with pytest.raises(ExecutionError) as disabled:
+        await extensions.catalog_operation(lifecycle_body('rename', 3, content={'name': 'Nope'}), FakeRegistry(local_env()))
+    assert disabled.value.code == 'CONNECTION_DISABLED'
+
+    install_lifecycle_storage(monkeypatch, provider_rows())
+    with pytest.raises(ExecutionError) as extra:
+        await extensions.catalog_operation(lifecycle_body('rename', 3, content={'name': 'Nope', 'baseUrl': 'https://evil.example'}), FakeRegistry(local_env()))
+    assert extra.value.code == 'INVALID_CONNECTION'
+
+
+async def test_restore_creates_an_active_version_and_reuses_the_saved_credential(monkeypatch):
+    storage = install_lifecycle_storage(monkeypatch, provider_rows(disabled=True))
+    await extensions.catalog_operation(lifecycle_body('restore', 3), FakeRegistry(local_env()))
+    name, args = storage.calls[0]
+    assert name == 'p4_catalog_save'
+    assert args[4] == 3 and args[5]['secretRef'] == 'vault:one' and args[6] is False
+
+
+async def test_restore_requires_a_disabled_latest_version(monkeypatch):
+    install_lifecycle_storage(monkeypatch, provider_rows())
+    with pytest.raises(ExecutionError) as active:
+        await extensions.catalog_operation(lifecycle_body('restore', 3), FakeRegistry(local_env()))
+    assert active.value.code == 'CONNECTION_NOT_DISABLED'
+
+
+async def test_delete_checks_the_latest_version_then_delegates_physical_cleanup(monkeypatch):
+    storage = install_lifecycle_storage(monkeypatch, provider_rows())
+    await extensions.catalog_operation(lifecycle_body('delete', 2), FakeRegistry(local_env()))
+    assert storage.calls == [('p4_connection_delete', ('a', 'local', 'models', 2))]
+
+    with pytest.raises(ExecutionError) as stale:
+        await extensions.catalog_operation(lifecycle_body('delete', 1), FakeRegistry(local_env()))
+    assert stale.value.code == 'CONNECTION_VERSION_CONFLICT'
+
+
 async def test_catalog_test_returns_the_unified_model_result(monkeypatch, local_fixtures):
     with local_http(lambda request, body: (200, json.dumps({'data': [{'id': 'z-model'}, {'id': 'a-model'}]}).encode(), {})) as base:
         rows = [{'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': base, 'modelRefs': ['a-model']}}]
@@ -518,12 +600,16 @@ async def test_catalog_test_returns_mcp_tool_names(monkeypatch):
     environment = local_env()
     hydrate_connections(environment, 'a', rows)
 
-    async def discover(registry, env, connector_ref):
+    async def discover(registry, env, connector_ref, include_all=False):
+        assert include_all is True
         return [{'name': 'echo', 'description': 'Echo tool'}, {'name': 'get-sum', 'description': 'Sum'}]
 
     monkeypatch.setattr(tools, 'discover', discover)
     result = await extensions.catalog_operation(catalog_body('mcp'), FakeRegistry(environment))
-    assert result['ok'] is True and result['tools'] == [{'name': 'echo', 'description': 'Echo tool'}, {'name': 'get-sum', 'description': 'Sum'}]
+    assert result['ok'] is True and result['tools'] == [
+        {'name': 'echo', 'description': 'Echo tool', 'allowed': True},
+        {'name': 'get-sum', 'description': 'Sum', 'allowed': False},
+    ]
     assert set(result) == {'ok', 'elapsedMs', 'tools'}
 
 
@@ -642,3 +728,23 @@ def test_builtin_hacker_news_search_uses_optional_words_without_typo_fallback():
     assert 'typoTolerance=false' in hn['path']
     assert 'removeWordsIfNoResults' not in hn['path']
     assert 'hitsPerPage=5' in hn['path']
+
+
+def test_restored_connection_stays_on_its_new_version_and_does_not_revive_old_bindings():
+    """Restore is a new active version; old pinned versions remain disabled.
+
+    Workflows that still point at the disabled version are intentionally not
+    resurrected. They surface as unavailable until the author selects the new
+    version, which is then revalidated by the normal workflow save.
+    """
+    env = {'providers': [], 'tools': [], 'connectors': [], 'capabilityOrigins': {}}
+    hydrate_connections(env, 'a', [
+        {'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': True,
+         'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1',
+                     'modelRefs': ['model-a'], 'secretRef': 'vault:one'}},
+        {'kind': 'connection', 'ref': 'models', 'version': 2, 'disabled': False,
+         'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1',
+                     'modelRefs': ['model-a'], 'secretRef': 'vault:one'}},
+    ])
+    assert [provider['ref'] for provider in env['providers']] == ['p4:a:models:2']
+    assert 'p4:a:models:1' not in env['capabilityOrigins']

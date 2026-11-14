@@ -58,7 +58,9 @@ export const PRESERVED_USER_TABLES = [
   "workflow_workspace_configuration",
   "workflow_private.p4_catalog",
   "workflow_private.p5_audit",
-  "workflow_private.p5_requests"
+  "workflow_private.p5_requests",
+  // Short-lived server-only OAuth state; expires on its own and cascades with auth.users.
+  "mcp_oauth_flows"
 ] as const;
 
 type ResetArgs = {

@@ -155,6 +155,7 @@
 .wf-resource-panel-card-icon.is-api{background:#e4f3f1;color:#1c6b66}
 .wf-resource-panel-card-icon.is-fn{background:#eef1f5;color:#4a566b}
 .wf-resource-panel-card-icon.is-var{background:#e9eefc;color:#3d56b8}
+.wf-resource-panel-card-icon.is-mcp{background:#eef1fa;color:#3d56b8}
 .wf-resource-panel-card-copy{flex:1;min-width:0}
 .wf-resource-panel-card-title{display:flex;align-items:center;gap:6px}
 .wf-resource-panel-card-title strong{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -163,10 +164,14 @@
 .wf-resource-panel-badge.is-api{color:#1c6b66;background:#e4f3f1}
 .wf-resource-panel-badge.is-fn{color:#4a566b;background:#eef1f5}
 .wf-resource-panel-badge.is-var{color:#3d56b8;background:#e9eefc}
+.wf-resource-panel-badge.is-mcp{color:#3d56b8;background:#eef1fa}
 .wf-resource-panel-badge.is-platform{color:#4a566b;background:#f0f2f6}
 .wf-resource-panel-card-meta{margin-top:2px;font-size:10.5px;color:#596a83;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wf-resource-panel-card-meta.is-mono{font-family:ui-monospace,Menlo,monospace;font-size:10px}
 .wf-resource-panel-card-use{margin-top:1px;font-size:10.5px;color:#596a83}
+.wf-resource-panel-tech{margin-top:3px;font-size:10px;color:#596a83}
+.wf-resource-panel-tech summary{cursor:pointer;width:fit-content}
+.wf-resource-panel-tech code{display:block;margin-top:3px;padding:4px 6px;border-radius:6px;background:#f4f6fa;font-family:ui-monospace,Menlo,monospace;font-size:9.5px;overflow-wrap:anywhere;user-select:all}
 .wf-resource-panel-edit{width:30px;height:30px;flex-shrink:0;border:0;border-radius:7px;background:transparent;color:#596a83;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .wf-resource-panel-edit:hover{background:#f0f3f8}
 .wf-resource-panel-empty{font-size:11.5px;color:#596a83;padding:12px 4px}

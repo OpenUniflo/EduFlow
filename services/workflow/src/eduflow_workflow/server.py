@@ -95,7 +95,7 @@ async def catalog(body:dict):
 async def discovery(body:dict):
     env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
     try:
-        tools=await discover(registry,env,body["connectorRef"])
+        tools=await discover(registry,env,body["connectorRef"],include_all=True)
     except ExecutionError:
         raise
     except Exception:
@@ -103,20 +103,23 @@ async def discovery(body:dict):
     path=os.environ.get("WORKFLOW_CATALOG_FILE")
     if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted':
         from .storage import Storage
+        from .extensions import connector_cache_digest
         connector=next(c for c in env['connectors'] if c['ref']==body['connectorRef'])
         await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_catalog_put',
-            env['ref']+':'+connector['ref'],digest(connector),tools)
+            env['ref']+':'+connector['ref'],connector_cache_digest(connector),tools)
         registry._refreshed_at=-100
         refresh();env=registry.environment(env['ref'],body['ownerId'])
     elif path:
         from pathlib import Path
+        from .extensions import connector_cache_digest
         connector=next(c for c in env["connectors"] if c["ref"]==body["connectorRef"])
         catalog=json.loads(Path(path).read_text()) if Path(path).exists() else {}
-        catalog[env["ref"]+":"+connector["ref"]]={"connectorDigest":digest(connector),"tools":tools}
+        catalog[env["ref"]+":"+connector["ref"]]={"connectorDigest":connector_cache_digest(connector),"tools":tools}
         temporary=Path(path+".tmp");temporary.write_text(json.dumps(catalog));temporary.replace(path)
         # Reload so all process roles observe the same catalog revision.
         refresh();env=registry.environment(body["environmentRef"],body["ownerId"])
-    return {"items":registry.public_tools(env),"nextCursor":None,"environment":registry.public_environment(env)}
+    connector=next((c for c in env["connectors"] if c["ref"]==body["connectorRef"]),None)
+    return {"items":registry.public_tools(env),"nextCursor":None,"environment":registry.public_environment(env),"discoveredToolNames":list(connector.get("discoveredToolNames") or []) if connector else []}
 
 @app.post("/v1/document")
 async def document(body:dict):

@@ -50,6 +50,9 @@ describe("ResourceCenterDialog", () => {
     for (const initialSection of ["providers", "apis", "mcp", "functions", "variables"] as const) {
       const html = renderToStaticMarkup(createElement(ResourceCenterDialog, { ...props, initialSection }));
       expect(html).not.toContain("运行环境");
+      if (initialSection === "mcp") {
+        for (const label of ["市场", "已连接", "工具"]) expect(html).toContain(label);
+      }
     }
   });
 
@@ -70,6 +73,26 @@ describe("ResourceCenterDialog", () => {
       intent: { kind: "create", section: "variables", onCreated: () => undefined },
     }));
     expect(variableIntent).toContain("正在为节点新建资源");
+  });
+
+  it("distinguishes loading, an empty environment directory and a failed read", () => {
+    const loading = renderToStaticMarkup(createElement(ResourceCenterDialog, { ...props, environmentRef: "", environmentLoading: true }));
+    expect(loading).toContain("正在连接工作流服务");
+    expect(loading).not.toContain("工作流服务暂时不可用");
+    expect(loading).toContain('data-resource-state="loading"');
+
+    const empty = renderToStaticMarkup(createElement(ResourceCenterDialog, { ...props, environmentRef: "", environmentLoading: false }));
+    expect(empty).toContain("还没有可用环境");
+    expect(empty).toContain('data-resource-state="empty"');
+    expect(empty).not.toContain("工作流服务暂时不可用");
+    expect(empty).toContain("新建模型供应商");
+    expect(empty).toContain("disabled");
+
+    const retry = () => undefined;
+    const failed = renderToStaticMarkup(createElement(ResourceCenterDialog, { ...props, environmentRef: "", environmentError: "连接失败", onRetryEnvironment: retry }));
+    expect(failed).toContain("连接失败");
+    expect(failed).toContain("重试连接");
+    expect(failed).toContain('data-resource-state="error"');
   });
 
   it("renders nothing while closed", () => {

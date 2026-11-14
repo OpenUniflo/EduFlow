@@ -11,8 +11,12 @@ from .execution_policies import catalog,REDUCERS
 from .sandbox import IMAGES,LIMITS,available
 
 CONNECTION_TYPES=('http','deepseek','mcp-http','openai-compatible')
-CONNECTION_FIELDS={'type','name','baseUrl','path','method','sideEffect','inputSchema','outputSchema','modelRefs','url','allowedToolNames','credentialHeader','description','secretRef',
+CONNECTION_FIELDS={'type','name','baseUrl','path','method','sideEffect','inputSchema','outputSchema','modelRefs','url','transport','authType','allowedToolNames','credentialHeader','description','secretRef','oauth','registryServerId','serverTitle',
                    'params','headers','body','auth','settings','outputMap'}
+MCP_CONNECTION_FIELDS={'type','name','url','transport','authType','allowedToolNames','credentialHeader','description','oauth','registryServerId','serverTitle'}
+MCP_AUTH_TYPES=('none','bearer','api-key','oauth','legacy')
+MCP_TOOL_NAME=re.compile(r'^[A-Za-z0-9_.:/-]{1,200}$')
+MAX_MCP_TOOLS=200
 OPENAI_COMPATIBLE_FIELDS={'type','name','baseUrl','modelRefs','credentialHeader','description','secretRef'}
 MODEL_CONNECTION_TYPES=('deepseek','openai-compatible')
 MODEL_REF_PATTERN=re.compile(r'^[\w.:/-]+$',re.ASCII)
@@ -20,6 +24,12 @@ MAX_MODEL_REFS=50
 PREVIEW_BYTES=4096
 LOCAL_LOOPBACK_HOSTS=('localhost','127.0.0.1')
 DEEPSEEK_BASE_URL='https://api.deepseek.com'
+
+def connector_cache_digest(connector):
+    # Discovery names are display metadata, not connection identity. Keeping them
+    # out prevents a loaded cache from invalidating itself on the next refresh.
+    return digest({key:value for key,value in connector.items() if key!='discoveredToolNames'})
+
 HTTP_METHODS=('GET','POST','PUT','PATCH','DELETE')
 HTTP_BODY_MODES=('none','json','form-data','x-www-form-urlencoded','raw')
 HTTP_AUTH_TYPES=('none','api-key-header','api-key-query','bearer','basic')
@@ -140,9 +150,104 @@ def reusable_secret_ref(rows,ref,content):
     secret=saved.get('secretRef')
     if not isinstance(secret,str) or not secret: return None
     if saved.get('type')!=content.get('type'): return None
-    if content.get('type') not in ('deepseek','openai-compatible'): return None
+    if content.get('type') not in ('deepseek','openai-compatible','mcp-http'): return None
     if content.get('type')=='openai-compatible' and str(saved.get('baseUrl','')).rstrip('/')!=str(content.get('baseUrl','')).rstrip('/'): return None
+    if content.get('type')=='mcp-http':
+        if str(saved.get('url','')).rstrip('/')!=str(content.get('url','')).rstrip('/'): return None
+        if (saved.get('authType') or 'legacy')!=(content.get('authType') or 'legacy'): return None
+        saved_header=saved.get('credentialHeader') or ('X-API-Key' if (saved.get('authType') or '')=='api-key' else 'Authorization')
+        content_header=content.get('credentialHeader') or ('X-API-Key' if (content.get('authType') or '')=='api-key' else 'Authorization')
+        if saved_header!=content_header: return None
     return secret
+
+def mcp_tool_names(value,required=False):
+    """Bounded, de-duplicated MCP allowlist. An empty list means connected but not yet allowed."""
+    if value is None:
+        if required: raise ExecutionError('INVALID_CONNECTION','Select at least one MCP tool')
+        return []
+    if not isinstance(value,list) or len(value)>MAX_MCP_TOOLS: raise ExecutionError('INVALID_CONNECTION','Choose at most 200 MCP tools')
+    names=[]
+    for item in value:
+        if not isinstance(item,str) or not MCP_TOOL_NAME.fullmatch(item): raise ExecutionError('INVALID_CONNECTION','MCP tool names are invalid')
+        if item not in names: names.append(item)
+    return names
+
+def mcp_oauth_metadata(value):
+    if not isinstance(value,dict): raise ExecutionError('INVALID_CONNECTION','Provide OAuth authorization metadata')
+    allowed={'issuer','authorizationEndpoint','tokenEndpoint','clientId','resource','scope','tokenEndpointAuthMethod'}
+    if set(value)-allowed: raise ExecutionError('INVALID_CONNECTION','Unsupported OAuth metadata field')
+    for key in ('tokenEndpoint','clientId'):
+        item=value.get(key)
+        if not isinstance(item,str) or not 1<=len(item)<=2048: raise ExecutionError('INVALID_CONNECTION','OAuth metadata is invalid')
+    for key in ('issuer','authorizationEndpoint','resource'):
+        item=value.get(key)
+        if item is not None and (not isinstance(item,str) or not 1<=len(item)<=2048): raise ExecutionError('INVALID_CONNECTION','OAuth metadata is invalid')
+    for key in ('scope','tokenEndpointAuthMethod'):
+        item=value.get(key)
+        if item is not None and (not isinstance(item,str) or len(item)>500): raise ExecutionError('INVALID_CONNECTION','OAuth metadata is invalid')
+    return value
+
+async def validate_mcp_connection(c,credential,env,credential_reused=False):
+    if set(c)-MCP_CONNECTION_FIELDS: raise ExecutionError('INVALID_CONNECTION','Unsupported MCP connection field')
+    raw=c.get('url','');parsed=urlparse(raw)
+    if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password or parsed.fragment: raise ExecutionError('INVALID_CONNECTION','Provide a valid MCP endpoint without credentials')
+    local_http=parsed.scheme=='http' and parsed.hostname in LOCAL_LOOPBACK_HOSTS and local_fixtures_allowed(env)
+    if parsed.scheme=='http' and not local_http: raise ExecutionError('INVALID_CONNECTION','Plain HTTP is only allowed for local fixture environments')
+    transport=c.get('transport','streamable-http')
+    if transport not in ('streamable-http','sse'): raise ExecutionError('INVALID_CONNECTION','Choose a supported remote MCP transport')
+    auth_type=c.get('authType') or ('legacy' if credential or credential_reused else 'none')
+    if auth_type not in MCP_AUTH_TYPES: raise ExecutionError('INVALID_CONNECTION','Choose a supported MCP authentication type')
+    credential_header=c.get('credentialHeader','X-API-Key' if auth_type=='api-key' else 'Authorization')
+    if auth_type=='api-key':
+        if not isinstance(credential_header,str) or not HTTP_HEADER_NAME.fullmatch(credential_header.strip()) or credential_header.lower() in ('host','content-length','connection','cookie','set-cookie'): raise ExecutionError('INVALID_CONNECTION','Provide a valid API key header')
+        credential_header=credential_header.strip()
+    elif auth_type=='legacy':
+        credential_header=c.get('credentialHeader','Authorization')
+        if credential_header not in ('Authorization','X-API-Key'): raise ExecutionError('INVALID_CONNECTION','Unsupported credential header')
+    elif auth_type in ('bearer','oauth'):
+        credential_header='Authorization'
+    else:
+        credential_header=None
+    if auth_type=='none' and credential: raise ExecutionError('INVALID_CONNECTION','This MCP service does not take a credential')
+    if auth_type in ('bearer','api-key','legacy') and not credential and not credential_reused: raise ExecutionError('INVALID_CONNECTION','Provide the MCP credential')
+    if auth_type=='oauth':
+        c['oauth']=mcp_oauth_metadata(c.get('oauth'))
+        token_endpoint=c['oauth']['tokenEndpoint']
+        token_url=urlparse(token_endpoint)
+        if token_url.scheme not in ('http','https') or not token_url.hostname or token_url.username or token_url.password: raise ExecutionError('INVALID_CONNECTION','OAuth token endpoint is invalid')
+        await assert_destination(token_url.scheme+'://'+token_url.netloc,env,token_url.path or '/')
+        if not credential and not credential_reused: raise ExecutionError('INVALID_CONNECTION','OAuth authorization must be completed before saving')
+        if credential:
+            try: bundle=json.loads(credential)
+            except ValueError: raise ExecutionError('INVALID_CONNECTION','OAuth token bundle is invalid') from None
+            if not isinstance(bundle,dict) or not isinstance(bundle.get('access_token'),str) or not bundle['access_token']: raise ExecutionError('INVALID_CONNECTION','OAuth token bundle is invalid')
+    c['url']=raw; c['transport']=transport; c['authType']=auth_type; c['allowedToolNames']=mcp_tool_names(c.get('allowedToolNames'))
+    if credential_header: c['credentialHeader']=credential_header
+    else: c.pop('credentialHeader',None)
+    await assert_destination(parsed.scheme+'://'+parsed.netloc,env,parsed.path or '/')
+    return c
+
+def mcp_connector(content,ref,owner,version=1,credential=None):
+    """One MCP connection descriptor. A preflight credential lives only in this request object."""
+    auth_type=content.get('authType') or ('legacy' if content.get('secretRef') else 'none')
+    connector={'ref':ref,'name':content.get('name',ref),'transport':content.get('transport','streamable-http'),
+               'url':content['url'],'allowedToolNames':content.get('allowedToolNames') or [],'sideEffect':'write',
+               'authType':auth_type,'credentialHeader':content.get('credentialHeader','Authorization'),
+               **({'secretRef':content['secretRef']} if content.get('secretRef') else {}),
+               **({'oauth':content['oauth']} if content.get('oauth') else {}),
+               **({'ephemeralCredential':credential} if isinstance(credential,str) and credential else {}),
+               # Discovery cache identity includes the per-tool effect policy so
+               # tools cached under the old blanket-write model are rediscovered.
+               'toolEffectPolicy':5}
+    return connector
+
+def _scrub_ephemeral(value,credential):
+    """Fields a remote server returns must never echo the request-time credential."""
+    if not credential: return value
+    if isinstance(value,str): return value.replace(credential,'[REDACTED]')
+    if isinstance(value,list): return [_scrub_ephemeral(item,credential) for item in value]
+    if isinstance(value,dict): return {key:_scrub_ephemeral(item,credential) for key,item in value.items()}
+    return value
 
 async def validate_connection(content,credential,env,credential_reused=False):
     """Validate and normalize a connection publish payload; credentials never enter content."""
@@ -160,6 +265,8 @@ async def validate_connection(content,credential,env,credential_reused=False):
         return c
     if ctype=='openai-compatible':
         return await validate_model_connection(c,credential,env,credential_reused)
+    if ctype=='mcp-http':
+        return await validate_mcp_connection(c,credential,env,credential_reused)
     raw=c.get('baseUrl' if ctype=='http' else 'url','');parsed=urlparse(raw)
     if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment: raise ExecutionError('INVALID_CONNECTION','Provide a valid HTTP endpoint without credentials')
     if ctype=='http' and (not isinstance(c.get('path','/'),str) or len(c.get('path','/'))>2000): raise ExecutionError('INVALID_CONNECTION','Provide a bounded HTTP path')
@@ -177,7 +284,6 @@ async def validate_connection(content,credential,env,credential_reused=False):
         c['settings']=http_settings(c.get('settings'))
         c['outputMap']=http_output_map(c.get('outputMap'))
         if c['body']['mode']!='none' and method=='GET': raise ExecutionError('INVALID_CONNECTION','GET requests cannot carry a body')
-    elif not isinstance(c.get('allowedToolNames'),list) or not c['allowedToolNames'] or any(not isinstance(v,str) for v in c['allowedToolNames']): raise ExecutionError('INVALID_CONNECTION','Select allowed MCP tool names')
     return c
 
 async def validate_model_connection(c,credential,env,credential_reused=False):
@@ -289,11 +395,60 @@ async def catalog_operation(body,registry):
         rows=await store.call('p4_catalog_read',owner,ref)
         return {'functions':catalog(env),'reducers':[{'name':k,'version':v} for k,v in REDUCERS.items()],
                 'runtime':{'images':({'hosted':os.environ.get('WORKFLOW_SANDBOX_IMAGE')} if os.environ.get('WORKFLOW_SANDBOX_BACKEND')=='vercel' else IMAGES),'limits':LIMITS,'available':await available(),'dependencies':'Pinned standard libraries only'},
+                'environment':registry.public_environment(env),
                 'connections':[{'connectionKey':'p4:'+owner+':'+r['ref']+':'+str(r['version']),'ref':r['ref'],'version':r['version'],'disabled':r['disabled'],'content':{k:v for k,v in r['content'].items() if k!='secretRef'},'hasCredential':bool(r['content'].get('secretRef'))} for r in rows if r['kind']=='connection']}
+    if action=='inspect':
+        draft=body.get('content')
+        if not isinstance(draft,dict) or draft.get('type')!='mcp-http': raise ExecutionError('INVALID_EXTENSION','Provide an MCP connection draft')
+        credential=body.get('credential','')
+        if not isinstance(credential,str) or len(credential)>16000: raise ExecutionError('INVALID_CREDENTIAL','Credential must be bounded text')
+        draft=await validate_connection(draft,credential,env,False)
+        connector=mcp_connector(draft,'inspect',owner,credential=credential)
+        started=time.monotonic()
+        try:
+            from .tools import inspect_tools
+            tools=await inspect_tools(connector,env)
+            return {'ok':True,'elapsedMs':elapsed_ms(started),'tools':_scrub_ephemeral([{'name':t['name'],'description':t.get('description',''),'inputSchema':t.get('inputSchema',{'type':'object'})} for t in tools],credential)}
+        except ExecutionError as error:
+            return {'ok':False,'elapsedMs':elapsed_ms(started),'error':{'code':error.code,'message':_scrub_ephemeral(str(error),credential)}}
     if kind not in ('function','connection') or not isinstance(name,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_.-]{0,79}',name) or isinstance(version,bool) or not isinstance(version,int) or not 1<=version<=100000:
         raise ExecutionError('INVALID_EXTENSION','Provide a kind, stable reference and positive immutable version')
     if name.startswith(('edu.','core.')): raise ExecutionError('RESERVED_REFERENCE','Built-in references cannot be changed','auth')
-    if action=='disable': return await store.call('p4_catalog_save',owner,ref,kind,name,version,{},True)
+    if action in ('rename','restore','delete'):
+        # Display identity lives in the mutable content; the stable ref never changes.
+        # These operations only target the newest immutable version so a stale browser
+        # cannot revive or delete a newer owner-visible state.
+        if kind!='connection': raise ExecutionError('INVALID_EXTENSION','Only managed connections support this operation')
+        rows=await store.call('p4_catalog_read',owner,ref)
+        versions=[row for row in rows if row.get('kind')=='connection' and row.get('ref')==name]
+        if not versions: raise ExecutionError('CONNECTION_UNAVAILABLE','Connection unavailable','auth')
+        latest=max(versions,key=lambda row:int(row.get('version') or 0))
+        latest_version=int(latest.get('version') or 0)
+        if action=='delete':
+            if version!=latest_version: raise ExecutionError('CONNECTION_VERSION_CONFLICT','Connection changed; refresh before deleting','validation')
+            return await store.call('p4_connection_delete',owner,ref,name,version)
+        if version!=latest_version+1: raise ExecutionError('CONNECTION_VERSION_CONFLICT','Connection changed; refresh before saving','validation')
+        if action=='restore':
+            if not latest.get('disabled'): raise ExecutionError('CONNECTION_NOT_DISABLED','Connection is already active','validation')
+            return await store.call('p4_catalog_save',owner,ref,kind,name,version,latest.get('content') or {},False)
+        draft=body.get('content')
+        if not isinstance(draft,dict) or set(draft)!={'name'}: raise ExecutionError('INVALID_CONNECTION','Provide only the display name')
+        new_name=draft.get('name')
+        if not isinstance(new_name,str) or not 1<=len(new_name.strip())<=120: raise ExecutionError('INVALID_CONNECTION','Name must be 1–120 characters')
+        if latest.get('disabled'): raise ExecutionError('CONNECTION_DISABLED','Restore the connection before renaming it','auth')
+        content={**(latest.get('content') or {}),'name':new_name.strip()}
+        return await store.call('p4_catalog_save',owner,ref,kind,name,version,content,False)
+    if action=='disable':
+        if kind=='connection':
+            # Disconnect is a logical-connection operation: every immutable version
+            # is revoked, so an old Workflow cannot keep calling the removed service.
+            rows=await store.call('p4_catalog_read',owner,ref)
+            versions=sorted(int(row['version']) for row in rows if row['kind']=='connection' and row['ref']==name)
+            if not versions: raise ExecutionError('CONNECTION_UNAVAILABLE','Connection unavailable','auth')
+            for item in versions:
+                await store.call('p4_catalog_save',owner,ref,kind,name,item,{},True)
+            return {'ref':name,'disabled':True,'versions':versions}
+        return await store.call('p4_catalog_save',owner,ref,kind,name,version,{},True)
     if action=='test':
         key='p4:'+owner+':'+name+':'+str(version)
         started=time.monotonic()
@@ -322,7 +477,7 @@ async def catalog_operation(body,registry):
         if c['type']=='http':
             tool=next((t for t in env['tools'] if t['ref']==key),None)
             if tool is None: raise ExecutionError('CONNECTION_UNAVAILABLE','Connection unavailable','auth')
-            if tool['sideEffect']=='write' and body.get('confirmExternalEffect') is not True: raise ExecutionError('EXTERNAL_EFFECT_CONFIRMATION_REQUIRED','Confirm the external effect','policy')
+            if tool.get('sideEffect') in ('write','unknown') and body.get('confirmExternalEffect') is not True: raise ExecutionError('EXTERNAL_EFFECT_CONFIRMATION_REQUIRED','Confirm the external effect','policy')
         started=time.monotonic()
         try:
             if c['type'] in MODEL_CONNECTION_TYPES:
@@ -339,15 +494,21 @@ async def catalog_operation(body,registry):
                 result=await http_test_preview(tool,env,body.get('arguments',{}))
                 return {**result,'elapsedMs':elapsed_ms(started)}
             from .tools import discover
-            tools=await discover(registry,env,key)
+            tools=await discover(registry,env,key,include_all=True)
+            connector=next(c for c in env['connectors'] if c['ref']==key)
+            allowed=[t for t in tools if t['name'] in connector.get('allowedToolNames',[])]
             path=os.environ.get('WORKFLOW_CATALOG_FILE')
             if path:
                 from pathlib import Path
-                connector=next(c for c in env['connectors'] if c['ref']==key)
                 saved=json.loads(Path(path).read_text()) if Path(path).exists() else {}
-                saved[ref+':'+key]={'connectorDigest':digest(connector),'tools':tools}
+                # Cache the complete tools/list result; execution still uses
+                # only the explicitly allowed subset.
+                saved[ref+':'+key]={'connectorDigest':connector_cache_digest(connector),'tools':tools}
                 temporary=Path(path+'.tmp');temporary.write_text(json.dumps(saved));temporary.replace(path)
-            return {'ok':True,'elapsedMs':elapsed_ms(started),'tools':[{'name':t['name'],'description':t.get('description','')} for t in tools]}
+            elif os.environ.get('WORKFLOW_DEPLOYMENT_MODE')=='hosted':
+                await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_catalog_put',env['ref']+':'+key,connector_cache_digest(connector),tools)
+            allowed_names={t['name'] for t in allowed}
+            return {'ok':True,'elapsedMs':elapsed_ms(started),'tools':[{'name':t['name'],'description':t.get('description',''),'allowed':t['name'] in allowed_names,**({'inputSchema':t['inputSchema']} if isinstance(t.get('inputSchema'),dict) else {})} for t in tools]}
         except ExecutionError as error:
             return {'ok':False,'error':{'code':error.code,'message':str(error)}}
         except Exception:
@@ -423,14 +584,29 @@ def http_connection_tool(c,r,key,headers,env):
 
 def hydrate_connections(env,owner,rows):
     env.setdefault('capabilityOrigins',{})
+    # The current active version defines the owner's live permission for every
+    # immutable version of the same logical connection. Disabling all versions
+    # (the disconnect operation) therefore revokes old Workflow bindings too.
+    latest={}
+    for row in rows:
+        if row['kind']=='connection' and not row['disabled']:
+            if row['ref'] not in latest or int(row['version'])>int(latest[row['ref']]['version']): latest[row['ref']]=row
     for r in rows:
         if r['kind']!='connection' or r['disabled']: continue
         c=r['content'];key='p4:'+owner+':'+r['ref']+':'+str(r['version']);headers={c.get('credentialHeader','Authorization'):c['secretRef']} if c.get('secretRef') else {}
         env['capabilityOrigins'][key]={'origin':'user','connectionRef':r['ref'],'version':r['version']}
+        live=latest.get(r['ref'])
+        current_allowed=(live['content'].get('allowedToolNames') or []) if live else []
         if c['type'] in MODEL_CONNECTION_TYPES:
             provider={'ref':key,'name':c.get('name',r['ref']),'modelRefs':c['modelRefs'],'baseUrl':DEEPSEEK_BASE_URL if c['type']=='deepseek' else c['baseUrl'],'adapter':'deepseek' if c['type']=='deepseek' else 'openai'}
             if c.get('secretRef'): provider['secretRef']=c['secretRef']
             env['providers'].append(provider)
         elif c['type']=='http': env['tools'].append(http_connection_tool(c,r,key,headers,env))
-        else: env['connectors'].append({'ref':key,'name':c.get('name',r['ref']),'transport':'streamable-http','url':c['url'],'headerSecretRefs':headers,'allowedToolNames':c['allowedToolNames'],'sideEffect':'write',**({'fixture':True} if c.get('fixture') is True else {})})
+        else:
+            connector=mcp_connector(c,key,owner,r['version'])
+            # Old schemas remain immutable; execution uses the current owner
+            # permission and cannot gain a tool that this binding never allowed.
+            connector['allowedToolNames']=[name for name in connector.get('allowedToolNames',[]) if name in current_allowed]
+            if live: connector['policyVersion']=live['version']
+            env['connectors'].append(connector)
     return env

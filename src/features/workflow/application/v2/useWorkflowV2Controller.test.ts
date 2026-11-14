@@ -85,6 +85,38 @@ describe("initial data and submission feedback", () => {
     expect(api.createRun).not.toHaveBeenCalled();
   });
 
+  it("waits for the tool catalog before starting a run instead of reporting authorization", async () => {
+    const catalog = deferred<{ items: WorkflowTool[] }>();
+    api.tools.mockImplementation((ref: string) => ref ? catalog.promise : Promise.resolve({ items: [] }));
+    await boot();
+    expect(render().initialLoadStatus).toBe("ready");
+    expect(render().toolsLoading).toBe(true);
+    expect(render().toolsLoaded).toBe(false);
+    await render().startRun(); await flush();
+    expect(api.validateDraft).not.toHaveBeenCalled();
+    expect(api.createRun).not.toHaveBeenCalled();
+    expect(render().error).toContain("正在加载资源与工具目录");
+    expect(render().error).not.toContain("授权");
+    catalog.resolve({ items: [] }); await flush(); render();
+    expect(render().toolsLoaded).toBe(true);
+    await render().startRun(); await flush();
+    expect(api.validateDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a tool catalog failure and offers a state-backed retry", async () => {
+    const tool = { ref: "http-tool", name: "HTTP tool" } as WorkflowTool;
+    api.tools.mockRejectedValueOnce(new Error("目录读取中断")).mockResolvedValue({ items: [tool] });
+    await boot();
+    expect(render().toolsError).toContain("目录读取中断");
+    await render().startRun(); await flush();
+    expect(render().error).toContain("工具目录加载失败");
+    expect(api.createRun).not.toHaveBeenCalled();
+    await render().refreshTools(); await flush(); render();
+    expect(render().toolsError).toBe("");
+    expect(render().toolsLoaded).toBe(true);
+    expect(render().tools).toEqual([tool]);
+  });
+
   it("refreshes tools with environment resources without changing the selected environment", async () => {
     const tool = { ref: "http-tool", name: "HTTP tool" } as WorkflowTool;
     api.tools.mockResolvedValueOnce({ items: [] }).mockResolvedValue({ items: [tool] });
@@ -288,7 +320,7 @@ describe("restore only commits after acceptance", () => {
     expect(rejected.inputResetVersion).toBe(before.inputResetVersion); expect(rejected.canUndo).toBe(before.canUndo); expect(rejected.canRedo).toBe(true);
     expect(rejected.saveConflict).toBe(true); expect(rejected.dirty).toBe(true);
     rejected.redo(); expect(render().definition.name).toBe("B"); render().undo(); expect(render().definition.name).toBe("A");
-    await render().saveDocument(); expect(api.save.mock.calls[1].slice(2)).toEqual([3, 8]);
+    await render().saveDocument(); expect(api.save.mock.calls[1].slice(2)).toEqual([3, 8, "local"]);
   });
 
   it("creates a Definition revision even for a layout-only restore and makes it undoable", async () => {
@@ -357,7 +389,7 @@ describe("same-tab recovery after authentication interruption", () => {
     expect(render().notice).toContain("服务端版本已更新");
     api.save.mockRejectedValueOnce(new ApiRequestError("REVISION_CONFLICT", "conflict", 409));
     await render().saveDocument();
-    expect(api.save.mock.calls[0].slice(2)).toEqual([3, 8]);
+    expect(api.save.mock.calls[0].slice(2)).toEqual([3, 8, "local"]);
     expect(render().definition.name).toBe("local draft"); expect(render().dirty).toBe(true);
     expect(render().saveConflict).toBe(true); render().undo(); expect(render().definition.name).toBe("saved");
   });

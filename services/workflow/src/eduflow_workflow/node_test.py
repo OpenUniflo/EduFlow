@@ -24,7 +24,7 @@ async def test_node(body,registry):
     if selected["type"] in ("core.start","core.end"): raise ExecutionError("NODE_TEST_UNAVAILABLE","Test a processing node")
     if selected["config"].get("authoring",{}).get("interrupt"): raise ExecutionError("NODE_TEST_REQUIRES_RUN","Run the workflow to respond to a node interrupt")
     refs=([selected["config"]["toolRef"]] if selected["type"]=="core.tool" else selected["config"].get("allowedToolRefs",[]))
-    if any(tool["ref"] in refs and tool.get("sideEffect")=="write" for tool in env["tools"]) and body.get("confirmExternalEffect") is not True:
+    if any(tool["ref"] in refs and tool.get("sideEffect") in ("write","unknown") for tool in env["tools"]) and body.get("confirmExternalEffect") is not True:
         raise ExecutionError("EXTERNAL_EFFECT_CONFIRMATION_REQUIRED","Confirm possible external changes before testing","policy")
     start={"id":"test-start-"+str(uuid.uuid4()),"label":"Test start","type":"core.start","typeVersion":1,"config":{},"inputs":{},"writes":{}}
     end={**start,"id":"test-end-"+str(uuid.uuid4()),"type":"core.end"}

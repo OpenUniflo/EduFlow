@@ -42,6 +42,13 @@ describe("ResourceTestPanel", () => {
     expect(html).toContain("响应预览（已脱敏，最多 4KB）");
   });
 
+  it("labels an allow-filtered MCP list as allowed rather than discovered", () => {
+    const result: ConnectionTestResult = { ok: true, tools: [{ name: "read_wiki_structure" }] };
+    const html = renderToStaticMarkup(createElement(ResourceTestPanel, { result, toolsLabel: "当前允许的工具" }));
+    expect(html).toContain("当前允许的工具（1）");
+    expect(html).not.toContain("可发现的工具（1）");
+  });
+
   it("shows worker errors without claiming success", () => {
     const result: ConnectionTestResult = { ok: false, error: { code: "CONNECTION_TEST_FAILED", message: "unreachable" } };
     const html = renderToStaticMarkup(createElement(ResourceTestPanel, { result }));

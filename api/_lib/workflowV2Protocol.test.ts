@@ -180,6 +180,29 @@ describe("Service-authenticated compiler requests", () => {
     expect(init.body).toBeUndefined();
   });
 
+  it("maps transaction-level connection conflicts to a retryable 409", async () => {
+    const fetchMock = vi.fn(async (_url: URL, _init: RequestInit) => ({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: "CONNECTION_IN_USE", message: "referenced", category: "validation" } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "http://127.0.0.1:18110");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "internal-token");
+    await expect(workflowCompiler("/v1/extensions", { action: "delete" }))
+      .rejects.toMatchObject({ status: 409, code: "CONNECTION_IN_USE" });
+  });
+
+  it("maps an unfinished-run deletion conflict to 409", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: "CONNECTION_BUSY", message: "run active", category: "validation" } }),
+    })));
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "http://127.0.0.1:18110");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "internal-token");
+    await expect(workflowCompiler("/v1/extensions", { action: "delete" }))
+      .rejects.toMatchObject({ status: 409, code: "CONNECTION_BUSY" });
+  });
+
   it("fails closed before issuing a request when the compiler identity is unconfigured", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

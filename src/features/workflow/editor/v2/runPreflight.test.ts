@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createNodeV2, createWorkflowV2, stateBinding } from "../../domain/v2/factory";
 import type { WorkflowEnvironment } from "../../domain/v2/types";
-import { nodeTestBlockReason, runPreflight } from "./runPreflight";
+import { nodeTestBlockReason, preflightIssuesForReadyCatalog, runPreflight } from "./runPreflight";
 
 const environment: WorkflowEnvironment = {
   environmentRef: "local", environmentRevision: "1", name: "Local", capabilities: ["llm", "http"],
@@ -66,6 +66,15 @@ describe("run preflight", () => {
     expect(issues.find(issue => issue.id === "write:search:hits:type")?.summary).toBe("工具 的 hits 输出是列表，但字段 hits 是文本");
     expect(issues.find(issue => issue.id === "write:search:hits:type")?.fix).toEqual({ field: "hits", type: "array" });
   });
+  it("suppresses only tool-not-ready markers while the catalog is loading", () => {
+    const issues = [
+      { id: "tool:search:unavailable", title: "tool", detail: "", tab: "node" as const, nodeId: "search" },
+      { id: "state:missing", title: "state", detail: "", tab: "state" as const },
+    ];
+    expect(preflightIssuesForReadyCatalog(issues, false).map(issue => issue.id)).toEqual(["state:missing"]);
+    expect(preflightIssuesForReadyCatalog(issues, true).map(issue => issue.id)).toEqual(["tool:search:unavailable", "state:missing"]);
+  });
+
   it("blocks a node test only for that node's own issue", () => {
     const base = createWorkflowV2();
     const search = createNodeV2("core.tool", "search"); search.config = { toolRef: "hn_search", contractDigest: "digest" }; search.writes = { hits: "/result/hits" };

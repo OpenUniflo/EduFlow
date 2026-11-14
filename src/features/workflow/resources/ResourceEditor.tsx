@@ -127,7 +127,8 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
   const addressIssue = type === "deepseek" ? "" : providerBaseUrlIssue(type, baseUrl, import.meta.env.DEV);
   const testIssue = addressIssue || (!testModel ? "请先选择或添加一个模型。" : credentialNeeded && !credential.trim() && !existing ? "请先填写 API Key。" : "");
   const credentialRequired = providerCredentialRequiredOnSave({ existing, type, baseUrl, credential });
-  const saveIssue = addressIssue || (!name.trim() ? "请填写名称。" : !models.length ? "请至少启用一个模型。" : credentialRequired ? "保存新版本需要重新填写 API Key（只写不读）。" : "");
+  const nameIssue = !name.trim() ? "请填写显示名称。" : name.trim().length > 120 ? "显示名称应为 1–120 个字符。" : "";
+  const saveIssue = addressIssue || nameIssue || (!models.length ? "请至少启用一个模型。" : credentialRequired ? "保存新版本需要重新填写 API Key（只写不读）。" : "");
 
   function choosePreset(id: string) {
     const next = findProviderPreset(id);
@@ -190,7 +191,7 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
     } finally { setBusy(false); }
   }
 
-  return <EditorFrame tone="model" icon={<Sparkles size={17}/>} title={existing ? "编辑模型供应商" : "添加模型供应商"} subtitle={`${name || "未命名供应商"} · ${existing ? "已有供应商" : "从资源中心添加"}`} footerNote="保存后生成新版本，正在使用旧版本的节点可在节点中升级" test={<TestPane title="测试" hint="选一个模型发一条测试消息，不会保存。">
+  return <EditorFrame tone="model" icon={<Sparkles size={17}/>} title={existing ? "编辑模型供应商" : "添加模型供应商"} subtitle={`${name.trim() || "未命名供应商"} · ${existing ? "已有供应商" : "从资源中心添加"}`} footerNote="保存后生成新版本，正在使用旧版本的节点可在节点中升级" test={<TestPane title="测试" hint="选一个模型发一条测试消息，不会保存。">
       <div>
         <label htmlFor="wf-provider-test-model">测试模型</label>
         <select id="wf-provider-test-model" aria-label="测试模型" value={testModel} onChange={event => setTestModel(event.target.value)}><option value="">选择模型</option>{candidates.map(model => <option key={model} value={model}>{model}</option>)}</select>
@@ -202,13 +203,18 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
         {!testResult.ok && testResult.error ? <div className="wf-editor-test-block"><h4>错误</h4><div className="wf-editor-test-line"><span>{testResult.error.message}</span></div></div> : null}
       </div> : null}
     </TestPane>} feedback={feedback} busy={busy} saveDisabled={Boolean(saveIssue)} onClose={onClose} onSave={() => void save()}>
-    <Section title="供应商" hint={existing ? "编辑已有供应商时类型不变" : "选择一家，保存后就是一个独立的模型供应商"}>
+    <Section title="供应商" hint={existing ? "显示名称可修改；稳定标识和已有引用不变" : "选择一家，保存后就是一个独立的模型供应商"}>
       {existing ? <div className="wf-editor-provider is-locked" aria-label="当前模型供应商">
-        <span className="wf-editor-provider-mark">{name.slice(0, 1)}</span>
-        <span><strong>{name}</strong><small>{providerTypeLabel(existing)} · 要换一家请新建模型供应商</small></span>
+        <span className="wf-editor-provider-mark">{name.trim().slice(0, 1) || "?"}</span>
+        <span><strong>{providerTypeLabel(existing)}</strong><small>稳定标识 <code>{existing.ref}</code> 不随名称改变；要换一家请新建模型供应商。</small></span>
       </div> : <div className="wf-editor-provider-grid" role="group" aria-label="选择模型供应商">
         {visibleProviderPresets(true).map(item => <button type="button" key={item.id} className="wf-editor-provider" aria-pressed={presetId === item.id} onClick={() => choosePreset(item.id)}><span className="wf-editor-provider-mark">{item.label.slice(0, 1)}</span><span>{item.id === "custom-openai" ? "OpenAI 兼容" : item.label}</span>{presetId === item.id ? <Check size={14}/> : null}</button>)}
       </div>}
+      <Field label="显示名称">
+        <input aria-label="供应商显示名称" maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="例如：团队模型网关" />
+        {nameIssue ? <span className="wf-editor-field-error" role="alert">{nameIssue}</span> : null}
+      </Field>
+      {!existing ? <p className="wf-editor-hint">稳定标识 <code>{ref}</code> 由供应商类型生成，不随显示名称改变。</p> : null}
     </Section>
     <Section title="连接" hint="API 地址和 Key 只保存在这个供应商里，不会写进节点" extra={<span className="wf-editor-hint">{credentialNeeded ? "需要凭据" : "本地地址无需凭据"}</span>}>
       <Field label="API 地址">

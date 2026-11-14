@@ -64,4 +64,18 @@ describe("resolved workflow resources", () => {
     expect(resources.find(resource => resource.kind === "provider")).toMatchObject({ title: "DeepSeek", meta: "已启用 1 个模型 · deepseek-chat", platform: true });
     expect(resources.find(resource => resource.kind === "variable")).toMatchObject({ title: "TOPIC", meta: "文本 · RAG" });
   });
+
+  it("shows a user MCP tool as MCP with its connection name and no p4 ref in the title", () => {
+    const ref = "p4:owner:docs:1:read_wiki_structure";
+    const resources = resolveWorkflowResources({
+      definition: definition([node("read", "读取结构", "core.tool", { toolRef: ref, contractDigest: "d" })]),
+      connections: [connection("docs", 1, { type: "mcp-http", name: "DeepWiki", serverTitle: "DeepWiki", url: "https://mcp.example.com/mcp", allowedToolNames: ["read_wiki_structure"] })],
+      tools: [{ ref, name: "read_wiki_structure", contractDigest: "d", inputSchema: { type: "object" }, origin: "user", connectionRef: "docs", connectorRef: "p4:owner:docs:1", adapter: "mcp", sideEffect: "unknown", declaredReadOnly: true }],
+    });
+    const item = resources.find(resource => resource.kind === "mcp");
+    expect(item).toMatchObject({ title: "read_wiki_structure", badge: "MCP 工具", meta: "DeepWiki · 服务声明只读", section: "mcp", platform: false, technicalId: ref });
+    expect(item?.title).not.toContain("p4:");
+    expect(item?.meta).not.toContain("p4:");
+    expect(resources.some(resource => resource.kind === "api")).toBe(false);
+  });
 });

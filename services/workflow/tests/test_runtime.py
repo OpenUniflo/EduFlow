@@ -110,7 +110,11 @@ async def test_prepared_wrapper_preserves_complete_tool_input_and_sdk_result(nod
         assert message["role"]=="tool" and message["toolCallId"]=="original-call" and json.loads(message["content"][0]["text"])==expected
     assert [kind for kind,_ in run.storage.events]==["tool.started","tool.completed"]
     assert run.storage.events[1][1]["result"]==expected
-    if adapter=="mcp":assert received==[("wrapper_tool",{"value":"wrapper-marker"})]
+    if adapter=="mcp":
+        assert received==[("wrapper_tool",{"value":"wrapper-marker"})]
+        assert run.storage.events[1][1]["effect"]=="unknown"
+        assert run.storage.events[1][1]["effectSource"]=="adapter"
+    else: assert run.storage.events[1][1]["effect"]=="none"
 
 async def test_commit_failure_stops_remaining_graph():
     storage=MemoryStorage(fail_commit=True);run=execution(storage=storage)
@@ -153,6 +157,7 @@ async def test_batch_preserves_first_success_and_skips_tail(monkeypatch):
     assert count==2
     kinds=[kind for kind,_ in run.storage.events]
     assert kinds==["tool.started","tool.completed","tool.started","tool.failed","tool.skipped"]
+    assert run.storage.events[1][1]["effect"]=="confirmed" and run.storage.events[1][1]["effectSource"]=="declared"
 
 async def test_credentials_never_enter_state_or_event_storage(monkeypatch):
     run=execution();run.env["providers"]=[{"ref":"provider","secretRef":"WORKFLOW_TEST_SECRET"}]

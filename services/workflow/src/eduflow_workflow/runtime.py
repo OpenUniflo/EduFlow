@@ -216,7 +216,10 @@ class RunExecution:
                 await self.event("tool.started",{"callId":call_id,"toolCallId":call["id"],"toolRef":tool["ref"],"contractDigest":tool["contractDigest"]})
                 await self.guard()
                 result=await asyncio.wait_for(invoke_tool(tool,self.env,call["arguments"],self.remaining()),timeout=self.remaining())
-                await self.event("tool.completed",{"callId":call_id,"toolCallId":call["id"],"result":result,"effect":"confirmed" if tool["sideEffect"]=="write" else "none"})
+                # An MCP success proves the call completed, not that no external
+                # change happened. Only non-MCP write tools can be confirmed here.
+                effect="unknown" if tool.get("adapter")=="mcp" else "confirmed" if tool.get("sideEffect")=="write" else "unknown" if tool.get("sideEffect")=="unknown" else "none"
+                await self.event("tool.completed",{"callId":call_id,"toolCallId":call["id"],"result":result,"effect":effect,"effectSource":"adapter" if tool.get("adapter")=="mcp" else "declared",**({"declaredReadOnly":tool.get("declaredReadOnly") is True,"declaredDestructive":tool.get("declaredDestructive") is True} if tool.get("adapter")=="mcp" else {})})
                 messages.append({"id":str(uuid.uuid4()),"role":"tool","content":[{"type":"text","text":json.dumps(result,ensure_ascii=False)}],"toolCallId":call["id"]})
             except Exception as error:
                 error=error if isinstance(error,ExecutionError) else ExecutionError("TOOL_TIMEOUT","Tool call interrupted","timeout",effect="unknown")
@@ -245,13 +248,15 @@ class RunExecution:
         if "thinking" in config["modelParameters"] and (not isinstance(thinking,dict) or set(thinking)!={"type"} or thinking["type"] not in ("enabled","disabled")):
             raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Thinking must explicitly select enabled or disabled")
         adapter=provider.get("adapter","deepseek")
+        provider_headers=provider.get("headers") if isinstance(provider.get("headers"),dict) else {}
+        provider_headers={str(name):str(value) for name,value in provider_headers.items() if isinstance(name,str) and isinstance(value,str) and name and len(name)<=200 and len(value)<=1000}
         try:
             if adapter=="openai":
                 if thinking is not None: raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Thinking is only available on DeepSeek connections")
                 api_key=secret(provider["secretRef"]) if provider.get("secretRef") else LOCAL_MODEL_KEY_PLACEHOLDER
-                model=ChatOpenAI(model=config["modelRef"],api_key=api_key,base_url=provider.get("baseUrl",""),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,http_async_client=model_http_client(provider.get("baseUrl",""),self.env),**parameters)
+                model=ChatOpenAI(model=config["modelRef"],api_key=api_key,base_url=provider.get("baseUrl",""),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,http_async_client=model_http_client(provider.get("baseUrl",""),self.env),**({"default_headers":provider_headers} if provider_headers else {}),**parameters)
             elif adapter=="deepseek":
-                model=ChatDeepSeek(model=config["modelRef"],api_key=secret(provider["secretRef"]),api_base=provider.get("baseUrl","https://api.deepseek.com"),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,**({"extra_body":{"thinking":thinking}} if thinking is not None else {}),**parameters)
+                model=ChatDeepSeek(model=config["modelRef"],api_key=secret(provider["secretRef"]),api_base=provider.get("baseUrl","https://api.deepseek.com"),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,**({"extra_body":{"thinking":thinking}} if thinking is not None else {}),**({"default_headers":provider_headers} if provider_headers else {}),**parameters)
             else: raise ExecutionError("MODEL_ADAPTER_FAILED","Unsupported model adapter","infrastructure",effect="none")
             refs=config["allowedToolRefs"]
             if refs:

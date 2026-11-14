@@ -8,14 +8,16 @@ import type { FunctionDraft, ResourceEditorTarget } from "./ResourceEditor";
 
 export type WorkflowResourceDisplay = {
   key: string;
-  kind: "provider" | "api" | "function" | "variable";
+  kind: "provider" | "api" | "mcp" | "function" | "variable";
   title: string;
   badge: string;
   meta: string;
   mono?: boolean;
   platform?: boolean;
   usage: string;
-  section: "providers" | "apis" | "functions" | "variables";
+  section: "providers" | "apis" | "mcp" | "functions" | "variables";
+  /** Stable machine identity shown in details, never in the primary title. */
+  technicalId?: string;
   edit?: ResourceEditorTarget;
 };
 
@@ -77,12 +79,13 @@ export function resolveWorkflowResources(input: {
       return {
         key: reference.key,
         kind: "provider",
-        title: platform?.name || reference.ref,
+        title: platform?.name || "未找到的模型供应商",
         badge: "模型供应商",
         meta: platform ? providerModelSummary(platform.modelRefs) : "供应商引用暂不可用",
         usage,
         section: "providers",
         platform: Boolean(platform),
+        technicalId: reference.ref,
         edit: platform ? undefined : { kind: "provider", mode: "edit", ref: reference.ref },
       };
     }
@@ -98,33 +101,55 @@ export function resolveWorkflowResources(input: {
           mono: true,
           usage,
           section: "apis",
+          technicalId: connection.connectionKey,
           edit: { kind: "api", mode: "edit", ref: connection.ref },
         };
       }
       const tool = tools.find(item => item.ref === reference.ref);
       if (tool) {
+        const mcp = tool.adapter === "mcp" || Boolean(tool.connectorRef);
+        const connection = mcp
+          ? connections.find(item => item.connectionKey === tool.connectorRef)
+            ?? connections.find(item => item.ref === tool.connectionRef)
+          : undefined;
+        const declaration = tool.declaredReadOnly ? "服务声明只读" : tool.declaredDestructive ? "服务声明可能写入" : "服务未声明副作用";
+        if (mcp) {
+          return {
+            key: reference.key,
+            kind: "mcp",
+            title: tool.name || "未命名 MCP 工具",
+            badge: "MCP 工具",
+            meta: `${connection ? String(connection.content.serverTitle ?? connection.content.name ?? connection.ref) : "MCP 连接"} · ${declaration}`,
+            usage,
+            section: "mcp",
+            platform: false,
+            technicalId: tool.ref,
+          };
+        }
         return {
           key: reference.key,
           kind: "api",
-          title: tool.name,
+          title: tool.name || "未命名 API 工具",
           badge: "API",
-          meta: `${tool.ref} · 平台提供`,
+          meta: (tool.origin ?? "environment") === "user" ? "我创建的 API 工具" : "平台提供 · 只读或计算",
           mono: true,
           usage,
           section: "apis",
           platform: (tool.origin ?? "environment") !== "user",
+          technicalId: tool.ref,
           edit: { kind: "api", mode: "create", platformTool: tool },
         };
       }
       return {
         key: reference.key,
         kind: "api",
-        title: reference.ref,
+        title: "未找到的 API 工具",
         badge: "API",
-        meta: "API 引用暂不可用",
+        meta: "资源引用暂不可用",
         mono: true,
         usage,
         section: "apis",
+        technicalId: reference.ref,
       };
     }
     if (reference.kind === "function") {
@@ -162,11 +187,12 @@ export function resolveWorkflowResources(input: {
       return {
         key: reference.key,
         kind: "function",
-        title: String(fn?.name ?? reference.ref),
+        title: String(fn?.name ?? "未找到的函数"),
         badge: "函数",
         meta: fn ? `${String(fn.language ?? "python") === "javascript" ? "JavaScript" : "Python"} · 固定版本 v${fn.version}` : "函数引用暂不可用",
         usage,
         section: "functions",
+        technicalId: reference.ref,
         edit: fn ? { kind: "function", mode: "edit", ref: fn.ref, version: fn.version } : { kind: "function", mode: "edit", ref: reference.ref, ...(version ? { version } : {}) },
       };
     }

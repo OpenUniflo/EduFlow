@@ -15,7 +15,7 @@ const catalog = vi.hoisted(() => ({
     runtime: { available: {}, limits: {} },
     connections: [
       { connectionKey: "p4:o:price_api:1", ref: "price_api", version: 1, disabled: false, hasCredential: true, content: { type: "http", name: "价格服务", baseUrl: "https://api.example.com", path: "/price", method: "GET", sideEffect: "read" } },
-      { connectionKey: "p4:o:mcp_docs:1", ref: "mcp_docs", version: 1, disabled: false, hasCredential: false, content: { type: "mcp-http", name: "文档 MCP", url: "https://mcp.example.com" } },
+      { connectionKey: "p4:o:mcp_docs:1", ref: "mcp_docs", version: 1, disabled: false, hasCredential: false, content: { type: "mcp-http", name: "文档 MCP", url: "https://mcp.example.com", allowedToolNames: ["search_docs"] } },
       { connectionKey: "p4:o:my_deepseek:1", ref: "my_deepseek", version: 1, disabled: false, hasCredential: true, content: { type: "deepseek", name: "我的 DeepSeek", baseUrl: "https://api.deepseek.com", modelRefs: ["deepseek-chat"] } },
       { connectionKey: "p4:o:my_deepseek:2", ref: "my_deepseek", version: 2, disabled: false, hasCredential: true, content: { type: "deepseek", name: "我的 DeepSeek", baseUrl: "https://api.deepseek.com", modelRefs: ["deepseek-chat", "deepseek-reasoner"] } },
     ],
@@ -54,17 +54,35 @@ describe("ApiResource", () => {
 describe("McpResource", () => {
   it("shows discovered tools supplied by the caller", () => {
     const tools: WorkflowTool[] = [{ ref: "p4:o:mcp_docs:1", name: "search_docs", description: "搜索文档", contractDigest: "digest", inputSchema: { type: "object" }, origin: "user", connectionRef: "mcp_docs" }];
-    const html = renderToStaticMarkup(createElement(McpResource, { environmentRef: "local", tools }));
+    const html = renderToStaticMarkup(createElement(McpResource, { environmentRef: "local", connections: catalog.data.connections, tools, discovery: { mcp_docs: ["search_docs"] }, initialTab: "connected" }));
     expect(html).toContain("文档 MCP");
-    expect(html).toContain("已发现 1 个工具");
-    expect(html).toContain("search_docs");
-    expect(html).toContain("添加 MCP 服务");
+    expect(html).toContain("已允许 1 个");
+    expect(html).toContain("已发现 1 个");
+    expect(html).toContain("可用 1 个");
+    expect(html).toContain("搜索已连接服务");
+    expect(html).toContain("断开");
+    const toolsHtml = renderToStaticMarkup(createElement(McpResource, { environmentRef: "local", connections: catalog.data.connections, tools, discovery: { mcp_docs: ["search_docs"] }, initialTab: "tools" }));
+    expect(toolsHtml).toContain("search_docs");
+    expect(toolsHtml).toContain("管理范围");
+  });
+
+  it("marks a disabled MCP connection and keeps a reconnect action", () => {
+    const disabled = [{ connectionKey: "p4:o:old_mcp:1", ref: "old_mcp", version: 1, disabled: true, hasCredential: true, content: { type: "mcp-http", name: "旧 MCP 服务", url: "https://mcp.example.com", allowedToolNames: ["search_docs"] } }];
+    const html = renderToStaticMarkup(createElement(McpResource, { environmentRef: "local", connections: disabled, tools: [], initialTab: "connected" }));
+    expect(html).toContain("已断开 · 不可调用");
+    expect(html).toContain("已允许 1 个");
+    expect(html).toContain("重新连接");
+    expect(html).toContain("实际可用为 0");
+    expect(html).toContain("发现未记录");
+    expect(html).not.toContain("刷新工具");
+    expect(html).not.toContain(">断开</button>");
   });
 
   it("renders the MCP creation form for an intent", () => {
-    const html = renderToStaticMarkup(createElement(McpResource, { environmentRef: "local", create: true, tools: [] }));
-    expect(html).toContain("新建 MCP 服务连接");
-    expect(html).toContain("MCP HTTP 地址");
+    const html = renderToStaticMarkup(createElement(McpResource, { environmentRef: "local", connections: catalog.data.connections, create: true, tools: [] }));
+    expect(html).toContain("连接自定义 MCP 服务");
+    expect(html).toContain("MCP 连接名称");
+    expect(html).toContain("读取工具");
   });
 });
 

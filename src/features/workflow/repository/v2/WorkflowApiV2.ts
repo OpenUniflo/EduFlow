@@ -1,6 +1,6 @@
 import { apiRequest as sharedApiRequest, ApiRequestError, ApiResponseError } from "@/shared/api/apiClient";
 import { z } from "zod";
-import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow } from "../../domain/v2/types";
+import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow, McpMarketPage, McpMarketSync, McpOAuthDiscovery, WorkflowEvaluationConfig } from "../../domain/v2/types";
 
 const endpoint = (resource: string, query: Record<string, string | number | undefined> = {}) => `/api/workflows?${new URLSearchParams({ resource, ...Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) })}`;
 const runSubmissionReceipt = z.object({
@@ -41,6 +41,29 @@ export function workflowErrorMessage(reason: unknown): string {
     INVALID_EDITOR: "布局配置与节点不一致，请检查节点与连线后重试。",
     GRAPH_INVALID: "配置或输入校验未通过，请点击问题列表定位并修正。",
     SECRET_IN_DEFINITION: "工作流中不能保存密钥，请改用连接中的安全引用。",
+    MCP_AUTH_REQUIRED: "MCP 授权已失效，请在资源中心重新连接或重新授权。",
+    MCP_CONNECTION_FAILED: "MCP 服务不可达，请检查地址、网络或服务状态。",
+    INVALID_CONNECTION: "连接配置无效，请检查地址、鉴权方式和允许工具。",
+    CONNECTION_UNAVAILABLE: "连接已删除或版本不存在。请刷新资源，重新选择连接后再保存或运行。",
+    CONNECTION_BUSY: "仍有未完成或等待回应的运行正在使用此连接。请先等待运行结束或取消运行，再删除。",
+    INVALID_CONNECTION_REFERENCE: "工作流中的连接引用格式无效。请先打开原工作流，在节点中重新选择连接后再复制或保存。",
+    ENVIRONMENT_REQUIRED: "保存前请选择运行环境，以便校验工作流引用的连接。",
+    CONNECTION_IN_USE: "此供应商仍被当前工作流引用，不能删除。请先替换或移除这些引用，再重试。",
+    CONNECTION_VERSION_CONFLICT: "供应商已被其他操作更新，请刷新确认后再试。",
+    CONNECTION_NOT_DISABLED: "此连接已恢复可用，无需再次恢复。",
+    CONNECTION_DISABLED: "此连接已停用，请先恢复连接再修改名称或测试。",
+    CATALOG_NOT_FOUND: "此连接已不存在，请刷新资源中心。",
+    MCP_CONNECTION_DISABLED: "MCP 连接已断开，请重新连接后再运行。",
+    MCP_OAUTH_STATE: "OAuth 授权已过期，请重新发起连接。",
+    MCP_OAUTH_DENIED: "OAuth 授权未完成，请重试。",
+    MCP_OAUTH_UNSUPPORTED: "该服务未公开可用的 OAuth 元数据，请改用 API Key 或 Bearer。",
+    MCP_OAUTH_TOKEN: "OAuth 授权码换取令牌失败，请重新发起连接。",
+    MCP_OAUTH_REGISTRATION_FAILED: "OAuth 客户端注册被服务方拒绝。",
+    MCP_OAUTH_DISCOVERY_FAILED: "无法读取服务方的 OAuth 元数据。",
+    INVALID_MCP_ENDPOINT: "MCP 服务地址不可用，必须使用公网 HTTPS 地址。",
+    MCP_MARKET_ADMIN_REQUIRED: "只有管理员可以维护补充目录。",
+    INVALID_MARKET_SERVER: "补充目录内容无效。",
+    MCP_MARKET_UNAVAILABLE: "MCP 目录暂时不可用，请稍后重试。",
     SECRET_IN_RUN_INPUT: "外部调用数据中不能包含密钥，请改用连接中的安全引用。",
     INVALID_LAUNCH_CONTEXT: "当前动手任务与工作流不匹配，请从对应课程动手任务重新进入。",
     ASSIGNMENT_PREREQUISITE_REQUIRED: "此动手任务的前置要求尚未满足，请返回课程查看。",
@@ -96,12 +119,19 @@ export class WorkflowApiV2 {
   template(templateId: string, purpose?: "starter" | "course") { return apiRequest<WorkflowTemplateDetail>(endpoint("templates", { id: templateId, purpose })); }
   useTemplate(templateId: string, options: {name?:string;fresh?:boolean;creationId?:string;environmentRef?:string;bindings?:{nodeId:string;graphPath:string[];field:"providerRef"|"toolRef";reference:string;modelRef?:string;contractDigest?:string}[]} = {}) { return jsonRequest<{workflowId:string;revision:number}>("definitions","POST",{templateId,...options},{op:"template"}); }
   get(workflowId: string, revision?: number) { return apiRequest<WorkflowDocumentV2>(endpoint("definitions", { id: workflowId, revision })); }
-  create(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, creationId?: string) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "POST", { definition, editor, ...(creationId ? {creationId} : {}) }); }
-  save(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, baseRevision: number, baseEditorRevision: number) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "PUT", { definition, editor, baseRevision, baseEditorRevision }, { id: definition.workflowId }); }
+  create(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, creationId?: string, environmentRef?: string) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "POST", { definition, editor, ...(creationId ? {creationId} : {}), ...(environmentRef ? {environmentRef} : {}) }); }
+  save(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, baseRevision: number, baseEditorRevision: number, environmentRef: string) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "PUT", { definition, editor, baseRevision, baseEditorRevision, environmentRef }, { id: definition.workflowId }); }
   saveEditor(editor: EditorDocumentV2, baseEditorRevision: number) { return jsonRequest<{ editorRevision: number }>("editor", "PUT", { editor, baseEditorRevision }, { id: editor.workflowId }); }
   copy(workflowId: string, revision: number, name?: string, creationId?: string) { return jsonRequest<{ workflowId: string; revision: number }>("definitions", "POST", { sourceWorkflowId: workflowId, sourceRevision: revision, ...(name ? {name} : {}), ...(creationId ? {creationId} : {}) }, { op: "copy" }); }
   archive(workflowId: string, baseRevision: number) { return jsonRequest<{ ok: boolean }>("definitions", "DELETE", { baseRevision }, { id: workflowId }); }
   testNode(body: {workflowId:string;baseRevision:number;definition:WorkflowDefinitionV2;nodeId:string;input:JsonValue;state:JsonValue;environmentRef:string;confirmExternalEffect:boolean}) { return jsonRequest<{mode:string;input:JsonValue;output:JsonValue;writes:JsonValue;stateBefore:JsonValue;stateAfter:JsonValue}>("node-tests","POST",body); }
+  mcpMarket(query:{q?:string;category?:string;page?:number;limit?:number} = {}) { return apiRequest<McpMarketPage>(endpoint("mcp-market",{view:"catalog",...query})); }
+  syncMcpMarket(maxPages?:number) { return jsonRequest<McpMarketSync>("mcp-market","POST",{action:"sync",...(maxPages?{maxPages}:{})}); }
+  supplementMcpMarket(input:Record<string,unknown>) { return jsonRequest<unknown>("mcp-market","POST",{action:"supplement",...input}); }
+  removeMcpMarketServer(id:string) { return jsonRequest<{ok:boolean}>("mcp-market","POST",{action:"remove",id}); }
+  discoverMcpOAuth(body:{url:string;resourceMetadataUrl?:string}) { return jsonRequest<McpOAuthDiscovery>("mcp-auth","POST",body,{op:"discover"}); }
+  startMcpOAuth(body:{environmentRef:string;ref:string;version:number;name:string;url:string;transport:"streamable-http"|"sse";sourceId?:string;serverTitle?:string;returnTo?:string;scopes?:string[];resourceMetadataUrl?:string}) { return jsonRequest<{authorizationUrl:string;callbackUrl:string}>("mcp-auth","POST",body,{op:"start"}); }
+  inspectMcp(environmentRef:string,body:{content:Record<string,JsonValue>;credential?:string}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{environmentRef,action:"inspect",kind:"connection",...body}); }
   extensions<T>(environmentRef:string) { return apiRequest<T>(endpoint("extensions",{environmentRef})); }
   extension<T>(environmentRef:string,body:Record<string,unknown>) { return jsonRequest<T>("extensions","POST",{...body,environmentRef}); }
   /** Read-only "who uses this connection" scan across the current user's current definitions. */
@@ -122,7 +152,7 @@ export class WorkflowApiV2 {
   }
   environments() { return apiRequest<{ items: WorkflowEnvironment[] }>(endpoint("environments")); }
   tools(environmentRef: string) { return apiRequest<{ items: WorkflowTool[] }>(endpoint("tools", { environmentRef })); }
-  discover(environmentRef: string, connectorRef: string) { return jsonRequest<{ items: WorkflowTool[] }>("tools", "POST", { environmentRef, connectorRef }, { op: "discover" }); }
+  discover(environmentRef: string, connectorRef: string) { return jsonRequest<{ items: WorkflowTool[]; discoveredToolNames?: string[] }>("tools", "POST", { environmentRef, connectorRef }, { op: "discover" }); }
   validate(workflowId: string, revision: number, environmentRef: string) { return jsonRequest<WorkflowCompileResult>("validate", "POST", { workflowId, revision, environmentRef }); }
   validateDraft(definition: WorkflowDefinitionV2, environmentRef: string, input: JsonValue | undefined, draftGeneration: number) {
     return jsonRequest<WorkflowCompileResult>("validate", "POST", { mode: "draft", workflowId: definition.workflowId, baseRevision: definition.revision, draftDefinition: definition, environmentRef, ...(input !== undefined ? { input } : {}), clientRequestId: crypto.randomUUID(), draftGeneration });

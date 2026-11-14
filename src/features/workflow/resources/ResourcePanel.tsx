@@ -31,19 +31,21 @@ export function ResourcePanel({ definition, environment, tools, variableConfigur
     variableValues,
   }), [data, definition, environment, tools, variableConfiguration, variableValues]);
 
-  function itemTone(kind: WorkflowResourceDisplay["kind"]): "model" | "api" | "fn" | "var" {
-    return kind === "provider" ? "model" : kind === "api" ? "api" : kind === "function" ? "fn" : "var";
+  function itemTone(kind: WorkflowResourceDisplay["kind"]): "model" | "api" | "mcp" | "fn" | "var" {
+    return kind === "provider" ? "model" : kind === "api" ? "api" : kind === "mcp" ? "mcp" : kind === "function" ? "fn" : "var";
   }
 
   function itemIcon(kind: WorkflowResourceDisplay["kind"]) {
     if (kind === "provider") return <Sparkles size={14}/>;
     if (kind === "api") return <Server size={14}/>;
+    if (kind === "mcp") return <Server size={14}/>;
     if (kind === "function") return <Wrench size={14}/>;
     return <Braces size={14}/>;
   }
 
   function editItem(item: WorkflowResourceDisplay) {
     if (item.kind === "variable") { onExpand("variables"); return; }
+    if (item.kind === "mcp") { onExpand("mcp"); return; }
     if (locked || !item.edit) return;
     onEdit(item.edit);
   }
@@ -68,8 +70,9 @@ export function ResourcePanel({ definition, environment, tools, variableConfigur
           <div className="wf-resource-panel-card-title"><strong title={item.title}>{item.title}</strong><span className={`wf-resource-panel-badge is-${itemTone(item.kind)}`}>{item.badge}</span>{item.platform ? <span className="wf-resource-panel-badge is-platform">平台提供</span> : null}</div>
           <div className={`wf-resource-panel-card-meta${item.mono ? " is-mono" : ""}`} title={item.meta}>{item.meta}</div>
           <div className="wf-resource-panel-card-use">用于 {item.usage}</div>
+          {item.technicalId ? <details className="wf-resource-panel-tech"><summary>技术标识</summary><code>{item.technicalId}</code></details> : null}
         </div>
-        {item.kind === "variable" || item.edit ? <button type="button" className="wf-resource-panel-edit" aria-label={`编辑 ${item.title}`} title="编辑" onClick={() => editItem(item)}><Pencil size={14}/></button> : null}
+        {item.kind === "variable" || item.kind === "mcp" || item.edit ? <button type="button" className="wf-resource-panel-edit" aria-label={item.kind === "mcp" ? `打开 ${item.title} 的 MCP 连接` : `编辑 ${item.title}`} title={item.kind === "mcp" ? "打开 MCP 连接" : "编辑"} onClick={() => editItem(item)}><Pencil size={14}/></button> : null}
       </div>) : null}
       {data && !items.length ? <p className="wf-resource-panel-empty">这个流程还没有引用模型、API、函数或变量。打开资源中心创建后，在节点里选择即可。</p> : null}
       <div className="wf-resource-panel-hint"><ChevronRight size={12}/><span>点击铅笔即可编辑；展开双箭头打开资源中心</span></div>

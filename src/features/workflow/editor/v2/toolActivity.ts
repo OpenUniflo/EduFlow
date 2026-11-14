@@ -1,6 +1,6 @@
 import type { JsonValue, WorkflowDefinitionV2, WorkflowEventV2, WorkflowRunV2, WorkflowTool } from "../../domain/v2/types";
 
-export type ToolActivity = { key: string; stepId?: string; nodeId?: string; toolCallId: string; toolRef?: string; status: "running" | "success" | "failed" | "skipped"; effect?: "none" | "confirmed" | "unknown"; result?: JsonValue };
+export type ToolActivity = { key: string; stepId?: string; nodeId?: string; toolCallId: string; toolRef?: string; status: "running" | "success" | "failed" | "skipped"; effect?: "none" | "confirmed" | "unknown"; legacyUnverified?: boolean; result?: JsonValue };
 const object = (value: JsonValue | undefined) => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 
 /** Execution events remain authoritative even when a failed batch commits no Step output or State. */
@@ -13,13 +13,35 @@ export function toolActivities(runId: string, events: WorkflowEventV2[]): ToolAc
     const previous = calls.get(key);
     const call: ToolActivity = previous ?? { key, stepId: event.stepId, nodeId: event.nodeId, toolCallId: payload.toolCallId, status: "running" };
     if (event.type === "tool.started") { call.status = "running"; if (typeof payload.toolRef === "string") call.toolRef = payload.toolRef; }
-    else if (event.type === "tool.completed") { call.status = "success"; call.result = payload.result; call.effect = payload.effect === "confirmed" ? "confirmed" : payload.effect === "none" ? "none" : "unknown"; }
-    else if (event.type === "tool.failed") { call.status = "failed"; const effect = object(payload.error)?.effect; call.effect = effect === "none" ? "none" : "unknown"; }
+    else if (event.type === "tool.completed") {
+      call.status = "success"; call.result = payload.result;
+      call.effect = payload.effect === "confirmed" ? "confirmed" : payload.effect === "none" ? "none" : "unknown";
+      markLegacyMcpWriteUnverified(call);
+    }
+    else if (event.type === "tool.failed") {
+      call.status = "failed"; const effect = object(payload.error)?.effect; call.effect = effect === "none" ? "none" : "unknown";
+    }
     else if (event.type === "tool.skipped") call.status = "skipped";
     else continue;
     calls.set(key, call);
   }
   return [...calls.values()];
+}
+
+/**
+ * Older MCP calls were persisted as `confirmed` writes with no concrete write
+ * evidence. A stable owner connection tool ref is enough to identify those
+ * legacy MCP records. Never consult today's mutable tool catalog here: a later
+ * annotation or metadata edit must not rewrite what the history recorded.
+ */
+function isLegacyMcpToolRef(toolRef: string | undefined) {
+  return Boolean(toolRef && /^p4:[^:]+:[^:]+:\d+:.+/.test(toolRef));
+}
+
+function markLegacyMcpWriteUnverified(call: ToolActivity) {
+  if (call.effect !== "confirmed" || !isLegacyMcpToolRef(call.toolRef)) return;
+  call.effect = "unknown";
+  call.legacyUnverified = true;
 }
 
 export function externalEffectNotice(run: Pick<WorkflowRunV2, "runId" | "status" | "error">, events: WorkflowEventV2[], complete: boolean): string {
@@ -36,7 +58,9 @@ export function externalEffectNotice(run: Pick<WorkflowRunV2, "runId" | "status"
 
 /** True when the flow can call a tool that is declared to write an external system. */
 export function definitionHasExternalWriteTools(definition: WorkflowDefinitionV2, tools: readonly WorkflowTool[]): boolean {
-  const writes = new Set(tools.filter(tool => tool.sideEffect === "write").map(tool => tool.ref));
+  // Unknown MCP effects are not proven writes, but a re-run still needs the
+  // same external-effect warning; only declared read-only tools are excluded.
+  const writes = new Set(tools.filter(tool => tool.sideEffect !== "read" && tool.sideEffect !== "none").map(tool => tool.ref));
   const walk = (scope: WorkflowDefinitionV2): boolean => scope.nodes.some(node => {
     const config = node.config;
     const refs = [...(typeof config.toolRef === "string" && config.toolRef ? [config.toolRef] : []), ...(Array.isArray(config.allowedToolRefs) ? config.allowedToolRefs.filter((ref): ref is string => typeof ref === "string") : [])];
