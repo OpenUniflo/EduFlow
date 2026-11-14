@@ -1,3 +1,4 @@
+import type { CourseLifecycle } from "../types";
 import type { CourseRepository } from "./CourseRepository";
 import { validateCourseIntegrity, validateCourseRuntime, type CourseRuntimeData } from "../runtime/courseRuntime";
 import { globalKnowledgeAccess, userKnowledgeAccess, type KnowledgeRepository } from "@/features/knowledge/repository/KnowledgeRepository";
@@ -23,5 +24,14 @@ export class ApiCourseRepository implements CourseRepository {
 
   getCourse(courseId: string) {
     return this.runtimes.find((runtime) => runtime.course.id === courseId) ?? null;
+  }
+
+  updateLifecycle(courseId: string, lifecycle: CourseLifecycle) {
+    const current = this.runtimes.find((runtime) => runtime.course.id === courseId);
+    if (!current) return false;
+    this.runtimes = this.runtimes.map((runtime) => runtime.course.id === courseId
+      ? { ...runtime, course: { ...runtime.course, lifecycle } }
+      : runtime);
+    return true;
   }
 }

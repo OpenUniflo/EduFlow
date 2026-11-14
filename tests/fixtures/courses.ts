@@ -199,6 +199,12 @@ export class SyntheticCourseRepository implements CourseRepository {
 
   listCourseRuntimes() { return [...this.runtimeById.values()]; }
   getCourse(courseId: string) { return this.runtimeById.get(courseId) ?? null; }
+  updateLifecycle(courseId: string, lifecycle: CourseRuntimeData["course"]["lifecycle"]) {
+    const runtime = this.runtimeById.get(courseId);
+    if (!runtime) return false;
+    this.runtimeById.set(courseId, { ...runtime, course: { ...runtime.course, lifecycle } });
+    return true;
+  }
 }
 
 export function syntheticUserCourseState(userId: string, courseId: string): UserCourseState {

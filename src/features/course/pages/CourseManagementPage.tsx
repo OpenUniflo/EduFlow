@@ -15,10 +15,15 @@ export function CourseManagementPage({ session, onLogout }: { session: MockSessi
   const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | CourseLifecycle>("all");
   const [revision, setRevision] = useState(0);
+  const [lifecycleBusy, setLifecycleBusy] = useState("");
+  const [lifecycleError, setLifecycleError] = useState<{ courseId: string; lifecycle: CourseLifecycle; message: string } | null>(null);
   const [submissions, setSubmissions] = useState<AssignmentSubmissionReview[]>([]);
   const [reviewError, setReviewError] = useState("");
   const [accepting, setAccepting] = useState("");
-  const courses = useMemo(() => applicationServices.courseRepository.listCourseRuntimes().map((runtime) => ({ runtime, lifecycle: runtime.course.lifecycle ?? "published" })), [revision]);
+  const courses = useMemo(() => applicationServices.courseRepository.listCourseRuntimes().map((runtime) => ({
+    runtime,
+    lifecycle: runtime.course.lifecycle ?? "published",
+  })), [revision]);
   const labels: Record<CourseLifecycle, string> = { draft: "草稿", published: "已发布", archived: "已归档" };
 
   async function loadSubmissions() {
@@ -34,8 +39,27 @@ export function CourseManagementPage({ session, onLogout }: { session: MockSessi
   useEffect(() => { void loadSubmissions(); }, []);
 
   async function setLifecycle(courseId: string, lifecycle: CourseLifecycle) {
-    await apiRequest("/api/courses", { method: "PATCH", body: JSON.stringify({ courseId, lifecycle }) });
-    setRevision((value) => value + 1);
+    if (lifecycleBusy) return;
+    setLifecycleBusy(courseId);
+    setLifecycleError(null);
+    try {
+      const result = await apiRequest<{ courseId: string; lifecycle: CourseLifecycle }>("/api/courses", {
+        method: "PATCH",
+        body: JSON.stringify({ courseId, lifecycle }),
+      });
+      // The repository is hydrated for the page lifetime; apply the server
+      // result to its shared projection so navigating away and back is stable.
+      applicationServices.courseRepository.updateLifecycle(courseId, result.lifecycle ?? lifecycle);
+      setRevision((value) => value + 1);
+    } catch (error) {
+      setLifecycleError({
+        courseId,
+        lifecycle,
+        message: error instanceof Error && error.message ? error.message : "课程状态更新失败，请重试。",
+      });
+    } finally {
+      setLifecycleBusy("");
+    }
   }
 
   async function accept(submission: AssignmentSubmissionReview) {
@@ -90,9 +114,13 @@ export function CourseManagementPage({ session, onLogout }: { session: MockSessi
           </dl>
           <div className="ef-teach-actions">
             <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(`/courses/${runtime.course.id}?experience=design`)}><BookOpen size={15} aria-hidden="true" />设计课程</button>
-            {lifecycle === "draft" ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => void setLifecycle(runtime.course.id, "published")}><Rocket size={15} aria-hidden="true" />发布</button>
-              : lifecycle !== "archived" ? <button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={() => void setLifecycle(runtime.course.id, "archived")}><Archive size={15} aria-hidden="true" />归档</button> : null}
+            {lifecycle === "draft" ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={lifecycleBusy === runtime.course.id} onClick={() => void setLifecycle(runtime.course.id, "published")}><Rocket size={15} aria-hidden="true" />{lifecycleBusy === runtime.course.id ? "更新中…" : "发布"}</button>
+              : lifecycle !== "archived" ? <button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" disabled={lifecycleBusy === runtime.course.id} onClick={() => void setLifecycle(runtime.course.id, "archived")}><Archive size={15} aria-hidden="true" />{lifecycleBusy === runtime.course.id ? "归档中…" : "归档"}</button> : null}
           </div>
+          {lifecycleError?.courseId === runtime.course.id ? <div className="ef-teach-alert" role="alert">
+            状态更新失败：{lifecycleError.message}
+            <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={Boolean(lifecycleBusy)} onClick={() => void setLifecycle(lifecycleError.courseId, lifecycleError.lifecycle)}>重试</button>
+          </div> : null}
         </article>)}
         {!visible.length ? <div className="ef-teach-empty" role="status">
           <BookOpen size={22} aria-hidden="true" />
