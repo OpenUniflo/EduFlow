@@ -36,6 +36,43 @@ import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeC
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
 import { Button } from "@/shared/ui/Button";
 import { ArchivePage } from "@/features/archive/pages/ArchivePage";
+import { ResourceCenterDialog } from "@/features/workflow/resources/ResourceCenterDialog";
+import type { McpTab } from "@/features/workflow/resources/mcpMarketModel";
+import { workflowApiV2 } from "@/features/workflow/application/v2/useWorkflowV2Controller";
+
+type GlobalResources = { tab: McpTab; focusRef: string; notice: string };
+
+function GlobalResourceCenter({ view, onClose, onOpenReference }: { view: GlobalResources | null; onClose: () => void; onOpenReference: (workflowId: string) => void }) {
+  const [environmentRef, setEnvironmentRef] = useState("");
+  const [environmentLoading, setEnvironmentLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [environmentAttempt, setEnvironmentAttempt] = useState(0);
+  useEffect(() => {
+    if (!view) { setEnvironmentRef(""); setEnvironmentLoading(false); setError(""); return; }
+    let active = true;
+    setEnvironmentRef(""); setEnvironmentLoading(true); setError("");
+    workflowApiV2.environments()
+      .then(result => { if (active) setEnvironmentRef(result.items[0]?.environmentRef ?? ""); })
+      .catch(() => { if (active) setError("工作流服务暂时不可用，无法读取资源目录。"); })
+      .finally(() => { if (active) setEnvironmentLoading(false); });
+    return () => { active = false; };
+  }, [view, environmentAttempt]);
+  if (!view) return null;
+  return <ResourceCenterDialog
+    open
+    environmentRef={environmentRef}
+    environmentLoading={environmentLoading}
+    environmentError={error}
+    onRetryEnvironment={() => setEnvironmentAttempt(value => value + 1)}
+    initialSection="mcp"
+    initialMcpTab={view.tab}
+    focusMcpRef={view.focusRef}
+    notice={view.notice}
+    onClose={onClose}
+    onOpenReference={(row) => { onClose(); onOpenReference(row.workflowId); }}
+    onResourcesChanged={() => undefined}
+  />;
+}
 
 const passwordResetEnabled = isPasswordResetEnabled();
 
@@ -69,6 +106,7 @@ export default function App() {
   const [session, setSession] = useState<MockSession | null>(null);
   const [ready, setReady] = useState(false);
   const [startupError, setStartupError] = useState("");
+  const [globalResources, setGlobalResources] = useState<GlobalResources | null>(null);
 
   useEffect(() => {
     try { retireLegacyWorkflowStorage(localStorage); } catch { /* Storage may be unavailable; no runtime reads old keys. */ }
@@ -112,6 +150,26 @@ export default function App() {
     () => routeWorkflowId ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
     [location.search, routeWorkflowId, ready]
   );
+  useEffect(() => {
+    if (!ready) return;
+    const params = new URLSearchParams(location.search);
+    const outcome = params.get("mcpOAuth");
+    if (!outcome) return;
+    const ref = params.get("ref") ?? "";
+    const message = params.get("message") ?? "";
+    const toolCount = params.get("tools") ?? "";
+    setGlobalResources({
+      tab: "connected", focusRef: ref,
+      notice: outcome === "success"
+        ? `OAuth 授权完成${ref ? `：${ref}` : ""}${toolCount ? ` · 服务端返回 ${toolCount} 个工具` : ""}。连接已保存。`
+        : outcome === "pending"
+          ? `OAuth 已授权${ref ? `：${ref}` : ""}${toolCount ? ` · 服务端返回 ${toolCount} 个工具` : ""}。${message || "请明确选择允许使用的工具。"}`
+          : `OAuth 连接未完成${message ? `：${message}` : ""}。可以重新尝试或改用 API Key。`,
+    });
+    params.delete("mcpOAuth"); params.delete("ref"); params.delete("tools"); params.delete("message");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }, [ready, location.pathname, location.search, navigate]);
+
   async function logout() {
     await Promise.all([
       (applicationServices.learningProgressRepository as { flush?: () => Promise<unknown> }).flush?.()
@@ -212,7 +270,7 @@ export default function App() {
 
   return (
     <AuthProvider value={{ session, signIn, signUp, logout, changePassword, requestPasswordReset, updatePassword }}>
-      <AppChrome session={session} onLogout={logout}>
+      <AppChrome session={session} onLogout={logout} onOpenResources={() => setGlobalResources({ tab: "market", focusRef: "", notice: "" })}>
         <AssistantRuntimeBoundary session={session}>
           <Routes>
             <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
@@ -251,6 +309,7 @@ export default function App() {
           </Routes>
         </AssistantRuntimeBoundary>
       </AppChrome>
+      <GlobalResourceCenter view={globalResources} onClose={() => setGlobalResources(null)} onOpenReference={(workflowId) => navigate(`/works/${workflowId}`)} />
       <GlobalCommandPalette session={session} />
     </AuthProvider>
   );

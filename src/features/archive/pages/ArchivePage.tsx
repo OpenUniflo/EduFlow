@@ -20,6 +20,7 @@ import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { ArchivePeopleBar } from "../components/ArchivePeopleBar";
 import { ArchivePersonPanel, ArchivePeopleSharePanel, type PanelPerson } from "../components/ArchivePeoplePanels";
+import { ArchiveNotificationsDialog } from "../components/ArchiveSocialDialogs";
 import { ArchiveAssistantPanel, GuestAssistantCard } from "../components/ArchiveAssistantPanel";
 import { ArchiveCourseFocusBar, ArchiveCourseMini, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveNodePanel } from "../components/ArchiveChrome";
 import { SceneZoomToolbar } from "@/shared/scene/SceneZoomToolbar";
@@ -184,6 +185,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const [people, setPeople] = useState<readonly FollowedPerson[]>([]);
   const [peopleError, setPeopleError] = useState("");
   const [socialOpen, setSocialOpen] = useState(urlState.panel === "people" || urlState.panel === "share");
+  const notificationsOpen = urlState.panel === "notifications";
   const [personPanelCollapsed, setPersonPanelCollapsed] = useState(false);
   const [assistant, setAssistant] = useState<ArchiveAssistantPresentation>(EMPTY_PRESENTATION);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -473,6 +475,13 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  const closeNotifications = useCallback(() => {
+    setPanelParam(null);
+    // The account trigger stays mounted on the Archive. Return focus there so
+    // closing the preview does not strand keyboard users on a removed dialog.
+    window.setTimeout(() => document.getElementById("ef-account-trigger")?.focus(), 0);
+  }, [setPanelParam]);
+
   const openSearch = useCallback(() => {
     setAssistantOpen(false);
     setCoursesOpen(false);
@@ -651,6 +660,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (event.key === "Escape") {
         event.preventDefault();
+        if (notificationsOpen) { closeNotifications(); return; }
         if (socialOpen) { setSocialOpen(false); return; }
         closeDetailOrFocus();
         return;
@@ -660,7 +670,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [closeDetailOrFocus, openSearch, socialOpen]);
+  }, [closeDetailOrFocus, closeNotifications, notificationsOpen, openSearch, socialOpen]);
 
   useEffect(() => {
     if (!assistantOpen || visibleAssistant.state === "idle") return;
@@ -785,6 +795,8 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           onOpenCourse={(id) => openCourse(id)}
         />
       ) : null}
+
+      <ArchiveNotificationsDialog open={notificationsOpen} onClose={closeNotifications} />
 
       {socialOpen && session ? (
         <ArchivePeopleSharePanel

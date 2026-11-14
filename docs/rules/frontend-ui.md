@@ -5,7 +5,7 @@
 ## Product Chrome
 
 - The primary chrome is a left vertical navigation rail with the account avatar at the bottom. It is the single primary chrome. A page title, contextual control, or workspace tool MUST NOT introduce a second full-width fixed header.
-- The learner rail grows from real learning state: 首页 by default, then 作品 after a real task/attempt, 记录 after a learning record, and 地图 after the first segment is complete. It is derived, never a level or unlock record. Teachers and admins always receive their full set. Hidden is not locked: URL, ⌘K and the Assistant still reach every destination.
+- The learner rail is fixed for every logged-in learner: 首页, 作品, 记录, 地图 in that order, independent of learning state. It is not a level or unlock record. Teachers and admins keep their role entries (教学 / 管理) after the learner set; guests receive 首页 only. URL, ⌘K and the Assistant still reach every destination the viewer may access.
 - Content and management pages use headings in normal document flow; graph, canvas, and reader pages use only lightweight contextual overlays so their primary workspace remains dominant.
 - Micro Learning is interaction-first. Assistant help may be contextual, but product chrome and Assistant actions MUST NOT visually or behaviorally dominate the assessment.
 
@@ -13,6 +13,8 @@
 
 - Single design source: `docs/design/new-ui/system/tokens.css` (six type sizes 12/13/14/16/20/28, semantic colors, radii, spacing, three shadows, two glass materials `lg-regular`/`lg-clear`, motion tokens). New styles use tokens only; legacy styles are removed page by page as pages migrate.
 - Glass MUST degrade to blur-only on Safari and to opaque surfaces under `prefers-reduced-transparency`.
+- Document-flow pages scroll the window. Only full-viewport canvases, maps and readers lock the window and own an internal scroll area; dialogs keep their own bounded scroll. Narrow screens reserve the fixed bottom navigation clearance so page controls and footers remain reachable.
+- Course design chrome is a responsive stack: title/mode toggle, then authoring controls, then search/meta. The title layer MUST NOT overlap or intercept authoring controls at desktop or phone widths.
 - Motion: durations 160/240/400/600 ms and three easings; 600 ms only for scene transitions (Archive → course immersive, 3D → 2D flatten). Every transition is reversible and has a `prefers-reduced-motion` alternative.
 - The avatar opens the account menu (first row: 打开我的面板). The 我的 panel opens from the Home top-right toggle and pushes, not covers, the conversation.
 - Objects open through one Object Shell with four sizes (card S, card L, side panel, immersive). Expanding never slides a new drawer in from the screen edge; entering a course zooms in place and morphs existing overlays. When one object changes size it stays one mounted instance with its state and moves from where it was; it MUST NOT open a second instance of the same object.

@@ -47,7 +47,11 @@
 .eduflow-assistant button:focus-visible, .eduflow-assistant input:focus-visible { outline: 2px solid var(--atlas-brand); outline-offset: 3px; }
 .eduflow-assistant button:disabled { opacity: .5; cursor: not-allowed; }
 
-@media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: 24px; } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
+@media(max-width:900px) {
+  .eduflow-assistant.course-design-assistant { bottom: var(--ef-mobile-nav-clearance); }
+  .eduflow-assistant .eduflow-assistant-panel { max-height: calc(100dvh - var(--ef-mobile-nav-clearance) - 80px); }
+}
+@media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: var(--ef-mobile-nav-clearance); } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
 @media(prefers-reduced-motion:reduce) { .eduflow-assistant.course-design-assistant, .eduflow-assistant .course-design-assistant-trigger { transition: none; } .eduflow-assistant .course-design-assistant-trigger:hover { transform: none; } .eduflow-assistant .spin { animation: none; } }
 
 /* The full Workbench already owns a conversation and stable Composer. */
@@ -58,11 +62,20 @@ body:has(.conversation-workbench) .eduflow-assistant { display:none; }
 body:has(.ef-practice-page) .ef-practice-shell .ef-ui-obj-foot {
   padding-right: calc(var(--sp-16) + 76px);
 }
-body:has(.creator-page) .creator-footer {
-  padding-right: calc(var(--sp-16) + 76px);
+@media (min-width: 901px) {
+  body:has(.creator-page) .creator-footer {
+    padding-right: calc(var(--sp-16) + 76px);
+  }
 }
 body:has(.creator-page) .creator-shell {
   padding-bottom: calc(var(--sp-32) + 72px);
+}
+/* Phones reserve vertical space instead of narrowing the footer: the fixed
+ * trigger sits below the action, so the primary label keeps one line. */
+@media (max-width: 900px) {
+  body:has(.creator-page) .creator-shell {
+    padding-bottom: calc(var(--ef-mobile-nav-clearance) + var(--ef-assistant-trigger-size) + var(--sp-16));
+  }
 }
 
 /* Micro Learning is an immersive bottom-action page: reserve the trigger's

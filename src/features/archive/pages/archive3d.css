@@ -646,16 +646,93 @@
   .ef-atlas-legend { display: none; }
 }
 
+@media (max-width: 900px) {
+  /* The rail becomes a fixed bottom bar here. The Atlas is a fixed canvas, so
+   * it must fill the viewport itself; its HUD reserves the bar's height. */
+  .ef-archive {
+    --ef-atlas-bottom-clearance: var(--ef-mobile-nav-clearance);
+    --ef-atlas-upper-clearance: calc(var(--ef-mobile-nav-clearance) + 54px);
+    --ef-atlas-panel-clearance: calc(var(--ef-atlas-upper-clearance) + 52px + var(--sp-8));
+    inset: 0;
+  }
+
+  .ef-archive .ef-atlas-people {
+    top: var(--sp-12);
+    left: var(--sp-12);
+    max-width: calc(100% - var(--sp-24));
+  }
+
+  .ef-archive .ef-atlas-level {
+    bottom: var(--ef-atlas-bottom-clearance);
+    left: var(--sp-12);
+  }
+
+  .ef-archive .ef-atlas-level button { padding: 4px var(--sp-8); }
+
+  .ef-archive .ef-atlas-zoom {
+    right: var(--sp-12);
+    bottom: var(--ef-atlas-bottom-clearance);
+  }
+
+  .ef-archive .ef-atlas-detail {
+    bottom: var(--ef-atlas-bottom-clearance);
+  }
+
+  .ef-archive .ef-archive-assistant-fab {
+    right: auto;
+    bottom: var(--ef-atlas-upper-clearance);
+    left: var(--sp-12);
+  }
+
+  .ef-archive .ef-archive-assistant {
+    right: var(--sp-12);
+    bottom: var(--ef-atlas-bottom-clearance);
+    left: var(--sp-12);
+    width: auto;
+    max-height: min(640px, calc(100dvh - var(--ef-atlas-bottom-clearance) - 74px));
+    z-index: 63;
+  }
+
+  .ef-archive .ef-archive-search-panel {
+    left: var(--sp-16);
+    width: min(370px, calc(100% - var(--sp-32)));
+    max-height: calc(100dvh - 72px - var(--ef-atlas-panel-clearance));
+  }
+
+  .ef-archive .ef-archive-search-panel.is-below-strip {
+    max-height: calc(100dvh - 120px - var(--ef-atlas-panel-clearance));
+  }
+
+  body:has(.ef-archive) .course-design-assistant {
+    bottom: calc(var(--ef-mobile-nav-clearance) + 54px);
+  }
+
+  body:has(.ef-archive) .course-design-assistant-panel {
+    max-height: calc(100dvh - var(--ef-mobile-nav-clearance) - 130px);
+  }
+}
+
 @media (max-width: 760px) {
   .ef-atlas-person-pill span { display: none; }
   .ef-atlas-people-preview { display: none; }
-  .ef-atlas-panel { right: var(--sp-16); width: auto; max-height: 52vh; top: auto; bottom: 64px; }
-  .ef-atlas-strip { top: auto; bottom: 64px; }
-  .ef-atlas-detail { right: var(--sp-16); left: var(--sp-16); width: auto; top: 36%; max-height: 56vh; }
+  .ef-atlas-panel { right: var(--sp-16); width: auto; max-height: 52vh; top: auto; bottom: var(--ef-atlas-panel-clearance); }
+  .ef-atlas-strip { top: auto; bottom: var(--ef-atlas-panel-clearance); }
+  .ef-archive .ef-atlas-detail { right: var(--sp-16); left: var(--sp-16); width: auto; top: auto; bottom: var(--ef-atlas-panel-clearance); max-height: 52vh; }
   .ef-atlas-coursebar { top: 64px; flex-wrap: wrap; }
   .ef-atlas-coursebar-progress { width: 120px; }
   .ef-atlas-zoom-reset span { display: none; }
   .ef-archive .ef-archive-assistant { width: calc(100% - 32px); }
+}
+
+@media (max-width: 360px) {
+  /* Keep all top tools visible: followed-person capsules still open from the
+   * people panel, while search/courses stay in the bar. */
+  .ef-archive {
+    --ef-atlas-panel-clearance: calc(var(--ef-atlas-upper-clearance) + 52px + 35px + var(--sp-16));
+  }
+  .ef-archive .ef-atlas-person-pill[data-preview="sample"] { display: none; }
+  .ef-archive .ef-atlas-level { bottom: var(--ef-atlas-upper-clearance); }
+  .ef-archive .ef-archive-assistant-fab { bottom: calc(var(--ef-atlas-upper-clearance) + 35px + var(--sp-8)); }
 }
 
 @media (prefers-reduced-transparency: reduce) {

@@ -108,6 +108,7 @@ body:has(.wf-library-page){min-width:0}
 .wf-library-pagination{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin-top:var(--sp-24);font-size:var(--fs-12)}.wf-library-pagination label{margin-right:auto}.wf-library-pagination select{font:inherit;border:1px solid var(--line);border-radius:var(--r-8);padding:6px;color:inherit;background:var(--surface)}
 .wf-library-notice{padding:9px var(--sp-12);background:var(--target-soft);color:color-mix(in srgb, var(--target) 54%, var(--ink));border-radius:var(--r-12)}.wf-library-pending{min-height:160px;padding:30px;text-align:center}
 .wf-v2-migration.wf-library-dialog{inset:auto;width:min(760px,calc(100vw - 40px));max-height:88dvh;margin:auto;padding:22px;box-sizing:border-box;top:50%;left:50%;transform:translate(-50%,-50%)}
+@media(max-width:900px){.wf-v2-migration.wf-library-dialog{max-height:calc(100dvh - var(--ef-mobile-nav-clearance) - var(--ef-mobile-nav-clearance));}}
 .wf-v2-migration.wf-action-dialog{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,calc(100vw - 32px));max-height:88dvh;margin:0;padding:var(--sp-20);box-sizing:border-box}.wf-v2-migration.wf-confirm-dialog{background:var(--surface)}
 .wf-v2-migration.wf-confirm-dialog .wf-v2-dialog-header,
 .wf-v2-migration.wf-confirm-dialog .wf-dialog-actions{background:var(--surface)}.wf-action-dialog .primary{background:var(--brand);color:var(--surface);border-color:var(--brand)}.wf-action-dialog .danger{color:var(--danger)}.wf-action-dialog .wf-dialog-actions .danger{background:var(--danger);color:var(--surface);border-color:var(--danger)}.wf-action-dialog p{margin:10px 0;line-height:1.7}.wf-confirm-list{margin:var(--sp-8) 0;padding-left:var(--sp-20);color:var(--danger)}.wf-confirm-list li{padding:2px 0}
@@ -1193,3 +1194,41 @@ main.atlas-page-shell.wf-library-page{padding:0}
   }
 }
 .wf-unified .wf-history-button{min-width:51px;padding:0 var(--sp-8);gap:var(--sp-4);justify-content:center}
+/* Empty-canvas starter must remain a usable newcomer path on phones: clear the
+   workflow toolbar, the data card and the fixed bottom navigation. */
+@media(max-width:900px){
+  .wf-empty-start{position:absolute;inset:0;z-index:6;display:block;overflow:auto;padding:112px var(--sp-12) calc(var(--ef-mobile-nav-clearance,84px) + 32px);-webkit-overflow-scrolling:touch}
+  .wf-empty-start-inner{max-width:640px;margin:0 auto;text-align:center}
+  .wf-v2-canvas:has(.wf-empty-start) .wf-overview{display:none}
+  .wf-v2-body:has(.wf-empty-start) .wf-floating-tools,
+  .wf-v2-body:has(.wf-empty-start) .wf-assistant-trigger-group{display:none}
+  .wf-empty-start-cards{gap:var(--sp-12)}
+}
+@media(max-width:600px){
+  .wf-empty-start{padding-top:96px}
+  .wf-empty-start h2{font-size:var(--fs-20)}
+  .wf-empty-start-cards{display:grid;grid-template-columns:1fr;gap:8px;margin-top:14px}
+  .wf-unified .wf-start-card{width:100%;height:auto;padding:11px 13px;min-height:0}
+  .wf-start-card small{display:none}
+  .wf-start-card .wf-start-chain{font-size:var(--fs-12)}
+  .wf-start-blank{width:100%;margin-top:12px}
+}
+
+/* Narrow-screen chrome: the actual global Assistant lives outside .wf-unified,
+   and the fixed learner nav owns the bottom safe area. Never let either cover
+   the evaluation form, history dock or report actions. */
+@media(max-width:900px){
+  body.workflow-live-active:has(.wf-v2-inspector:not(.closed)) .eduflow-assistant,
+  body.workflow-live-active:has(.wf-history-dock.open) .eduflow-assistant{display:none}
+  body.workflow-live-active:has(.wf-v2-inspector:not(.closed)) .wf-history-dock{display:none}
+  body.workflow-live-active:has(.wf-history-dock.open) .wf-v2-inspector{display:none}
+  .wf-v2-inspector{top:calc(var(--wf-floating-bottom,102px) + 8px);bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--sp-8))}
+  .wf-history-dock{bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--sp-4))}
+  .wf-history-dock.open{max-height:min(40vh,calc(100dvh - var(--ef-mobile-nav-clearance,88px) - 112px))}
+  .wf-run-result-card{bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--wf-history-height,0px) + var(--sp-8))}
+  .wf-v2-inspector[data-tab="evaluation"] .wf-v2-inspector-scroll{padding-bottom:calc(104px + env(safe-area-inset-bottom))}
+}
+@media(max-width:600px){
+  .wf-v2-inspector{top:calc(var(--wf-floating-bottom,102px) + 8px);bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--sp-4))}
+  .wf-history-dock{bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--sp-4))}
+}

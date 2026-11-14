@@ -454,7 +454,7 @@
 
   .ef-app-main {
     margin-left: 0;
-    padding-bottom: 88px;
+    padding-bottom: var(--ef-mobile-nav-clearance);
   }
 
   .ef-nav {
@@ -477,14 +477,34 @@
 
   .ef-nav-grp {
     width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
     flex-direction: row;
+    justify-content: space-between;
+    gap: 2px;
   }
 
   .ef-nav-item,
   .ef-nav-me,
   .ef-nav-guest {
-    width: 50px;
+    width: auto;
     min-height: 48px;
+  }
+
+  .ef-nav-item {
+    min-width: 0;
+    max-width: 72px;
+    flex: 1 1 0;
+  }
+
+  .ef-nav-me,
+  .ef-nav-guest {
+    min-width: 48px;
+  }
+
+  .ef-nav-me-wrap {
+    width: auto;
+    flex: 0 0 auto;
   }
 
   .ef-nav-account {
@@ -492,6 +512,35 @@
     right: var(--sp-12);
     bottom: calc(var(--sp-12) + 76px);
     left: auto;
+  }
+}
+
+/* A 320px viewport has exactly room for six entries and the account at the
+ * 44px touch minimum when the rail uses the full width. */
+@media (max-width: 360px) {
+  .ef-nav {
+    right: 6px;
+    left: 6px;
+    gap: 0;
+    padding: 0;
+  }
+
+  .ef-nav-grp {
+    gap: 0;
+    justify-content: stretch;
+  }
+
+  .ef-nav-item {
+    min-width: 44px;
+    max-width: none;
+    padding-inline: 0;
+  }
+
+  .ef-nav-me,
+  .ef-nav-guest {
+    width: 44px;
+    min-width: 44px;
+    padding-inline: 0;
   }
 }
 

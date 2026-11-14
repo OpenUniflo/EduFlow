@@ -10,6 +10,36 @@
   --ef-global-nav-rail: var(--nav-w);
   --ef-global-nav-gap: var(--sp-12);
   --ef-page-left: calc(var(--ef-global-nav-rail) + var(--ef-global-nav-gap));
+  /* Height the fixed bottom bar reserves on narrow screens: 64px bar,
+   * 12px bottom inset and a 12px gap before page controls. */
+  --ef-mobile-nav-clearance: 0px;
+  /* Course design chrome is one vertical stack: title, mode toggle, then
+   * authoring controls. The page and the canvas keep their own scrolling. */
+  --ef-course-header-top: var(--sp-24);
+  --ef-course-header-left: calc(var(--ef-global-nav-rail) + var(--sp-24));
+  --ef-course-header-right: var(--sp-24);
+  --ef-course-header-height: 64px;
+  --ef-course-toolbar-top: calc(var(--ef-course-header-top) + var(--ef-course-header-height) + var(--sp-8));
+}
+
+/*
+ * Document pages scroll the window. Full-viewport workspaces (graph, map,
+ * canvas, reader) opt the window out and own their internal scroll. Dialogs
+ * never depend on this switch; they keep their own bounded scroll areas.
+ */
+html {
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body:has(.atlas-graph-page),
+body:has(.ef-archive),
+body.workflow-live-active {
+  overflow-y: hidden;
 }
 
 .ef-app-main {
@@ -38,6 +68,11 @@
   :root {
     --ef-global-nav-rail: 0px;
     --ef-global-nav-gap: 0px;
+    --ef-mobile-nav-clearance: calc(64px + var(--sp-24));
+    --ef-course-header-top: var(--sp-16);
+    --ef-course-header-left: var(--sp-16);
+    --ef-course-header-right: var(--sp-16);
+    --ef-course-toolbar-top: calc(var(--ef-course-header-top) + var(--ef-course-header-height) + var(--sp-8));
   }
 
   .ef-app-main .material-reader-current .atlas-lesson-header {
@@ -46,6 +81,139 @@
 
   .ef-app-main .material-reader-current .atlas-lesson-outline {
     left: var(--material-shell-margin);
+  }
+}
+
+/* ---------- Course graph / design chrome ---------- */
+/* These overrides replace the historical blanket `top/left` shared by the
+ * course title and the authoring toolbar. They remain separate rows at every
+ * width, so the higher title layer can never cover an authoring control. */
+.ef-app-main .atlas-skill-course-island {
+  top: var(--ef-course-header-top);
+  right: var(--ef-course-header-right);
+  left: var(--ef-course-header-left);
+  min-height: var(--ef-course-header-height);
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--sp-12);
+  padding: 6px 8px;
+}
+
+.ef-app-main .atlas-skill-course-island > .atlas-skill-header-left,
+.ef-app-main .atlas-skill-course-island > .atlas-skill-header-center,
+.ef-app-main .atlas-skill-course-island > .atlas-skill-header-actions {
+  min-width: 0;
+}
+
+.ef-app-main .atlas-skill-course-island .atlas-skill-title {
+  max-width: 100%;
+}
+
+.ef-app-main .atlas-skill-course-island .atlas-skill-title > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ef-app-main .atlas-skill-course-island .atlas-skill-header-actions {
+  overflow: hidden;
+}
+
+.ef-app-main .atlas-skill-course-island .atlas-skill-focus {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ef-app-main .course-authoring-toolbar,
+.ef-app-main .course-authoring-toolbar.drawer-open {
+  top: var(--ef-course-toolbar-top);
+  right: auto;
+  left: var(--ef-course-header-left);
+  z-index: 58;
+  width: max-content;
+  max-width: calc(100vw - var(--ef-global-nav-rail) - var(--sp-48));
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: var(--sh-1);
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+
+.ef-app-main .course-authoring-toolbar.drawer-open {
+  max-width: calc(100vw - var(--ef-global-nav-rail) - min(50vw, 760px) - var(--sp-48));
+}
+
+.ef-app-main .atlas-graph-meta {
+  top: var(--ef-course-toolbar-top);
+  right: var(--ef-course-header-right);
+  left: auto;
+  z-index: 35;
+}
+
+.ef-app-main .atlas-graph-meta.drawer-open {
+  right: calc(min(50vw, 760px) + var(--sp-24));
+}
+
+@media (max-width: 760px) {
+  :root {
+    --ef-course-header-top: var(--sp-12);
+    --ef-course-header-left: var(--sp-12);
+    --ef-course-header-right: var(--sp-12);
+    /* Two rows: title + mode toggle, then the expand action. */
+    --ef-course-header-height: calc(var(--ctl-40) + var(--ctl-32) + var(--sp-24));
+    --ef-course-toolbar-top: calc(var(--ef-course-header-top) + var(--ef-course-header-height) + var(--sp-8));
+  }
+
+  .ef-app-main .atlas-skill-course-island {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-4) var(--sp-8);
+    padding: var(--sp-4);
+  }
+
+  .ef-app-main .atlas-skill-course-island > .atlas-skill-header-left {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .ef-app-main .atlas-skill-course-island > .atlas-skill-header-center {
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-end;
+  }
+
+  .ef-app-main .atlas-skill-course-island > .atlas-skill-header-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .ef-app-main .atlas-skill-course-island .experience-mode-toggle button {
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: var(--fs-12);
+  }
+
+  .ef-app-main .course-authoring-toolbar,
+  .ef-app-main .course-authoring-toolbar.drawer-open {
+    right: var(--ef-course-header-right);
+    width: auto;
+    max-width: none;
+    padding: var(--sp-4);
+    flex-wrap: wrap;
+    row-gap: var(--sp-4);
+    overflow-x: visible;
+  }
+
+  .ef-app-main .course-authoring-toolbar button {
+    flex: 0 0 auto;
+  }
+
+  .ef-app-main .atlas-graph-meta,
+  .ef-app-main .atlas-graph-meta.drawer-open {
+    top: calc(var(--ef-course-toolbar-top) + 52px);
+    right: var(--ef-course-header-right);
+    left: var(--ef-course-header-left);
   }
 }
 
@@ -82,5 +250,40 @@
     left: var(--sp-16);
     max-width: calc(100% - 290px);
     transform: none;
+  }
+}
+
+/* Course creation footer: the confirmation action stays a horizontal,
+ * full-height control at phone widths instead of collapsing into a vertical
+ * strip inside the flex row. */
+@media (max-width: 760px) {
+  .ef-app-main .creator-footer {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .ef-app-main .creator-footer > span {
+    flex: 1 0 100%;
+  }
+
+  .ef-app-main .creator-footer > button {
+    min-height: var(--ctl-40);
+    flex: 1 1 140px;
+  }
+}
+
+/* Three step columns leave the label only a few characters at phone widths;
+ * two columns keep every step title horizontal and readable. */
+@media (max-width: 520px) {
+  .ef-app-main .creator-stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ef-app-main .creator-stepper button {
+    align-items: flex-start;
+  }
+
+  .ef-app-main .creator-stepper svg:last-child {
+    display: none;
   }
 }

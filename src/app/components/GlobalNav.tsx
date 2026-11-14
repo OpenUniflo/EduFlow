@@ -1,4 +1,4 @@
-import { Bell, Eye, GraduationCap, History, Home, LayoutGrid, LogIn, Network, Settings2, ShieldCheck, Users } from "lucide-react";
+import { Bell, Blocks, Eye, GraduationCap, History, Home, LayoutGrid, LogIn, Network, Settings2, ShieldCheck, Users } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -10,8 +10,7 @@ import { AccountMenu } from "@/shared/ui/AccountMenu";
 import { Avatar } from "@/shared/ui/Avatar";
 import { BrandMark } from "@/shared/ui/BrandMark";
 import { shortDisplayName } from "@/shared/ui/displayName";
-import { deriveHomeNavigation, type HomeNavId, type HomeNavSignals } from "@/features/home/homeMainline";
-import { useLearnerNavigationSignals } from "./useLearnerNavigationSignals";
+import { deriveHomeNavigation, type HomeNavId } from "@/features/home/homeMainline";
 
 export type GlobalNavActive = "home" | "archive" | "works" | "records" | "teaching" | "admin";
 
@@ -32,16 +31,16 @@ const learnerNavigationItems: Record<HomeNavId, GlobalNavItem> = {
 };
 
 /**
- * Learner workspaces appear from real state; role workspaces append without
- * changing learner IA. Guests and brand-new learners start with Home only;
- * every other route stays reachable by URL, ⌘K and the Assistant.
+ * Logged-in learners always receive the same four workspaces in the same
+ * order; learning state never hides one. Role workspaces append without
+ * changing learner IA. Guests only receive Home, while every route stays
+ * reachable by URL, ⌘K and the Assistant.
  */
-export function getPrimaryNavigationItems(session?: MockSession | null, signals: HomeNavSignals = { hasLearningRecord: false, hasPracticeActivity: false, hasFirstSegmentComplete: false }): GlobalNavItem[] {
+export function getPrimaryNavigationItems(session?: MockSession | null): GlobalNavItem[] {
   if (!session) return [learnerNavigationItems.home];
   return deriveHomeNavigation({
     isTeacher: canManageCourses(session),
-    isAdmin: canManageKnowledgeDomains(session),
-    signals
+    isAdmin: canManageKnowledgeDomains(session)
   }).map((id) => learnerNavigationItems[id]);
 }
 
@@ -55,10 +54,8 @@ function NavItem({ item }: { item: GlobalNavItem }) {
   );
 }
 
-export function GlobalNav({ session, onLogout, navigationSignals }: { session?: MockSession | null; onLogout?: () => void; navigationSignals?: HomeNavSignals }) {
+export function GlobalNav({ session, onLogout, onOpenResources }: { session?: MockSession | null; onLogout?: () => void; onOpenResources?: () => void }) {
   const navigate = useNavigate();
-  const readSignals = useLearnerNavigationSignals(session ?? null);
-  const signals = navigationSignals ?? readSignals;
   const location = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -84,6 +81,7 @@ export function GlobalNav({ session, onLogout, navigationSignals }: { session?: 
         onClose={() => setAccountOpen(false)}
         onOpenPanel={() => navigate("/?panel=1")}
         items={[
+          ...(onOpenResources ? [{ id: "resources", label: "资源中心", icon: <Blocks size={18} aria-hidden />, kbd: "MCP", onSelect: onOpenResources }] : []),
           { id: "visibility", label: "地图可见性与分享", icon: <Eye size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=share") },
           { id: "people", label: "关注的人", icon: <Users size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=people") },
           { id: "settings", label: "设置", icon: <Settings2 size={18} aria-hidden />, onSelect: () => navigate("/settings") },
@@ -102,13 +100,14 @@ export function GlobalNav({ session, onLogout, navigationSignals }: { session?: 
           <BrandMark variant="rail" size={22} />
         </NavLink>
         <div className="ef-nav-grp">
-          {getPrimaryNavigationItems(session, signals).map((item) => <NavItem key={item.id} item={item} />)}
+          {getPrimaryNavigationItems(session).map((item) => <NavItem key={item.id} item={item} />)}
         </div>
         <div className="ef-nav-spacer" />
         {session ? (
           <div className="ef-nav-me-wrap">
             <button
               ref={triggerRef}
+              id="ef-account-trigger"
               type="button"
               className={`ef-nav-me${accountOpen ? " is-open" : ""}`}
               aria-label={`账户：${session.name}，${accountOpen ? "收起" : "打开"}账户菜单`}

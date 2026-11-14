@@ -19,39 +19,26 @@ export function deriveHomeView(input: {
   return "conversation";
 }
 
-export type HomeNavSignals = {
-  hasLearningRecord: boolean;
-  hasPracticeActivity: boolean;
-  hasFirstSegmentComplete: boolean;
-};
-
 export type HomeNavId = "home" | "archive" | "works" | "records" | "teaching" | "admin";
 
 /**
- * Default navigation grows from real learner state. It is not a level or an
- * unlock store: every hidden destination remains reachable by URL, ⌘K and the
- * Assistant. Teachers and admins always receive their full set.
+ * Authenticated navigation is stable: every logged-in learner always gets
+ * 首页 / 作品 / 记录 / 地图 in that order, independent of learning state.
+ * Teachers and admins keep their role entries after the learner set. Guests
+ * only receive 首页; other destinations stay reachable by URL, ⌘K and the
+ * Assistant.
  */
 export function deriveHomeNavigation(input: {
   isTeacher: boolean;
   isAdmin: boolean;
-  signals: HomeNavSignals;
 }): HomeNavId[] {
-  if (input.isTeacher || input.isAdmin) {
-    return [
-      "home",
-      "archive",
-      "works",
-      "records",
-      ...(input.isTeacher || input.isAdmin ? ["teaching" as const] : []),
-      ...(input.isAdmin ? ["admin" as const] : [])
-    ];
-  }
   return [
     "home",
-    ...(input.signals.hasPracticeActivity ? ["works" as const] : []),
-    ...(input.signals.hasLearningRecord ? ["records" as const] : []),
-    ...(input.signals.hasFirstSegmentComplete ? ["archive" as const] : [])
+    "works",
+    "records",
+    "archive",
+    ...(input.isTeacher || input.isAdmin ? ["teaching" as const] : []),
+    ...(input.isAdmin ? ["admin" as const] : [])
   ];
 }
 

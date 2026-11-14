@@ -9,7 +9,6 @@ import type { MockSession } from "@/features/auth/types";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mounted: Array<{ root: Root; container: HTMLElement }> = [];
-const allSignals = { hasLearningRecord: true, hasPracticeActivity: true, hasFirstSegmentComplete: true };
 const student: MockSession = { userId: "u1", name: "小林", email: "lin@example.com", role: "student", capabilities: [], createdAt: "2026-01-01" };
 
 function mount(node: ReactNode) {
@@ -44,7 +43,7 @@ function LocationProbe() {
 
 describe("GlobalNav shell", () => {
   it("marks the current page and renders learner items in one rail", () => {
-    const container = mount(<MemoryRouter initialEntries={["/archive"]}><GlobalNav session={student} navigationSignals={allSignals} onLogout={vi.fn()} /></MemoryRouter>);
+    const container = mount(<MemoryRouter initialEntries={["/archive"]}><GlobalNav session={student} onLogout={vi.fn()} /></MemoryRouter>);
     const links = Array.from(container.querySelectorAll<HTMLAnchorElement>("a.ef-nav-item"));
     expect(links.map((link) => link.textContent)).toEqual(["首页", "作品", "记录", "地图"]);
     expect(container.querySelector('a.ef-nav-item[aria-current="page"]')?.textContent).toBe("地图");
@@ -69,6 +68,16 @@ describe("GlobalNav shell", () => {
     key(document, "Escape");
     expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("opens the resource center from the account menu", () => {
+    const onOpenResources = vi.fn();
+    const container = mount(<MemoryRouter initialEntries={["/"]}><GlobalNav session={student} onLogout={vi.fn()} onOpenResources={onOpenResources} /></MemoryRouter>);
+    click(container.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!);
+    const item = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menu"] [role="menuitem"]')).find((element) => element.textContent?.includes("资源中心"));
+    expect(item).toBeTruthy();
+    click(item!);
+    expect(onOpenResources).toHaveBeenCalledTimes(1);
   });
 
   it("opens the My panel from the account menu instead of navigating to the bare Home route", () => {

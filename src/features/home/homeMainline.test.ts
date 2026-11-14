@@ -33,18 +33,13 @@ describe("home two states", () => {
   });
 });
 
-describe("progressive navigation", () => {
-  it("starts with Home only", () => {
-    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: false, signals: { hasLearningRecord: false, hasPracticeActivity: false, hasFirstSegmentComplete: false } })).toEqual(["home"]);
+describe("fixed navigation", () => {
+  it("always shows the learner set in a fixed order, independent of learning state", () => {
+    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: false })).toEqual(["home", "works", "records", "archive"]);
   });
-  it("adds works, records and map from real signals in order", () => {
-    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: false, signals: { hasLearningRecord: false, hasPracticeActivity: true, hasFirstSegmentComplete: false } })).toEqual(["home", "works"]);
-    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: false, signals: { hasLearningRecord: true, hasPracticeActivity: true, hasFirstSegmentComplete: false } })).toEqual(["home", "works", "records"]);
-    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: false, signals: { hasLearningRecord: true, hasPracticeActivity: true, hasFirstSegmentComplete: true } })).toEqual(["home", "works", "records", "archive"]);
-  });
-  it("always shows the full set to teachers and admins", () => {
-    expect(deriveHomeNavigation({ isTeacher: true, isAdmin: false, signals: { hasLearningRecord: false, hasPracticeActivity: false, hasFirstSegmentComplete: false } })).toEqual(["home", "archive", "works", "records", "teaching"]);
-    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: true, signals: { hasLearningRecord: false, hasPracticeActivity: false, hasFirstSegmentComplete: false } })).toEqual(["home", "archive", "works", "records", "teaching", "admin"]);
+  it("keeps the learner set and appends role workspaces for teachers and admins", () => {
+    expect(deriveHomeNavigation({ isTeacher: true, isAdmin: false })).toEqual(["home", "works", "records", "archive", "teaching"]);
+    expect(deriveHomeNavigation({ isTeacher: false, isAdmin: true })).toEqual(["home", "works", "records", "archive", "teaching", "admin"]);
   });
 });
 
