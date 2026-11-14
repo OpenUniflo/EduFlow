@@ -11,6 +11,7 @@ import { cleanVariableOverrides, configurationSaveIssue, configurationSaveSchema
 import { dispatchQueuedWorkflow } from "./workflowQueue.js";
 import { readMcpMarket, removeAdminMarketServer, supplementMcpMarketServer, syncMcpMarket } from "./mcpRegistry.js";
 import { discoverMcpOAuth, startMcpOAuth } from "./mcpAuth.js";
+import { handleWorkflowEvaluation } from "./workflowEvaluation.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
 function result<T>(query: Result<T>): T {
@@ -200,6 +201,7 @@ async function mcpAdministrator(client: SupabaseClient, owner: string) {
 export async function handleWorkflowV2(request: VercelRequest, response: VercelResponse, owner: string, userClient?: SupabaseClient) {
   const resource = queryString(request, "resource"); if (!resource) return false;
   const op = queryString(request, "op"); const id = queryString(request, "id"); const client = createServerSupabase();
+  if (await handleWorkflowEvaluation(request, response, owner, client)) return true;
   if (resource === "mcp-market") {
     if (request.method === "GET" && (request.query.view ?? "catalog") === "catalog") {
       const market = await readMcpMarket({ query: queryString(request, "q"), category: queryString(request, "category"), page: Number(queryString(request, "page") ?? 1), limit: Number(queryString(request, "limit") ?? 120) });

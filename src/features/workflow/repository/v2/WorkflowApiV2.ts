@@ -1,6 +1,6 @@
 import { apiRequest as sharedApiRequest, ApiRequestError, ApiResponseError } from "@/shared/api/apiClient";
 import { z } from "zod";
-import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow, McpMarketPage, McpMarketSync, McpOAuthDiscovery, WorkflowEvaluationConfig } from "../../domain/v2/types";
+import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow, McpMarketPage, McpMarketSync, McpOAuthDiscovery, WorkflowEvaluation, WorkflowEvaluationConfig } from "../../domain/v2/types";
 
 const endpoint = (resource: string, query: Record<string, string | number | undefined> = {}) => `/api/workflows?${new URLSearchParams({ resource, ...Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) })}`;
 const runSubmissionReceipt = z.object({
@@ -186,4 +186,8 @@ export class WorkflowApiV2 {
   cancelThread(id:string){return jsonRequest<{ok:boolean}>('threads','POST',{},{id,op:'cancel'});}
   cancel(runId: string) { return jsonRequest<{ status: string }>("runs", "POST", {}, { id: runId, op: "cancel" }); }
   artifact(id: string) { return apiRequest<{ content?: JsonValue; url?: string }>(endpoint("artifacts", { id })); }
+  evaluationConfig(workflowId: string) { return apiRequest<{ config: WorkflowEvaluationConfig }>(endpoint("evaluation-config", { workflowId })); }
+  saveEvaluationConfig(config: WorkflowEvaluationConfig) { return jsonRequest<{ config: WorkflowEvaluationConfig }>("evaluation-config", "PUT", { workflowId: config.workflowId, baseVersion: config.version, enabled: config.enabled, goal: config.goal, criteria: config.criteria, providerRef: config.providerRef, modelRef: config.modelRef, environmentRef: config.environmentRef }); }
+  evaluations(runId: string) { return apiRequest<{ items: WorkflowEvaluation[]; runStatus: string; runId: string }>(endpoint("evaluations", { runId })); }
+  retryEvaluation(runId: string, idempotencyKey: string) { return apiRequest<{ evaluation: WorkflowEvaluation }>(endpoint("evaluations", { id: runId, op: "retry" }), { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({}) }); }
 }

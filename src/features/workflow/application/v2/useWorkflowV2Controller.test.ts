@@ -8,7 +8,7 @@ vi.mock("react", () => ({
   useCallback(fn: any, deps: any[]) { const i = host.index++; const old = host.slots[i]; if (!old || deps.some((d, j) => d !== old.deps[j])) host.slots[i] = { fn, deps }; return host.slots[i].fn; },
   useEffect(fn: any, deps: any[]) { const i = host.index++; const old = host.slots[i]; if (!old || deps.some((d, j) => d !== old.deps[j])) { host.effects.push(() => { old?.cleanup?.(); host.slots[i].cleanup = fn(); }); host.slots[i] = { deps }; } },
 }));
-const api = vi.hoisted(() => ({ environments: vi.fn(), history: vi.fn(), tools: vi.fn(), get: vi.fn(), run: vi.fn(), events: vi.fn(), steps: vi.fn(), save: vi.fn(), saveEditor: vi.fn(), validateDraft: vi.fn(), createRun: vi.fn(), cancel: vi.fn(), resumeThread:vi.fn(), threads:vi.fn(), thread:vi.fn(), cancelThread:vi.fn(), discover: vi.fn() }));
+const api = vi.hoisted(() => ({ environments: vi.fn(), history: vi.fn(), tools: vi.fn(), get: vi.fn(), run: vi.fn(), events: vi.fn(), steps: vi.fn(), save: vi.fn(), saveEditor: vi.fn(), validateDraft: vi.fn(), createRun: vi.fn(), cancel: vi.fn(), resumeThread:vi.fn(), threads:vi.fn(), thread:vi.fn(), cancelThread:vi.fn(), discover: vi.fn(), evaluations: vi.fn(), retryEvaluation: vi.fn() }));
 vi.mock("@/shared/api/supabaseClient", () => ({ supabaseClient: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "test-bearer" } } }), signOut: vi.fn() } } }));
 vi.mock("../../repository/v2/WorkflowApiV2", () => ({
   WorkflowApiV2: class { constructor() { return api; } },
@@ -54,6 +54,8 @@ beforeEach(() => {
   api.thread.mockResolvedValue(null);
   api.history.mockResolvedValue({ items: [oldRun], legacyItems: [] });
   api.tools.mockResolvedValue({ items: [] });
+  api.evaluations.mockResolvedValue({ items: [], runStatus: "success", runId: "old" });
+  api.retryEvaluation.mockResolvedValue({ evaluation: { evaluationId: "evaluation", runId: "old", status: "queued" } });
   api.get.mockResolvedValue(initial);
   api.run.mockImplementation(async (id: string) => ({ ...oldRun, runId: id }));
   api.events.mockImplementation(async (id: string) => ({ events: [{ protocolVersion: "1", eventId: `event-${id}`, runId: id, seq: 1, type: "run.success", occurredAt: oldRun.createdAt, payload: {} }], nextSeq: 1, hasMore: false }));
@@ -512,4 +514,44 @@ it('a late accepted response does not replace a history selection made during su
   control.selectRun({...oldRun,runId:'chosen-history'});control=render();
   gate.resolve({runId:'continuation',revision:3,status:'queued'});expect(await pending).toBe(true);control=render();
   expect(control.observedRunId).toBe('chosen-history');expect(control.runOrigin).toBe('history');
+});
+
+describe("evaluation observation recovery", () => {
+  it("polls an initially empty terminal evaluation response until the automatic task appears", async () => {
+    const evaluator = { evaluationId: "eval-1", runId: "old", workflowId: "workflow", revision: 3, trigger: "automatic", status: "queued", outcome: null, mode: "rules", semanticStatus: "not_configured", rubricVersion: 0, providerRef: null, modelRef: null, report: null, error: null, attemptCount: 0, maxAttempts: 3, supersedesId: null, createdAt: "2026-01-01T00:00:00Z", startedAt: null, finishedAt: null };
+    api.evaluations.mockResolvedValueOnce({ items: [], runStatus: "success", runId: "old" }).mockResolvedValue({ items: [evaluator], runStatus: "success", runId: "old" });
+    const control = await boot();
+    control.selectRun(oldRun); render(); await flush();
+    expect(api.evaluations).toHaveBeenCalled();
+    expect(render().evaluations).toEqual([]);
+    await vi.advanceTimersByTimeAsync(3000);
+    await flush();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-1");
+  });
+
+  it("re-reads a completed evaluation when the same terminal run is selected again", async () => {
+    const completed = { evaluationId: "eval-done", runId: "old", workflowId: "workflow", revision: 3, trigger: "automatic", status: "completed", outcome: "rules_passed", mode: "rules", semanticStatus: "not_configured", rubricVersion: 0, providerRef: null, modelRef: null, report: null, error: null, attemptCount: 1, maxAttempts: 3, supersedesId: null, createdAt: "2026-01-01T00:00:00Z", startedAt: "2026-01-01T00:00:01Z", finishedAt: "2026-01-01T00:00:02Z" };
+    api.evaluations.mockResolvedValue({ items: [completed], runStatus: "success", runId: "old" });
+    const control = await boot();
+    control.selectRun(oldRun); render(); await flush(); render(); await flush();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-done");
+    api.evaluations.mockClear();
+    render().selectRun(oldRun); render(); await flush(); render(); await flush();
+    expect(api.evaluations).toHaveBeenCalledTimes(1);
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-done");
+  });
+
+  it("does not let an old evaluation read overwrite a newer selection observation", async () => {
+    const stale = { evaluationId: "eval-stale", runId: "old", workflowId: "workflow", revision: 3, trigger: "automatic", status: "queued", outcome: null, mode: "rules", semanticStatus: "not_configured", rubricVersion: 0, providerRef: null, modelRef: null, report: null, error: null, attemptCount: 0, maxAttempts: 3, supersedesId: null, createdAt: "2026-01-01T00:00:00Z", startedAt: null, finishedAt: null };
+    const fresh = { ...stale, evaluationId: "eval-fresh", status: "completed", outcome: "rules_passed" };
+    const pending = deferred<{ items: typeof stale[]; runStatus: string; runId: string }>();
+    api.evaluations.mockReturnValueOnce(pending.promise);
+    const control = await boot();
+    control.selectRun(oldRun); render(); await flush();
+    api.evaluations.mockResolvedValue({ items: [fresh], runStatus: "success", runId: "old" });
+    render().selectRun(oldRun); render(); await flush(); render(); await flush();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-fresh");
+    pending.resolve({ items: [stale], runStatus: "success", runId: "old" }); await flush(); render();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-fresh");
+  });
 });

@@ -132,7 +132,8 @@ async def serve(port):
 
 async def service(port):
     # Compiler/API and executor are independent tasks; watchdog is a separate process.
-    await asyncio.gather(serve(port),worker())
+    from .evaluation_worker import evaluation_worker
+    await asyncio.gather(serve(port),worker(),evaluation_worker())
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument("command",choices=["service","worker","watchdog","compiler"]);parser.add_argument("--port",type=int,default=18110)
@@ -144,7 +145,8 @@ def main():
             import signal
             stop = asyncio.Event()
             asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, stop.set)
-            await worker(stop)
+            from .evaluation_worker import evaluation_worker
+            await asyncio.gather(worker(stop),evaluation_worker(stop))
         else:
             await (service(args.port) if args.command=="service" else serve(args.port) if args.command=="compiler" else watchdog())
     asyncio.run(run())

@@ -79,3 +79,61 @@ export type McpOAuthDiscovery = { issuer: string; authorizationEndpoint: string;
 
 export type ConnectionTestResult = { ok: boolean; elapsedMs?: number; status?: number; preview?: string; models?: string[]; reply?: string; output?: JsonValue; tools?: { name: string; description?: string; allowed?: boolean; inputSchema?: JsonSchema }[]; discoveredToolNames?: string[]; error?: { code: string; message: string } };
 export type ResourceReferenceRow = { workflowId: string; workflowName: string; revision: number; graphPath: string[]; nodeId: string; nodeLabel: string; version?: number; modelRef?: string; variableKey?: string };
+
+/** P2 completion evaluation. Reports are historical records; they never change Run truth. */
+export type WorkflowEvaluationEvidence = { label: string; value: string };
+export type WorkflowEvaluationDimension = {
+  key: string; label: string;
+  status: "passed" | "failed" | "not_applicable" | "not_evaluated";
+  source: "rule" | "semantic";
+  reason: string;
+  evidence: WorkflowEvaluationEvidence[];
+  score?: number; threshold?: number; passed?: boolean; elapsedMs?: number;
+};
+export type WorkflowEvaluationHardFailure = { code: string; reason: string; evidence: string };
+export type WorkflowEvaluationSemantic = {
+  status: "pending" | "not_configured" | "completed" | "failed" | "skipped_hard_failure" | "insufficient_evidence" | "not_evaluated";
+  reason: string; model?: string | null; provider?: string | null;
+  adapter?: string; promptVersion?: string; threshold?: number;
+  deepevalVersion?: string; errorCode?: string;
+  metrics?: WorkflowEvaluationDimension[];
+};
+export type WorkflowEvaluationReport = {
+  schemaVersion: number; promptVersion: string; generatedAt: string;
+  mode: "rules" | "semantic";
+  outcome: "passed" | "needs_improvement" | "failed" | "insufficient_evidence" | "rules_passed";
+  headline: string; summary: string;
+  dimensions: WorkflowEvaluationDimension[];
+  hardFailures: WorkflowEvaluationHardFailure[];
+  suggestions: string[];
+  semantic: WorkflowEvaluationSemantic;
+  trace: {
+    complete: boolean; expectedNodeCount: number; stepCount: number; failedStepCount: number;
+    toolEventCount: number; toolFailureCount: number;
+    stepReturned?: number; stepsTruncated?: boolean; stepErrorCount?: number; stepStatusCounts?: Record<string, number>;
+    toolEventReturned?: number; toolEventsTruncated?: boolean; toolCallCount?: number;
+    toolRecoveredCount?: number; toolFinalFailureCount?: number; toolIncompleteCount?: number;
+  };
+  rubric: { version: number; goal: string; criteria: string[] };
+  limitations: string[]; truncated?: boolean;
+};
+export type WorkflowEvaluation = {
+  evaluationId: string; runId: string; workflowId: string; revision: number;
+  trigger: "automatic" | "manual";
+  status: "queued" | "running" | "completed" | "failed";
+  outcome: WorkflowEvaluationReport["outcome"] | null;
+  mode: "rules" | "semantic";
+  semanticStatus: WorkflowEvaluationSemantic["status"];
+  rubricVersion: number;
+  providerRef: string | null; modelRef: string | null;
+  report: WorkflowEvaluationReport | null;
+  error: { code: string; message: string } | null;
+  attemptCount: number; maxAttempts: number;
+  supersedesId: string | null;
+  createdAt: string; startedAt: string | null; finishedAt: string | null;
+};
+export type WorkflowEvaluationConfig = {
+  workflowId: string; version: number; enabled: boolean; goal: string; criteria: string[];
+  providerRef: string | null; modelRef: string | null; environmentRef: string | null;
+  updatedAt: string | null;
+};

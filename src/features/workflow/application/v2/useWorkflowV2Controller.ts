@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { recordEdit, rebaseSnapshot, snapshotChanges, travelHistory, type EditorHistory, type EditorSnapshot, type WorkflowControllerRecovery } from "./editorHistory";
 import { ApiRequestError, type ApiAuthenticationFailure } from "@/shared/api/apiClient";
 import { WorkflowApiV2, workflowErrorMessage } from "../../repository/v2/WorkflowApiV2";
-import type { EditorDocumentV2, JsonValue, WorkflowDiagnostic, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowTool, WorkflowThreadV2 } from "../../domain/v2/types";
+import type { EditorDocumentV2, JsonValue, WorkflowDiagnostic, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEvaluation, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowTool, WorkflowThreadV2 } from "../../domain/v2/types";
 
 export const workflowApiV2 = new WorkflowApiV2();
 export type WorkflowRunOrigin = "current" | "history" | null;
@@ -97,6 +97,11 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   const observationThread=useRef<string|null>(null);
   const [threadsError,setThreadsError]=useState('');
   const [history, setHistory] = useState<WorkflowRunV2[]>([]);
+  const [evaluations, setEvaluations] = useState<WorkflowEvaluation[]>([]);
+  const [evaluationError, setEvaluationError] = useState("");
+  const [evaluationLoading, setEvaluationLoading] = useState(false);
+  const [evaluationEpoch, setEvaluationEpoch] = useState(0);
+  const evaluationRetry = useRef<{ runId: string; key: string } | null>(null);
   const [events, setEvents] = useState<WorkflowEventV2[]>([]);
   const [steps, setSteps] = useState<WorkflowStepV2[]>([]);
   const [observationComplete, setObservationComplete] = useState(false);
@@ -126,6 +131,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     setObservedRunId(null); setRun(null); setRunSnapshot(null); setRunOrigin(origin);
     observationThread.current=null;setThreadView(null);setHistoryExpired(false);
     setSteps([]); setEvents([]); setObservationComplete(false);
+    setEvaluations([]); setEvaluationError(""); setEvaluationLoading(false);
   }
   function rejectRunPreparation(message: string) {
     // An uncertain submission still owns its original key and observation identity.
@@ -231,6 +237,38 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [runId, activeWorkflowId, observationEpoch]);
 
+  useEffect(() => {
+    if (!runId || !run || !terminal.has(run.status)) {
+      setEvaluations([]); setEvaluationError(""); setEvaluationLoading(false); return;
+    }
+    let alive = true;
+    const generation = observationGeneration.current;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const current = () => alive && authenticationInterrupted.current === false && generation === observationGeneration.current;
+    async function read() {
+      if (!current()) return;
+      setEvaluationLoading(true);
+      try {
+        const page = await workflowApiV2.evaluations(runId!);
+        if (!current()) return;
+        setEvaluations(page.items); setEvaluationError("");
+        attempts += 1;
+        if (page.items.some(item => item.status === "queued" || item.status === "running") && attempts < 240) timer = setTimeout(() => void read(), 1500);
+        else if (!page.items.length && attempts < 40) timer = setTimeout(() => void read(), 3000);
+        else if (!page.items.length) setEvaluationError("评价任务尚未出现。可刷新评价，或重新触发基础评价；不会重新运行工作流。");
+      } catch (reason) {
+        if (!current()) return;
+        setEvaluationError(workflowErrorMessage(reason));
+        attempts += 1;
+        if (attempts < 10) timer = setTimeout(() => void read(), 3000);
+      } finally {
+        if (current()) setEvaluationLoading(false);
+      }
+    }
+    void read();
+    return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, [runId, run?.status, evaluationEpoch, observationEpoch]);
 
   function publish(snapshot: EditorSnapshot) {
     setDefinition(snapshot.definition); setEditor(snapshot.editor);
@@ -355,7 +393,20 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     pendingRunRequest.current = null; setSubmitUnknown(false); clearRunObservation("current"); setObservedRunId(created.historyExpired ? null : created.runId); setObservationEpoch(current => current + 1); if(created.historyExpired)setNotice("原提交的运行历史已清理；没有重复执行。");else setRunNotice({runId:created.runId,text:"已确认原提交；没有创建重复运行。"});
   }); }
   function selectRun(record: WorkflowRunV2) { if (cancelPendingRunId) setNotice(""); clearRunObservation("history"); setRun(record); setObservedRunId(record.runId); observationThread.current=record.threadId??null; setObservationEpoch(current => current + 1); }
-
+  const refreshEvaluations = () => setEvaluationEpoch(current => current + 1);
+  function retryEvaluation() { return operation(async () => {
+    if (!runId) return;
+    // Reuse the key after a wake-up failure so the same persisted row is recovered,
+    // never a duplicate evaluation. A new Run always gets a new key.
+    const key = evaluationRetry.current?.runId === runId ? evaluationRetry.current.key : crypto.randomUUID();
+    evaluationRetry.current = { runId, key };
+    const created = await workflowApiV2.retryEvaluation(runId, key);
+    evaluationRetry.current = null;
+    setEvaluations(current => [created.evaluation, ...current.filter(item => item.evaluationId !== created.evaluation.evaluationId)]);
+    setEvaluationEpoch(current => current + 1);
+    setNotice("已创建新的评价记录；原报告仍保留在历史中。");
+    return created;
+  }); }
   function selectThread(thread:WorkflowThreadV2){
     clearRunObservation('current');observationThread.current=thread.threadId;setThreadView(thread);setObservedRunId(thread.currentRunId);setObservationEpoch(value=>value+1);
   }
@@ -410,5 +461,5 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     await reloadEnvironments();
     await loadTools(environmentChoice.current);
   });
-  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, toolsLoading, toolsLoaded, toolsError, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, setVariableEnvironment, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
+  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, evaluations, evaluationError, evaluationLoading, refreshEvaluations, retryEvaluation, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, toolsLoading, toolsLoaded, toolsError, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, setVariableEnvironment, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
 }

@@ -111,6 +111,49 @@ async def _maintenance(storage, *, require_watchdog=False):
         _log_maintenance_failure("reap")
 
 
+
+async def _schedule_evaluation_sweep(delay_seconds=15, key=None):
+    """Publish a durable wake-up. A send failure must propagate so the queue redelivers."""
+    await send_message(
+        TOPIC,
+        {"kind": "evaluation"},
+        delay=max(1, min(int(delay_seconds), MAX_DELAY_SECONDS - WAIT_DELIVERY_MARGIN_SECONDS)),
+        retention=3_600,
+        idempotency_key=key or f"evaluation-sweep:{uuid.uuid4().hex}",
+    )
+    return True
+
+
+async def _evaluation_state(storage):
+    state = await storage.call("evaluation_pending")
+    if not isinstance(state, dict):
+        raise RuntimeError("EVALUATION_PENDING_STATE_INVALID")
+    return state
+
+
+async def _drain_evaluations(storage, budget_seconds=60):
+    """Drain exactly one due evaluation; the single scheduled follow-up owns the next round."""
+    from .evaluation_worker import evaluate_pending
+
+    return await asyncio.wait_for(
+        evaluate_pending(limit=1, budget_seconds=max(8, budget_seconds)),
+        timeout=max(10, budget_seconds + 5),
+    )
+
+
+async def _ensure_evaluation_wakeup(storage, budget_seconds=60, initial_delay=5):
+    """Create at most one follow-up, before draining, so a crash cannot strand a job.
+
+    Each queue consumption schedules one successor and drains one job. A still-pending
+    state is handled by that successor, keeping the chain linear instead of branching.
+    """
+    state = await _evaluation_state(storage)
+    if not state.get("pending"):
+        return 0
+    await _schedule_evaluation_sweep(initial_delay)
+    return await _drain_evaluations(storage, budget_seconds=budget_seconds)
+
+
 async def consume_run(run_id, kind=None):
     """Claim and execute one Run; return a bounded outcome label.
 
@@ -126,6 +169,8 @@ async def consume_run(run_id, kind=None):
     refresh()
     if kind == "timeout":
         await _maintenance(storage, require_watchdog=True)
+        # A delayed check may be the only surviving delivery after a terminal Run.
+        await _ensure_evaluation_wakeup(storage, budget_seconds=30)
         return "timeout_swept"
     worker_id = "queue:" + uuid.uuid4().hex
     claim = await storage.call("claim_run", run_id, worker_id)
@@ -134,10 +179,16 @@ async def consume_run(run_id, kind=None):
     claim_kind = claim.get("kind")
     if claim_kind == "busy":
         raise RetryAfter(5)
-    if claim_kind in {"terminal", "running", "unsupported"}:
+    if claim_kind == "terminal":
+        # A duplicate delivery of a terminal Run is still the only wake-up some
+        # deployments get. It must recover an evaluation whose first drain crashed.
+        await _ensure_evaluation_wakeup(storage, budget_seconds=60)
+        return claim_kind
+    if claim_kind in {"running", "unsupported"}:
         return claim_kind
     if claim_kind in {"sealed", "expired"}:
         await _maintenance(storage)
+        await _ensure_evaluation_wakeup(storage, budget_seconds=30)
         return claim_kind
     if claim_kind == "waiting":
         return await _schedule_existing_wait(storage, run_id, claim)
@@ -151,6 +202,10 @@ async def consume_run(run_id, kind=None):
     )
     if result.get("status") == "paused":
         await _send_wait(run_id, max(1, int(result.get("waitMs", 1000) / 1000)))
+    else:
+        # The Run is terminal; its evaluation row was inserted by the same SQL trigger.
+        # Establish the follow-up wake-up before draining, so a crash cannot lose it.
+        await _ensure_evaluation_wakeup(storage, budget_seconds=60)
     await _maintenance(storage)
     return result.get("status", "failed")
 
@@ -160,8 +215,21 @@ async def consume(message: Message[dict[str, object]]) -> None:
     payload = message.payload if isinstance(message.payload, dict) else {}
     run_id = _run_id(payload.get("runId"))
     kind = payload.get("kind")
-    if not isinstance(kind, str) or kind not in {"timeout", "wait"}:
+    if not isinstance(kind, str) or kind not in {"timeout", "wait", "evaluation"}:
         kind = None
+    if kind == "evaluation":
+        from .server import refresh
+        from .storage import Storage
+        started = time.monotonic()
+        storage = Storage(os.environ["WORKFLOW_DATABASE_URL"])
+        try:
+            refresh()
+            processed = await _ensure_evaluation_wakeup(storage, budget_seconds=90)
+        except Exception:
+            print(json.dumps({"event": "workflow.queue.evaluation", "outcome": "retry", "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
+            raise RetryAfter(15)
+        print(json.dumps({"event": "workflow.queue.evaluation", "outcome": "processed", "processed": processed, "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
+        return
     if not run_id:
         # A malformed message is not worth redelivering; return so the SDK acknowledges it.
         print(json.dumps({"event": "workflow.queue.consumer", "outcome": "invalid"}), flush=True)
@@ -171,7 +239,7 @@ async def consume(message: Message[dict[str, object]]) -> None:
         outcome = await consume_run(run_id, kind=kind)
     except Exception:
         print(json.dumps({"event": "workflow.queue.consumer", "runId": run_id, "kind": kind, "outcome": "retry", "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
-        raise
+        raise RetryAfter(15)
     print(json.dumps({"event": "workflow.queue.consumer", "runId": run_id, "kind": kind, "outcome": outcome, "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
 
 

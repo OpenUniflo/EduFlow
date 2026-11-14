@@ -67,6 +67,8 @@ async def test_timeout_message_runs_one_bounded_sweep_without_claiming(monkeypat
 
         async def call(self, name, *args):
             calls.append(name)
+            if name == "evaluation_pending":
+                return {"pending": False}
             return 0
 
     async def reap():
@@ -77,7 +79,7 @@ async def test_timeout_message_runs_one_bounded_sweep_without_claiming(monkeypat
     monkeypatch.setattr(server, "refresh", lambda: None)
     monkeypatch.setattr(sandbox, "reap", reap)
     assert await queue_consumer.consume_run("11111111-1111-4111-8111-111111111111", kind="timeout") == "timeout_swept"
-    assert calls == ["watchdog", "p5_sweep", "reap"]
+    assert calls == ["watchdog", "p5_sweep", "reap", "evaluation_pending"]
 
 
 @pytest.mark.asyncio
@@ -118,6 +120,8 @@ async def test_duplicate_delivery_acks_without_executing(monkeypatch, claim_kind
             pass
 
         async def call(self, name, *args):
+            if name == "evaluation_pending":
+                return {"pending": False}
             assert name == "claim_run"
             return {"kind": claim_kind}
 
@@ -146,6 +150,8 @@ async def test_sealed_stale_lease_is_acknowledged_and_swept(monkeypatch):
             calls.append(name)
             if name == "claim_run":
                 return {"kind": "sealed"}
+            if name == "evaluation_pending":
+                return {"pending": False}
             return 0
 
     async def execute_claim(*args, **kwargs):
@@ -160,7 +166,7 @@ async def test_sealed_stale_lease_is_acknowledged_and_swept(monkeypatch):
     monkeypatch.setattr(cli, "execute_claim", execute_claim)
     monkeypatch.setattr(sandbox, "reap", reap)
     assert await queue_consumer.consume_run("11111111-1111-4111-8111-111111111111") == "sealed"
-    assert calls == ["claim_run", "watchdog", "p5_sweep", "reap"]
+    assert calls == ["claim_run", "watchdog", "p5_sweep", "reap", "evaluation_pending"]
 
 
 @pytest.mark.asyncio
@@ -200,3 +206,183 @@ async def test_execute_claim_finishes_a_budget_timeout_as_run_timeout(monkeypatc
     assert error["reason"] == "timeout"
     assert error["timeoutMs"] == 50
     assert error["effect"] == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_evaluation_message_drains_one_job_and_schedules_a_pending_sweep(monkeypatch):
+    from eduflow_workflow import evaluation_worker, server, storage
+
+    drained = []
+    scheduled = []
+
+    async def evaluate_pending(limit, budget_seconds):
+        drained.append((limit, budget_seconds))
+        return 1
+
+    async def send_message(topic, payload, **kwargs):
+        scheduled.append((topic, payload, kwargs))
+
+    class Store:
+        def __init__(self, url):
+            pass
+
+        async def call(self, name, *args):
+            assert name == "evaluation_pending"
+            return {"queued": 1, "running": 0, "staleRunning": 0, "pending": True}
+
+    class Message:
+        payload = {"kind": "evaluation"}
+
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL", "synthetic-database")
+    monkeypatch.setattr(storage, "Storage", Store)
+    monkeypatch.setattr(server, "refresh", lambda: None)
+    monkeypatch.setattr(evaluation_worker, "evaluate_pending", evaluate_pending)
+    monkeypatch.setattr(queue_consumer, "send_message", send_message)
+    await queue_consumer.consume(Message())
+    assert drained == [(1, 90)]
+    assert [item[1] for item in scheduled] == [{"kind": "evaluation"}]
+    assert [item[2]["delay"] for item in scheduled] == [5]
+
+
+@pytest.mark.asyncio
+async def test_evaluation_send_failure_is_retried_before_any_drain(monkeypatch):
+    from vercel.queue import RetryAfter
+    from eduflow_workflow import evaluation_worker, server, storage
+
+    drained = []
+
+    async def evaluate_pending(limit, budget_seconds):
+        drained.append(limit)
+        return 1
+
+    async def send_message(topic, payload, **kwargs):
+        raise RuntimeError("queue unavailable")
+
+    class Store:
+        def __init__(self, url):
+            pass
+
+        async def call(self, name, *args):
+            assert name == "evaluation_pending"
+            return {"pending": True}
+
+    class Message:
+        payload = {"kind": "evaluation"}
+
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL", "synthetic-database")
+    monkeypatch.setattr(storage, "Storage", Store)
+    monkeypatch.setattr(server, "refresh", lambda: None)
+    monkeypatch.setattr(evaluation_worker, "evaluate_pending", evaluate_pending)
+    monkeypatch.setattr(queue_consumer, "send_message", send_message)
+    with pytest.raises(RetryAfter):
+        await queue_consumer.consume(Message())
+    assert drained == []
+
+
+@pytest.mark.asyncio
+async def test_pending_read_failure_is_not_acked(monkeypatch):
+    from vercel.queue import RetryAfter
+    from eduflow_workflow import server, storage
+
+    class Store:
+        def __init__(self, url):
+            pass
+
+        async def call(self, name, *args):
+            raise RuntimeError("pending read failed")
+
+    class Message:
+        payload = {"kind": "evaluation"}
+
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL", "synthetic-database")
+    monkeypatch.setattr(storage, "Storage", Store)
+    monkeypatch.setattr(server, "refresh", lambda: None)
+    with pytest.raises(RetryAfter):
+        await queue_consumer.consume(Message())
+
+
+@pytest.mark.asyncio
+async def test_sweep_is_scheduled_before_the_drain_can_crash(monkeypatch):
+    from eduflow_workflow import evaluation_worker, storage
+
+    order = []
+
+    async def evaluate_pending(limit, budget_seconds):
+        order.append("drain")
+        raise RuntimeError("worker died")
+
+    async def send_message(topic, payload, **kwargs):
+        order.append("schedule")
+
+    class Store:
+        def __init__(self, url):
+            pass
+
+        async def call(self, name, *args):
+            return {"pending": True}
+
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL", "synthetic-database")
+    monkeypatch.setattr(storage, "Storage", Store)
+    monkeypatch.setattr(evaluation_worker, "evaluate_pending", evaluate_pending)
+    monkeypatch.setattr(queue_consumer, "send_message", send_message)
+    with pytest.raises(RuntimeError):
+        await queue_consumer._ensure_evaluation_wakeup(Store("x"), budget_seconds=10)
+    assert order == ["schedule", "drain"]
+
+
+@pytest.mark.asyncio
+async def test_terminal_redelivery_checks_pending_instead_of_acking_early(monkeypatch):
+    from eduflow_workflow import cli, server, storage
+
+    ensured = []
+
+    class Store:
+        def __init__(self, url):
+            pass
+
+        async def call(self, name, *args):
+            assert name == "claim_run"
+            return {"kind": "terminal", "status": "success"}
+
+    async def ensure(storage, budget_seconds):
+        ensured.append(budget_seconds)
+        return 1
+
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL", "synthetic-database")
+    monkeypatch.setattr(storage, "Storage", Store)
+    monkeypatch.setattr(server, "refresh", lambda: None)
+    monkeypatch.setattr(queue_consumer, "_ensure_evaluation_wakeup", ensure)
+    assert await queue_consumer.consume_run("11111111-1111-4111-8111-111111111111") == "terminal"
+    assert ensured == [60]
+
+
+@pytest.mark.asyncio
+async def test_each_pending_round_schedules_exactly_one_linear_successor(monkeypatch):
+    from eduflow_workflow import evaluation_worker, storage
+
+    sends = []
+    drains = []
+
+    async def evaluate_pending(limit, budget_seconds):
+        drains.append(limit)
+        return 0
+
+    async def send_message(topic, payload, **kwargs):
+        sends.append(kwargs["idempotency_key"])
+
+    class Store:
+        def __init__(self, url):
+            pass
+
+        async def call(self, name, *args):
+            return {"pending": True, "queued": 1, "running": 0}
+
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL", "synthetic-database")
+    monkeypatch.setattr(storage, "Storage", Store)
+    monkeypatch.setattr(evaluation_worker, "evaluate_pending", evaluate_pending)
+    monkeypatch.setattr(queue_consumer, "send_message", send_message)
+    for _ in range(5):
+        await queue_consumer._ensure_evaluation_wakeup(Store("x"), budget_seconds=8)
+    assert len(sends) == 5
+    assert len(drains) == 5
+    assert len(set(sends)) == 5
