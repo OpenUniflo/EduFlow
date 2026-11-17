@@ -20,6 +20,7 @@ export type PlatformMcpService = {
   featured: boolean;
   connectMode: "config" | "quick" | "login";
   oauthScopes: readonly string[];
+  oauthResourceMetadataUrl?: string;
 };
 
 export const PLATFORM_MCP_SERVICES: readonly PlatformMcpService[] = [
@@ -38,5 +39,6 @@ export const PLATFORM_MCP_SERVICES: readonly PlatformMcpService[] = [
     featured: true,
     connectMode: "login",
     oauthScopes: ["mcp:tools"],
+    oauthResourceMetadataUrl: "https://agent.qcc.com/mcp/.well-known/oauth-protected-resource/company/stream",
   },
 ];

@@ -93,6 +93,7 @@ export function pinnedRequest(destination: CheckedDestination, options: {
   body?: string;
   timeoutMs?: number;
   maxBytes?: number;
+  signal?: AbortSignal;
 } = {}): Promise<PinnedResponse> {
   const local = LOCAL_FIXTURES() && ["127.0.0.1", "localhost", "::1"].includes(destination.hostname);
   if (!local && privateAddress(destination.address)) return Promise.reject(new Error("目标地址不允许访问"));
@@ -116,6 +117,7 @@ export function pinnedRequest(destination: CheckedDestination, options: {
       family: destination.family,
       lookup: (_hostname, _options, callback) => callback(null, destination.address, destination.family),
       timeout: options.timeoutMs ?? 15000,
+      signal: options.signal,
       rejectUnauthorized: true,
     }, (response) => {
       const chunks: Buffer[] = [];

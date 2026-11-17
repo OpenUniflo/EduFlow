@@ -7,6 +7,7 @@ import { checkResourceAllowed } from "@modelcontextprotocol/sdk/shared/auth-util
 import { ApiError } from "./http.js";
 import { createServerSupabase } from "./supabase.js";
 import { assertPublicDestination, pinnedRequest } from "./outbound.js";
+import { PLATFORM_MCP_SERVICES } from "./platformMcpCatalog.js";
 import { workflowCompiler } from "./workflowV2Protocol.js";
 
 type FlowRow = {
@@ -109,6 +110,7 @@ export async function safeOAuthFetch(input: string | URL | Request, init: Reques
     headers: headerRecord(init.headers),
     body,
     timeoutMs: 20000,
+    signal: init.signal ?? undefined,
   });
   const headers = new Headers();
   for (const [name, value] of Object.entries(response.headers)) {
@@ -117,6 +119,26 @@ export async function safeOAuthFetch(input: string | URL | Request, init: Reques
     headers.set(name, value);
   }
   return new Response(response.body, { status: response.status, headers });
+}
+
+function platformOAuthMetadataFetch(origin: string): typeof safeOAuthFetch {
+  return async (input, init = {}) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (url.origin !== origin || (init.method ?? "GET").toUpperCase() !== "GET") return safeOAuthFetch(input, init);
+    // Retrying a read is safe. Client registration and token exchange continue
+    // through the regular transport without automatic retries.
+    for (let attempt = 0; ; attempt += 1) {
+      const deadline = AbortSignal.timeout(4500);
+      const signal = init.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+      try {
+        return await safeOAuthFetch(input, { ...init, signal });
+      } catch (reason) {
+        const code = (reason as NodeJS.ErrnoException | null)?.code;
+        const retryable = deadline.aborted || code === "ETIMEDOUT" || code === "ECONNRESET";
+        if (attempt === 2 || !retryable || init.signal?.aborted) throw reason;
+      }
+    }
+  };
 }
 
 function normalizeIssuer(value: string) {
@@ -284,18 +306,23 @@ async function challengeMetadata(serverUrl: string) {
 
 /** Official SDK discovery, with explicit issuer/resource checks for the MCP resource. */
 export async function discoverMcpOAuth(input: { url: string; resourceMetadataUrl?: string }) {
-  await assertPublicDestination(input.url, "MCP 服务地址");
-  const challenge = input.resourceMetadataUrl ? null : await challengeMetadata(input.url);
-  const resourceMetadataUrl = input.resourceMetadataUrl ? new URL(input.resourceMetadataUrl) : challenge?.resourceMetadataUrl;
+  const destination = await assertPublicDestination(input.url, "MCP 服务地址");
+  const platformResourceMetadataUrl = PLATFORM_MCP_SERVICES.find((service) => service.url === destination.url.href)?.oauthResourceMetadataUrl;
+  const metadataHint = platformResourceMetadataUrl ?? input.resourceMetadataUrl;
+  const challenge = metadataHint ? null : await challengeMetadata(input.url);
+  const resourceMetadataUrl = metadataHint ? new URL(metadataHint) : challenge?.resourceMetadataUrl;
   if (resourceMetadataUrl) await assertPublicDestination(resourceMetadataUrl.toString(), "OAuth 资源元数据地址");
+  const fetchFn = platformResourceMetadataUrl ? platformOAuthMetadataFetch(destination.url.origin) : safeOAuthFetch;
+  const platformDiscoveryError = "暂时无法读取企查查的 OAuth 授权信息，请稍后重试";
   let discovered: Awaited<ReturnType<typeof discoverOAuthServerInfo>>;
   try {
-    discovered = await discoverOAuthServerInfo(input.url, { fetchFn: safeOAuthFetch, ...(resourceMetadataUrl ? { resourceMetadataUrl } : {}) });
+    discovered = await discoverOAuthServerInfo(input.url, { fetchFn, ...(resourceMetadataUrl ? { resourceMetadataUrl } : {}) });
   } catch (reason) {
-    throw new ApiError(400, "MCP_OAUTH_DISCOVERY_FAILED", safeMessage(reason, "无法读取服务方的 OAuth 元数据"));
+    throw new ApiError(400, "MCP_OAUTH_DISCOVERY_FAILED", platformResourceMetadataUrl ? platformDiscoveryError : safeMessage(reason, "无法读取服务方的 OAuth 元数据"));
   }
   const metadata = discovered.authorizationServerMetadata;
   if (!metadata || !metadata.authorization_endpoint || !metadata.token_endpoint) {
+    if (platformResourceMetadataUrl) throw new ApiError(400, "MCP_OAUTH_DISCOVERY_FAILED", platformDiscoveryError);
     throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", "该服务未公开可用的 OAuth 授权元数据，请改用 API Key 或 Bearer 连接");
   }
   if (metadata.issuer && normalizeIssuer(metadata.issuer) !== normalizeIssuer(discovered.authorizationServerUrl)) {
@@ -445,6 +472,7 @@ export async function startMcpOAuth(input: {
     authorizationServerUrl: discovery.info.authorizationServerUrl,
     authorizationServerMetadata: discovery.metadata,
     resourceMetadata: discovery.resourceMetadata,
+    ...(discovery.resourceMetadataUrl ? { resourceMetadataUrl: discovery.resourceMetadataUrl } : {}),
   };
   if (saved) {
     // The SDK skips discovery and dynamic registration when both cached
@@ -461,7 +489,7 @@ export async function startMcpOAuth(input: {
     result = await auth(provider, {
       serverUrl: destination.url.toString(),
       scope: scope || undefined,
-      ...(!saved && input.resourceMetadataUrl ? { resourceMetadataUrl: new URL(input.resourceMetadataUrl) } : {}),
+      ...(!saved && discovery.resourceMetadataUrl ? { resourceMetadataUrl: new URL(discovery.resourceMetadataUrl) } : {}),
       fetchFn: safeOAuthFetch,
     });
   } catch (reason) {
