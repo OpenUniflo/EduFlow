@@ -56,10 +56,13 @@ export type McpRecommendationAction = "config" | "quick" | "login";
  * A featured catalog row is only a direct action when an administrator chose a
  * compatible recommendation mode. Existing featured rows stay on the ordinary
  * configuration path by default, so `featured` alone never grants free connect.
+ * A platform-owned login row may have no preset scopes: it then asks the
+ * provider without a scope parameter and the server still checks discovery.
+ * Administrator rows keep requiring an explicitly verified scope list.
  */
-export function mcpRecommendationAction(item: Pick<McpMarketItem, "connectMode" | "authHint" | "oauthScopes">): McpRecommendationAction {
+export function mcpRecommendationAction(item: Pick<McpMarketItem, "source" | "connectMode" | "authHint" | "oauthScopes">): McpRecommendationAction {
   if (item.connectMode === "quick" && item.authHint === "none") return "quick";
-  if (item.connectMode === "login" && item.authHint === "oauth" && item.oauthScopes.length > 0) return "login";
+  if (item.connectMode === "login" && item.authHint === "oauth" && (item.oauthScopes.length > 0 || item.source === "platform")) return "login";
   return "config";
 }
 function preferredMarketRow(left: McpMarketItem, right: McpMarketItem): McpMarketItem {

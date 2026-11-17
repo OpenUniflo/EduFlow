@@ -242,6 +242,47 @@ describe("McpConnectDialog new-window OAuth", () => {
     expect(container.textContent).toContain("等待服务方授权");
   });
 
+  it("lets a platform login recommendation without preset scopes rely on server discovery", async () => {
+    const platformLogin = {
+      ...server,
+      id: "platform-aliyun-yunxiao",
+      source: "platform" as const,
+      sourceId: "aliyun-yunxiao",
+      title: "阿里云云效",
+      name: "Aliyun Yunxiao",
+      url: "https://openapi-rdc.aliyuncs.com/ai/mcp",
+      authHint: "oauth" as const,
+      connectMode: "login" as const,
+      oauthScopes: [],
+      suggestedRef: "aliyun_yunxiao",
+    };
+    await act(async () => {
+      root.render(<McpConnectDialog
+        environmentRef="local"
+        server={platformLogin}
+        loginOnly
+        connections={[]}
+        returnTo="/works"
+        onClose={() => undefined}
+        onSaved={() => undefined}
+      />);
+    });
+    expect(container.textContent).toContain("登录阿里云云效");
+    expect(container.textContent).toContain("授权范围：由服务方声明");
+    expect(container.querySelectorAll("input,select,textarea")).toHaveLength(0);
+    const primary = container.querySelector<HTMLButtonElement>(".wf-mcp-modal-foot .primary");
+    expect(primary?.textContent).toContain("登录并授权");
+    await act(async () => { primary!.click(); });
+    await flush();
+    expect(api.discoverMcpOAuth).not.toHaveBeenCalled();
+    expect(api.extension).not.toHaveBeenCalled();
+    expect(oauthWindow.open).toHaveBeenCalledTimes(1);
+    const body = api.startMcpOAuth.mock.calls[0][0] as { scopes?: string[] };
+    expect(body).not.toHaveProperty("scopes");
+    expect(oauthWindow.navigate).toHaveBeenCalledWith(expect.anything(), "https://login.example/authorize?state=s");
+    expect(container.textContent).toContain("等待服务方授权");
+  });
+
   it("re-authorizes an existing OAuth connection from its saved configuration without discovery", async () => {
     const entry = {
       connectionKey: "p4:owner:synthetic_login:4", ref: "synthetic_login", version: 4, disabled: false, hasCredential: true,

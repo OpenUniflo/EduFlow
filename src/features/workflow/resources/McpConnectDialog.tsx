@@ -408,12 +408,15 @@ export function McpConnectDialog({ environmentRef, server, entry, loginOnly = fa
 
   async function requestOAuthAuthorization(targetRef: string, version: number, flowId: string) {
     if (loginFlow) {
-      if (!presetScopes.length) throw new Error("此推荐服务未配置授权范围，请改用“配置”连接。");
+      // Platform-owned recommendations may have no preset scopes (for example
+      // Yunxiao publishes none). Omit the parameter instead of inventing or
+      // auto-selecting a scope; the server's discovery check remains authority.
+      if (!presetScopes.length && server?.source !== "platform") throw new Error("此推荐服务未配置授权范围，请改用“配置”连接。");
       return workflowApiV2.startMcpOAuth({
         environmentRef, ref: targetRef, version, name: name.trim(), url: url.trim(), transport,
         ...(sourceId ? { sourceId } : {}), ...(serverTitle ? { serverTitle } : {}),
         returnTo: withMcpOAuthReturnTo(returnTo, flowId, true),
-        scopes: presetScopes,
+        ...(presetScopes.length ? { scopes: presetScopes } : {}),
       });
     }
     const available = await ensureOAuthScopes();

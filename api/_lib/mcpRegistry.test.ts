@@ -112,9 +112,10 @@ const dbMarketItem = (overrides: Partial<McpMarketItem>): McpMarketItem => ({
 });
 
 describe("platform-owned MCP catalog", () => {
-  it("defines the single real Qichacha company service with verifiable metadata", () => {
-    expect(PLATFORM_MCP_SERVICES).toHaveLength(1);
+  it("keeps the real Qichacha row and adds nine verified OAuth login cards", () => {
+    expect(PLATFORM_MCP_SERVICES).toHaveLength(10);
     expect(PLATFORM_MCP_SERVICES[0]).toMatchObject({
+      id: "platform-qichacha-company",
       url: "https://agent.qcc.com/mcp/company/stream",
       transport: "streamable-http",
       authHint: "oauth",
@@ -123,7 +124,31 @@ describe("platform-owned MCP catalog", () => {
       connectMode: "login",
       oauthScopes: ["mcp:tools"],
     });
-    expect(platformMcpMarketItems()).toHaveLength(1);
+
+    const byId = new Map(PLATFORM_MCP_SERVICES.map((service) => [service.id, service]));
+    const expected = [
+      ["platform-linear", "https://mcp.linear.app/mcp", ["read"], "productivity"],
+      ["platform-notion", "https://mcp.notion.com/mcp", ["default"], "productivity"],
+      ["platform-cloudbase-cn", "https://tcb-api.cloud.tencent.com/mcp/v1", ["mcp:full"], "developer"],
+      ["platform-cloudbase-intl", "https://tcb-api.tencentcloud.com/mcp/v1", ["mcp:full"], "developer"],
+      ["platform-aliyun-yunxiao", "https://openapi-rdc.aliyuncs.com/ai/mcp", [], "developer"],
+      ["platform-atlassian-rovo", "https://mcp.atlassian.com/v2/mcp", [
+        "read:me", "read:account", "read:jira:agent-interface", "search:jira:agent-interface",
+        "read:confluence:agent-interface", "search:confluence:agent-interface",
+      ], "productivity"],
+      ["platform-sentry", "https://mcp.sentry.dev/mcp", ["org:read"], "developer"],
+      ["platform-canva", "https://mcp.canva.com/mcp", ["profile:read", "design:meta:read", "design:content:read"], "creative"],
+      ["platform-globalentity", "https://www.globalentityapi.com/mcp", ["company:read"], "data"],
+    ] as const;
+    for (const [id, url, oauthScopes, category] of expected) {
+      expect(byId.get(id)).toMatchObject({ url, oauthScopes, category, featured: true, connectMode: "login", authHint: "oauth" });
+    }
+    expect(byId.get("platform-cloudbase-cn")?.title).toContain("国内站");
+    expect(byId.get("platform-cloudbase-intl")?.title).toContain("国际站");
+    expect(new Set(PLATFORM_MCP_SERVICES.map((service) => service.id)).size).toBe(10);
+    expect(new Set(PLATFORM_MCP_SERVICES.map((service) => service.url)).size).toBe(10);
+
+    expect(platformMcpMarketItems()).toHaveLength(10);
     expect(platformMcpMarketItems()[0]).toMatchObject({
       id: "platform-qichacha-company",
       source: "platform",
@@ -138,13 +163,22 @@ describe("platform-owned MCP catalog", () => {
     });
   });
 
-  it("matches the platform service by Chinese name, English name, host, and category", () => {
+  it("matches platform services by Chinese name, English name, host, and category", () => {
     const ids = (query = "", category = "") => platformMarketItemsForQuery(query, category).map((item) => item.id);
     expect(ids("企查查")).toEqual(["platform-qichacha-company"]);
     expect(ids("Qichacha")).toEqual(["platform-qichacha-company"]);
     expect(ids("agent.qcc.com")).toEqual(["platform-qichacha-company"]);
     expect(ids("qcc.com")).toEqual(["platform-qichacha-company"]);
-    expect(ids("", "data")).toEqual(["platform-qichacha-company"]);
+    expect(ids("云效")).toEqual(["platform-aliyun-yunxiao"]);
+    expect(ids("Linear")).toEqual(["platform-linear"]);
+    expect(ids("cloudbase")).toEqual(["platform-cloudbase-cn", "platform-cloudbase-intl"]);
+    expect(ids("国际站")).toEqual(["platform-cloudbase-intl"]);
+    expect(ids("", "data")).toEqual(["platform-qichacha-company", "platform-globalentity"]);
+    expect(ids("", "productivity")).toEqual(["platform-linear", "platform-notion", "platform-atlassian-rovo"]);
+    expect(ids("", "developer")).toEqual([
+      "platform-cloudbase-cn", "platform-cloudbase-intl", "platform-aliyun-yunxiao", "platform-sentry",
+    ]);
+    expect(ids("", "creative")).toEqual(["platform-canva"]);
     expect(ids("", "finance")).toEqual([]);
     expect(ids("unrelated")).toEqual([]);
   });
@@ -153,6 +187,8 @@ describe("platform-owned MCP catalog", () => {
     expect(platformCatalogPageWindow(1, 1, 2)).toEqual({ start: 0, platformOnPage: 1, dbStart: 0, dbLimit: 1 });
     expect(platformCatalogPageWindow(1, 2, 2)).toEqual({ start: 2, platformOnPage: 0, dbStart: 1, dbLimit: 2 });
     expect(platformCatalogPageWindow(0, 1, 2)).toEqual({ start: 0, platformOnPage: 0, dbStart: 0, dbLimit: 2 });
+    expect(platformCatalogPageWindow(10, 1, 12)).toEqual({ start: 0, platformOnPage: 10, dbStart: 0, dbLimit: 2 });
+    expect(platformCatalogPageWindow(10, 2, 6)).toEqual({ start: 6, platformOnPage: 4, dbStart: 0, dbLimit: 2 });
 
     const platform = platformMcpMarketItems()[0];
     const categories = [

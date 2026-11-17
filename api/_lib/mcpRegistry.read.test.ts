@@ -20,6 +20,9 @@ vi.mock("./supabase.js", () => ({
 }));
 
 import { MCP_CLASSIFIER_VERSION, readMcpMarket } from "./mcpRegistry";
+import { PLATFORM_MCP_SERVICES } from "./platformMcpCatalog";
+
+const platformIds = PLATFORM_MCP_SERVICES.map((service) => service.id);
 
 type Filter = { column: string; op: "eq" | "neq"; value: unknown };
 
@@ -90,9 +93,10 @@ beforeEach(() => {
 });
 
 describe("readMcpMarket platform catalog merge", () => {
-  it("puts the platform service first, reserves its page slot, and keeps totals and category counts exact", async () => {
+  it("puts all platform services first, reserves their page slots, and keeps totals and category counts exact", async () => {
+    expect(platformIds).toHaveLength(10);
     const first = await readMcpMarket({ sync: false, page: 1, limit: 120 });
-    expect(first.total).toBe(698);
+    expect(first.total).toBe(707);
     expect(first.items).toHaveLength(120);
     expect(first.items[0]).toMatchObject({
       id: "platform-qichacha-company",
@@ -102,40 +106,45 @@ describe("readMcpMarket platform catalog merge", () => {
       recommended: true,
       connectMode: "login",
     });
-    expect(first.items[1].id).toBe("row-000");
-    expect(first.items[first.items.length - 1].id).toBe("row-118");
+    expect(first.items.map((item) => item.id).slice(0, 10)).toEqual(platformIds);
+    expect(first.items[10].id).toBe("row-000");
+    expect(first.items[first.items.length - 1].id).toBe("row-109");
     expect(first.hasMore).toBe(true);
-    expect(first.recommendedIds).toEqual(["platform-qichacha-company"]);
-    expect(first.categories.find((item) => item.key === "data")).toMatchObject({ label: "数据服务", count: 350 });
+    expect(first.recommendedIds).toEqual(platformIds);
+    expect(first.categories.find((item) => item.key === "data")).toMatchObject({ label: "数据服务", count: 351 });
     expect(first.categories.find((item) => item.key === "finance")).toMatchObject({ label: "金融投资", count: 348 });
+    expect(first.categories.find((item) => item.key === "productivity")).toMatchObject({ label: "办公协作", count: 3 });
+    expect(first.categories.find((item) => item.key === "developer")).toMatchObject({ label: "开发工具", count: 4 });
+    expect(first.categories.find((item) => item.key === "creative")).toMatchObject({ label: "内容创作", count: 1 });
     expect(first.categories.reduce((total, item) => total + item.count, 0)).toBe(first.total);
 
     const second = await readMcpMarket({ sync: false, page: 2, limit: 120 });
-    expect(second.total).toBe(698);
+    expect(second.total).toBe(707);
     expect(second.items).toHaveLength(120);
-    expect(second.items[0].id).toBe("row-119");
-    expect(second.items[second.items.length - 1].id).toBe("row-238");
+    expect(second.items[0].id).toBe("row-110");
+    expect(second.items[second.items.length - 1].id).toBe("row-229");
     expect(second.hasMore).toBe(true);
   });
 
-  it("shows the platform service when the database has no market rows", async () => {
+  it("shows every platform service when the database has no market rows", async () => {
     fake.rows = [];
     const page = await readMcpMarket({ sync: false, page: 1, limit: 120 });
-    expect(page.total).toBe(1);
-    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(10);
+    expect(page.items).toHaveLength(10);
+    expect(page.items.map((item) => item.id)).toEqual(platformIds);
     expect(page.items[0]).toMatchObject({ id: "platform-qichacha-company", source: "platform" });
-    expect(page.categories.find((item) => item.key === "data")).toMatchObject({ count: 1 });
+    expect(page.categories.find((item) => item.key === "data")).toMatchObject({ count: 2 });
     expect(page.categories.find((item) => item.key === "finance")).toMatchObject({ count: 0 });
     expect(page.hasMore).toBe(false);
   });
 
-  it("removes a database row that duplicates the platform endpoint from rows and totals", async () => {
+  it("removes a database row that duplicates a platform endpoint from rows and totals", async () => {
     const duplicate = registryRows(1)[0];
     fake.rows = [...registryRows(5), { ...duplicate, id: "admin-duplicate", source: "admin", url: "https://agent.qcc.com/mcp/company/stream/" }];
     const page = await readMcpMarket({ sync: false, page: 1, limit: 120 });
-    expect(page.total).toBe(6);
+    expect(page.total).toBe(15);
     expect(page.items.map((item) => item.id)).toEqual([
-      "platform-qichacha-company", "row-000", "row-001", "row-002", "row-003", "row-004",
+      ...platformIds, "row-000", "row-001", "row-002", "row-003", "row-004",
     ]);
   });
 });

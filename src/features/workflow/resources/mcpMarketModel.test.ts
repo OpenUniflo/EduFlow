@@ -105,6 +105,9 @@ describe("API-driven MCP recommendations", () => {
     expect(mcpRecommendationAction(marketItem({ connectMode: "config" }))).toBe("config");
     expect(mcpRecommendationAction(marketItem({ connectMode: "quick", authHint: "oauth" }))).toBe("config");
     expect(mcpRecommendationAction(marketItem({ connectMode: "login", authHint: "oauth", oauthScopes: [] }))).toBe("config");
+    // Platform login may rely on server-side discovery instead of a preset
+    // scope list, while an administrator recommendation still needs one.
+    expect(mcpRecommendationAction(marketItem({ source: "platform", connectMode: "login", authHint: "oauth", oauthScopes: [] }))).toBe("login");
   });
 
   it("dedupes by URL, keeps API order, and prefers platform metadata without changing other sources' priority", () => {
