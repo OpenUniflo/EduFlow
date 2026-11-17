@@ -1,14 +1,18 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, Clock3, FileText, FolderOpen, GitBranch, History, Link2, MoreHorizontal, Paperclip, Plus, Search, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ApiRequestError } from "@/shared/api/apiClient";
 import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
 import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
-import type { WorkflowDeleteImpact, WorkflowLibraryPage as LibraryPage, WorkflowSummaryV2 } from "../domain/v2/types";
+import { WorkflowDependencyList } from "../editor/v2/WorkflowDependencyList";
+import type { WorkflowDeleteImpact, WorkflowEditorFocus, WorkflowLibraryPage as LibraryPage, WorkflowSummaryV2 } from "../domain/v2/types";
 import type { MyPracticeSubmission, PracticeSubmissionStatus } from "@/shared/learning/practiceSubmission";
 import { Button } from "@/shared/ui/Button";
 import { Pill, PreviewBadge, TextField, type PillTone } from "@/shared/ui";
 import { WorkflowDialog } from "../editor/v2/WorkflowDialog";
 import { WorkflowCreateDialog } from "./WorkflowCreateDialog";
+import { WorkflowRelationsDialog } from "./WorkflowRelationsDialog";
+import { relationSummaryText } from "./workflowRelations";
 import type { WorkflowVersionPreview } from "./worksPreview";
 import { thumbnailNodes } from "./worksThumbnail";
 import "./worksOverview.css";
@@ -109,7 +113,7 @@ async function loadAllWorkflows() {
 
 type PracticeSubmissionSource = { listMyPracticeSubmissions(): Promise<{ items: MyPracticeSubmission[] }> };
 
-export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflow, versionPreviews = [] }: { userId: string; learnerStateService: PracticeSubmissionSource; onOpenWorkflow: (id: string, returnTo?: string) => void; versionPreviews?: readonly WorkflowVersionPreview[] }) {
+export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflow, versionPreviews = [] }: { userId: string; learnerStateService: PracticeSubmissionSource; onOpenWorkflow: (id: string, returnTo?: string, focus?: WorkflowEditorFocus) => void; versionPreviews?: readonly WorkflowVersionPreview[] }) {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const search = (params.get("q") ?? "").slice(0, 200);
@@ -122,7 +126,7 @@ export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflo
   const [practice, setPractice] = useState<MyPracticeSubmission[] | null>(null);
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [retry, setRetry] = useState(0), [creating, setCreating] = useState(false), [action, setAction] = useState<Action | null>(null);
-  const [menu, setMenu] = useState<string | null>(null), [versions, setVersions] = useState<WorkflowSummaryV2 | null>(null), [notice, setNotice] = useState("");
+  const [menu, setMenu] = useState<string | null>(null), [versions, setVersions] = useState<WorkflowSummaryV2 | null>(null), [relations, setRelations] = useState<WorkflowSummaryV2 | null>(null), [notice, setNotice] = useState("");
   const restored = useRef(false);
   const returnTo = `/works${params.size ? `?${params.toString()}` : ""}`;
   const scrollKey = `${userId}:${returnTo}`;
@@ -183,6 +187,8 @@ export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflo
   function clearFilters() { setParams({}, { replace: true }); setMenu(null); setVersions(null); }
   function refresh(message: string) { setNotice(message); setLoading(true); setAction(null); setVersions(null); setRetry(value => value + 1); }
   function openWorkflow(item: WorkflowSummaryV2) { scrollPositions.set(scrollKey, window.scrollY); onOpenWorkflow(item.workflowId, returnTo); }
+  function openRelatedWorkflow(id: string, focus?: WorkflowEditorFocus) { setRelations(null); setMenu(null); setVersions(null); scrollPositions.set(scrollKey, window.scrollY); onOpenWorkflow(id, returnTo, focus); }
+  function openDependencyWorkflow(id: string, focus?: WorkflowEditorFocus) { setAction(null); openRelatedWorkflow(id, focus); }
   function openPractice(item: MyPracticeSubmission) { scrollPositions.set(scrollKey, window.scrollY); navigate(`/courses/${encodeURIComponent(item.courseId)}/assignments/${encodeURIComponent(item.assignmentId)}`); }
 
   const searchText = search.trim().toLocaleLowerCase();
@@ -232,7 +238,7 @@ export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflo
       : visible.length ? <>
         <section className="ef-works-grid" aria-label="我的作品列表">
           {visible.map(entry => entry.kind === "workflow"
-            ? <WorkflowCard key={entry.item.workflowId} item={entry.item} menuOpen={menu === entry.item.workflowId} versionsOpen={versions?.workflowId === entry.item.workflowId} onOpen={() => openWorkflow(entry.item)} onMenu={() => { setVersions(null); setMenu(menu === entry.item.workflowId ? null : entry.item.workflowId); }} onVersions={() => { setMenu(null); setVersions(versions?.workflowId === entry.item.workflowId ? null : entry.item); }} onCloseVersions={() => setVersions(null)} versionPreviews={versionPreviews} onAction={kind => { setMenu(null); setVersions(null); setAction({ kind, item: entry.item }); }} />
+            ? <WorkflowCard key={entry.item.workflowId} item={entry.item} menuOpen={menu === entry.item.workflowId} versionsOpen={versions?.workflowId === entry.item.workflowId} onOpen={() => openWorkflow(entry.item)} onRelations={() => { setMenu(null); setVersions(null); setRelations(entry.item); }} onMenu={() => { setVersions(null); setRelations(null); setMenu(menu === entry.item.workflowId ? null : entry.item.workflowId); }} onVersions={() => { setMenu(null); setRelations(null); setVersions(versions?.workflowId === entry.item.workflowId ? null : entry.item); }} onCloseVersions={() => setVersions(null)} versionPreviews={versionPreviews} onAction={kind => { setMenu(null); setVersions(null); setRelations(null); setAction({ kind, item: entry.item }); }} />
             : <PracticeCard key={`${entry.item.courseId}:${entry.item.assignmentId}`} item={entry.item} onOpen={() => openPractice(entry.item)} />)}
         </section>
         <nav className="ef-works-pagination" aria-label="作品分页">
@@ -247,7 +253,8 @@ export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflo
         <div className="ef-works-state-actions">{filtering ? <Button variant="secondary" onClick={clearFilters}>清除筛选</Button> : null}{tab !== "practice" ? <Button variant="primary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setCreating(true)}>新建作品</Button> : null}</div>
       </section>}
     {creating ? <WorkflowCreateDialog onClose={() => setCreating(false)} onCreated={id => onOpenWorkflow(id, returnTo)} /> : null}
-    {action ? <WorkflowLibraryAction key={`${action.kind}:${action.item.workflowId}`} action={action} onClose={() => setAction(null)} onDone={refresh} /> : null}
+    {relations ? <WorkflowRelationsDialog key={`${relations.workflowId}:${relations.revision}`} item={relations} onClose={() => setRelations(null)} onOpenWorkflow={openRelatedWorkflow} /> : null}
+    {action ? <WorkflowLibraryAction key={`${action.kind}:${action.item.workflowId}`} action={action} onClose={() => setAction(null)} onDone={refresh} onOpenWorkflow={openDependencyWorkflow} /> : null}
   </main>;
 }
 
@@ -267,11 +274,12 @@ function useThumbnailWidth() {
   return { ref, width };
 }
 
-function WorkflowCard({ item, menuOpen, versionsOpen, onOpen, onMenu, onVersions, onCloseVersions, versionPreviews, onAction }: {
+function WorkflowCard({ item, menuOpen, versionsOpen, onOpen, onRelations, onMenu, onVersions, onCloseVersions, versionPreviews, onAction }: {
   item: WorkflowSummaryV2;
   menuOpen: boolean;
   versionsOpen: boolean;
   onOpen: () => void;
+  onRelations: () => void;
   onMenu: () => void;
   onVersions: () => void;
   onCloseVersions: () => void;
@@ -310,6 +318,10 @@ function WorkflowCard({ item, menuOpen, versionsOpen, onOpen, onMenu, onVersions
       <span className="ef-works-meta" title={workflowSource(item)}><span className="ef-works-meta-copy">{workflowSource(item)} · {item.nodeCount ?? nodes.length} 个节点</span></span>
       <span className="ef-works-foot"><Pill tone={status.tone} dot>{status.label}</Pill><time dateTime={item.updatedAt}>{formatTime(item.updatedAt)}</time></span>
     </button>
+    <button type="button" className="ef-works-relations" onClick={onRelations} aria-label={`查看 ${item.name} 的引用关系`}>
+      <GitBranch size={13} aria-hidden="true" />
+      <span>{relationSummaryText(item.relations)}</span>
+    </button>
   </article>;
 }
 
@@ -338,14 +350,16 @@ function PracticeCard({ item, onOpen }: { item: MyPracticeSubmission; onOpen: ()
   </article>;
 }
 
-function WorkflowLibraryAction({ action: { kind, item }, onClose, onDone }: { action: Action; onClose: () => void; onDone: (message: string) => void }) {
+function WorkflowLibraryAction({ action: { kind, item }, onClose, onDone, onOpenWorkflow }: { action: Action; onClose: () => void; onDone: (message: string) => void; onOpenWorkflow: (workflowId: string, focus?: WorkflowEditorFocus) => void }) {
   const [name, setName] = useState(kind === "copy" ? `${item.name.slice(0, 117)} 副本` : item.name), [error, setError] = useState(""), [busy, setBusy] = useState(false);
-  const [impact, setImpact] = useState<WorkflowDeleteImpact | null>(null), [retry, setRetry] = useState(0);
+  const [impact, setImpact] = useState<WorkflowDeleteImpact | null>(null), [retry, setRetry] = useState(0), [impactLoading, setImpactLoading] = useState(kind === "delete"), [staleNotice, setStaleNotice] = useState("");
   const pending = useRef(false), creationId = useRef(crypto.randomUUID());
   useEffect(() => {
     if (kind !== "delete") return;
     let active = true;
-    void workflowApiV2.deleteImpact(item.workflowId).then(value => { if (active) { setImpact(value); setError(""); } }).catch(reason => { if (active) setError(workflowErrorMessage(reason)); });
+    setImpactLoading(true);
+    setImpact(null);
+    void workflowApiV2.deleteImpact(item.workflowId).then(value => { if (active) { setImpact(value); setError(""); } }).catch(reason => { if (active) setError(workflowErrorMessage(reason)); }).finally(() => { if (active) setImpactLoading(false); });
     return () => { active = false; };
   }, [kind, item.workflowId, retry]);
   async function submit() {
@@ -356,12 +370,20 @@ function WorkflowLibraryAction({ action: { kind, item }, onClose, onDone }: { ac
       else if (kind === "rename") await workflowApiV2.rename(item.workflowId, item.revision, name.trim());
       else await workflowApiV2.copy(item.workflowId, item.revision, name.trim(), creationId.current);
       onDone(kind === "delete" ? "工作流已删除。" : kind === "rename" ? "名称已更新。" : "副本已创建，可在列表中打开。若未显示，请检查当前筛选条件。");
-    } catch (reason) { setError(workflowErrorMessage(reason)); }
+    } catch (reason) {
+      if (kind === "delete" && reason instanceof ApiRequestError && reason.code === "WORKFLOW_REFERENCED") {
+        setError("");
+        setStaleNotice("删除被服务器阻止：预览之后新增了固定版本引用。引用关系已刷新，请先打开引用方移除引用并保存，再确认删除。");
+        setImpact(null);
+        setImpactLoading(true);
+        setRetry(value => value + 1);
+      } else setError(workflowErrorMessage(reason));
+    }
     finally { pending.current = false; setBusy(false); }
   }
   const title = kind === "delete" ? "删除工作流" : kind === "rename" ? "重命名工作流" : "复制工作流";
-  return <WorkflowDialog title={title} className="wf-library-dialog wf-action-dialog" error={error} onClose={() => { if (!pending.current) onClose(); }}>
-    {kind === "delete" ? <><p>确定删除“{item.name}”？此操作不可恢复。</p>{impact ? <p>将删除 {impact.revisions} 个版本及 {impact.runs} 条运行记录和调试详情。共享模板、课程动手任务和已有学习证据会保留。</p> : !error ? <p role="status">正在检查删除范围…</p> : <button onClick={() => setRetry(value => value + 1)}>重新检查</button>}{impact?.activeRuns ? <p role="alert">当前有 {impact.activeRuns} 条运行尚未结束，请结束后再删除。</p> : null}</> : <><p>{kind === "copy" ? "复制当前保存的节点配置和布局，运行记录不会复制。" : "更新名称会创建一个新修订，已有运行记录会保留。"}</p><label className="wf-dialog-name">工作流名称<input disabled={busy} maxLength={120} value={name} onChange={event => { setName(event.target.value); creationId.current = crypto.randomUUID(); }} onKeyDown={event => { if (event.key === "Enter" && name.trim()) void submit(); }} /></label></>}
-    <footer className="wf-dialog-actions"><button disabled={busy} onClick={onClose}>取消</button><button className={kind === "delete" ? "danger" : "primary"} disabled={busy || (kind === "delete" ? !impact || Boolean(impact.activeRuns) : !name.trim())} onClick={() => void submit()}>{busy ? "正在处理…" : kind === "delete" ? "确认删除" : kind === "copy" ? "创建副本" : "保存名称"}</button></footer>
+  return <WorkflowDialog title={title} className={`wf-library-dialog wf-action-dialog${kind === "delete" ? " wf-delete-dialog" : ""}`} error={error} onClose={() => { if (!pending.current) onClose(); }}>
+    {kind === "delete" ? <><p>删除“{item.name}”会移除它的全部修订，此操作不可恢复。</p>{impact ? <p>将删除 {impact.revisions} 个版本及 {impact.runs} 条运行记录和调试详情。共享模板、课程动手任务和已有学习证据会保留；引用此作品的旧运行仍使用自己的快照。</p> : impactLoading ? <p role="status">正在检查删除范围与当前引用…</p> : !error ? <p role="status">尚未读取删除范围。</p> : <button onClick={() => setRetry(value => value + 1)}>重新检查</button>}{impact?.referenceCount ? <div className="wf-delete-reference-block">{staleNotice ? <p role="alert" className="wf-delete-stale">{staleNotice}</p> : null}<p>此作品仍被当前可到达的固定版本引用，不能删除。当前由 {impact.referencedBy ?? 0} 个根作品经固定版本引用。</p><WorkflowDependencyList blocks={impact.blockingReferences ?? []} totalCount={impact.referenceCount} onOpenWorkflow={onOpenWorkflow}/><p>请打开引用方作品，移除对应调用节点或更换目标，保存后再删除。历史修订中的旧引用不会永久阻止删除。</p><button type="button" onClick={() => setRetry(value => value + 1)} disabled={impactLoading}>{impactLoading ? "正在刷新…" : "刷新引用关系"}</button></div> : null}{impact && !impact.referenceCount ? <p className="wf-reference-ready" role="status">当前没有可达的固定版本引用阻止删除。</p> : null}{impact?.activeRuns ? <p role="alert">当前有 {impact.activeRuns} 条运行尚未结束，请结束后再删除。</p> : null}</> : <><p>{kind === "copy" ? "复制当前保存的节点配置和布局，运行记录不会复制。" : "更新名称会创建一个新修订，已有运行记录会保留。"}</p><label className="wf-dialog-name">工作流名称<input disabled={busy} maxLength={120} value={name} onChange={event => { setName(event.target.value); creationId.current = crypto.randomUUID(); }} onKeyDown={event => { if (event.key === "Enter" && name.trim()) void submit(); }} /></label></>}
+    <footer className="wf-dialog-actions"><button disabled={busy} onClick={onClose}>取消</button><button className={kind === "delete" ? "danger" : "primary"} disabled={busy || impactLoading || (kind === "delete" ? !impact || Boolean(impact.activeRuns) || Boolean(impact.referenceCount) : !name.trim())} onClick={() => void submit()}>{busy ? "正在处理…" : kind === "delete" ? "确认删除" : kind === "copy" ? "创建副本" : "保存名称"}</button></footer>
   </WorkflowDialog>;
 }
