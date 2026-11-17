@@ -164,7 +164,7 @@ class Registry:
             file = os.environ.get("WORKFLOW_ENVIRONMENTS_FILE")
             configuration = json.loads(Path(file).read_text()) if file else json.loads(os.environ.get("WORKFLOW_ENVIRONMENTS_JSON", '{"environments":[]}'))
         self.environments = copy.deepcopy(configuration["environments"])
-        from .extensions import connector_cache_digest
+        from .extensions import connector_cache_digest, is_catalog_placeholder
         catalog_file = os.environ.get("WORKFLOW_CATALOG_FILE")
         hosted = os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted'
         if hosted or catalog_file and Path(catalog_file).exists():
@@ -178,7 +178,10 @@ class Registry:
                 for connector in env.get("connectors",[]):
                     saved = catalog.get(env["ref"]+":"+connector["ref"])
                     if saved and saved["connectorDigest"]==connector_cache_digest(connector):
-                        env["tools"]=[tool for tool in env.get("tools",[]) if tool.get("connectorRef")!=connector["ref"]]+saved["tools"]
+                        # Compact entries are names only and never executable.
+                        # Full descriptors from legacy and current caches remain unchanged.
+                        cached=[tool for tool in (saved.get("tools") or []) if not is_catalog_placeholder(tool)]
+                        env["tools"]=[tool for tool in env.get("tools",[]) if tool.get("connectorRef")!=connector["ref"]]+cached
         self.nodes = copy.deepcopy(NODE_DESCRIPTORS)
         self.operations = copy.deepcopy(OPERATIONS)
         for env in self.environments:
@@ -242,7 +245,7 @@ class Registry:
                 rows=connection.execute('select workflow_private.p4_catalog_read(%s::uuid,%s)',(owner,ref)).fetchone()[0]
                 for row in rows:
                     if row['kind']=='function': env['functions'].append({**row['content'],'ref':row['ref'],'version':row['version'],'disabled':row['disabled']})
-                from .extensions import connector_cache_digest, hydrate_connections
+                from .extensions import connector_cache_digest, hydrate_connections, is_catalog_placeholder
                 hydrate_connections(env,owner,rows)
                 catalog_file=os.environ.get('WORKFLOW_CATALOG_FILE')
                 if os.environ.get('WORKFLOW_DEPLOYMENT_MODE')=='hosted' or catalog_file and Path(catalog_file).exists():
@@ -257,10 +260,11 @@ class Registry:
                             # The cache contains the complete tools/list result. Only
                             # explicitly allowed tools may enter execution/selection;
                             # full names remain non-sensitive discovery metadata.
-                            all_tools=list(saved.get('tools') or [])
+                            # Compact placeholders contribute names only.
+                            all_tools=[tool for tool in (saved.get('tools') or []) if isinstance(tool,dict)]
                             connector['discoveredToolNames']=list(dict.fromkeys(str(t.get('name','')) for t in all_tools if t.get('name')))
                             allowed=set(connector.get('allowedToolNames') or [])
-                            env['tools']=[t for t in env['tools'] if t.get('connectorRef')!=connector['ref']]+[t for t in all_tools if t.get('name') in allowed]
+                            env['tools']=[t for t in env['tools'] if t.get('connectorRef')!=connector['ref']]+[t for t in all_tools if t.get('name') in allowed and not is_catalog_placeholder(t)]
                 self.update(env)
         return env
     def snapshot(self, env):
@@ -275,9 +279,10 @@ class Registry:
             return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"],"version":value["version"]} if "connectionRef" in value else {})}
         return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{"ref":p["ref"],"modelRefs":p["modelRefs"],"name":p.get("name",p["ref"]),**meta(p["ref"])} for p in env["providers"]],"connectors":[{"ref":c["ref"],"name":c.get("name",c["ref"]),"transport":c.get("transport","streamable-http"),**meta(c["ref"]),**({"discoveredToolNames":list(c["discoveredToolNames"])} if isinstance(c.get("discoveredToolNames"),list) else {})} for c in env["connectors"] if c.get("fixture") is not True],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
     def public_tools(self, env):
+        from .extensions import is_catalog_placeholder
         origins=env.get("capabilityOrigins",{})
         hidden=fixture_tool_refs()
         def meta(tool):
             value=origins.get(tool.get("connectorRef") or tool["ref"],{})
             return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"]} if "connectionRef" in value else {})}
-        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","declaredReadOnly","declaredDestructive","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool)} for tool in env["tools"] if not is_fixture_tool(tool,hidden)]
+        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","declaredReadOnly","declaredDestructive","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool)} for tool in env["tools"] if not is_fixture_tool(tool,hidden) and not is_catalog_placeholder(tool)]

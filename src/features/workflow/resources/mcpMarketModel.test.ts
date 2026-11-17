@@ -67,6 +67,10 @@ describe("MCP market model", () => {
     expect(mcpConnectionErrorMessage("MCP_AUTH_REQUIRED")).not.toContain("MCP service rejected");
     expect(mcpConnectionErrorMessage("MCP_CONNECTION_FAILED")).toContain("不可达");
     expect(mcpConnectionErrorMessage("MCP_OAUTH_TOKEN")).toContain("重新授权");
+    expect(mcpConnectionErrorMessage("CATALOG_PAYLOAD_TOO_LARGE")).toContain("完整定义超过单条发现目录容量");
+    expect(mcpConnectionErrorMessage("CATALOG_PAYLOAD_TOO_LARGE")).toContain("减少允许工具");
+    expect(mcpConnectionErrorMessage("CATALOG_QUOTA_EXCEEDED")).toContain("连接数量已满");
+    expect(mcpConnectionErrorMessage("CATALOG_QUOTA_EXCEEDED")).not.toContain("完整定义");
     expect(mcpConnectionErrorMessage(undefined)).toBe("读取工具失败，请检查连接配置后重试。");
   });
 

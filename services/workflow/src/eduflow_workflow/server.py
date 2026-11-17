@@ -104,10 +104,9 @@ async def discovery(body:dict):
     path=os.environ.get("WORKFLOW_CATALOG_FILE")
     if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted':
         from .storage import Storage
-        from .extensions import connector_cache_digest
+        from .extensions import save_discovered_catalog
         connector=next(c for c in env['connectors'] if c['ref']==body['connectorRef'])
-        await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_catalog_put',
-            env['ref']+':'+connector['ref'],connector_cache_digest(connector),tools)
+        await save_discovered_catalog(Storage(os.environ['WORKFLOW_DATABASE_URL']),env['ref']+':'+connector['ref'],connector,tools)
         registry._refreshed_at=-100
         refresh();env=registry.environment(env['ref'],body['ownerId'])
     elif path:

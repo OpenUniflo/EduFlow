@@ -95,6 +95,15 @@ describe("Workflow request failures", () => {
     expect(workflowErrorMessage(new ApiRequestError("INVALID_CONNECTION_REFERENCE", "bad", 400))).toContain("打开原工作流");
   });
 
+  it("keeps catalog row overflow distinct from shared discovery quota", () => {
+    const payload = workflowErrorMessage(new ApiRequestError("CATALOG_PAYLOAD_TOO_LARGE", "row", 422));
+    const quota = workflowErrorMessage(new ApiRequestError("CATALOG_QUOTA_EXCEEDED", "quota", 422));
+    expect(payload).toContain("完整定义超过单条发现目录容量");
+    expect(payload).toContain("减少允许工具");
+    expect(quota).toContain("连接数量已满");
+    expect(quota).not.toContain("完整定义");
+  });
+
   it("distinguishes a save revision conflict from an Assignment state conflict", () => {
     expect(workflowErrorMessage(new ApiRequestError("REVISION_CONFLICT", "Conflict", 409))).toContain("保存冲突");
     const message = workflowErrorMessage(new ApiRequestError("ASSIGNMENT_STATE_CONFLICT", "Conflict", 409));

@@ -65,6 +65,8 @@ export function workflowErrorMessage(reason: unknown): string {
     CONNECTION_NOT_DISABLED: "此连接已恢复可用，无需再次恢复。",
     CONNECTION_DISABLED: "此连接已停用，请先恢复连接再修改名称或测试。",
     CATALOG_NOT_FOUND: "此连接已不存在，请刷新资源中心。",
+    CATALOG_PAYLOAD_TOO_LARGE: "已允许工具的完整定义超过单条发现目录容量。未允许工具已只保留名称，请减少允许工具后重试。",
+    CATALOG_QUOTA_EXCEEDED: "共享发现目录的连接数量已满。请断开或删除不再使用的连接版本后重试。",
     MCP_CONNECTION_DISABLED: "MCP 连接已断开，请重新连接后再运行。",
     MCP_OAUTH_STATE: "OAuth 授权已过期，请重新发起连接。",
     MCP_OAUTH_DENIED: "OAuth 授权未完成，请重试。",

@@ -23,6 +23,8 @@ export function mcpConnectionErrorMessage(code?: string): string {
     MCP_OAUTH_SCOPE: "授权范围不被服务支持，请重新选择。",
     MCP_OAUTH_DISCOVERY_FAILED: "无法读取服务的 OAuth 配置，请检查地址或改用 API Key/Bearer。",
     CONNECTION_TEST_TIMEOUT: "连接超时，请检查服务地址和网络后重试。",
+    CATALOG_PAYLOAD_TOO_LARGE: "已允许工具的完整定义超过单条发现目录容量，未允许工具已只保留名称。请减少允许工具后重试。",
+    CATALOG_QUOTA_EXCEEDED: "共享发现目录的连接数量已满。请先清理不再使用的连接版本后重试。",
   };
   return messages[code ?? ""] ?? "读取工具失败，请检查连接配置后重试。";
 }

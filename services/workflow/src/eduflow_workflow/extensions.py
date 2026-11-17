@@ -32,6 +32,46 @@ def connector_cache_digest(connector):
     # out prevents a loaded cache from invalidating itself on the next refresh.
     return digest({key:value for key,value in connector.items() if key!='discoveredToolNames'})
 
+CATALOG_PLACEHOLDER='discoveryPlaceholder'
+
+def is_catalog_placeholder(tool):
+    """True only for the name-only cache entry written by the compact fallback."""
+    return isinstance(tool,dict) and tool.get(CATALOG_PLACEHOLDER) is True
+
+def compact_catalog_tools(tools,allowed_names):
+    """Keep allowed descriptors complete and every other discovered name only.
+
+    The database bounds one discovery row to 256 KiB. A large tools/list result
+    (for example Notion) can exceed that bound even though only a small allowed
+    subset can ever execute. Placeholders keep the complete catalog browsable
+    for the UI without fabricating a schema or granting an executable tool.
+    """
+    allowed=set(allowed_names or [])
+    compact=[]
+    for tool in tools if isinstance(tools,list) else []:
+        if not isinstance(tool,dict): continue
+        name=tool.get('name')
+        if isinstance(name,str) and name in allowed:
+            compact.append(tool)
+        elif isinstance(name,str) and name:
+            compact.append({'name':name,CATALOG_PLACEHOLDER:True})
+    return compact
+
+async def save_discovered_catalog(store,key,connector,tools):
+    """Persist one discovery result, retrying once with placeholders on row overflow.
+
+    Only the explicit row-size classification triggers the compact retry. Quota
+    exhaustion is never masked, and if the allowed descriptors alone still
+    exceed the row bound the second error reaches the caller unchanged.
+    """
+    cache_digest=connector_cache_digest(connector)
+    try:
+        return await store.call('p6_catalog_put',key,cache_digest,tools)
+    except ExecutionError as error:
+        if error.code!='CATALOG_PAYLOAD_TOO_LARGE': raise
+        compact=compact_catalog_tools(tools,connector.get('allowedToolNames') or [])
+        return await store.call('p6_catalog_put',key,cache_digest,compact)
+
 HTTP_METHODS=('GET','POST','PUT','PATCH','DELETE')
 HTTP_BODY_MODES=('none','json','form-data','x-www-form-urlencoded','raw')
 HTTP_AUTH_TYPES=('none','api-key-header','api-key-query','bearer','basic')
@@ -582,7 +622,7 @@ async def catalog_operation(body,registry):
                 saved[ref+':'+key]={'connectorDigest':connector_cache_digest(connector),'tools':tools}
                 temporary=Path(path+'.tmp');temporary.write_text(json.dumps(saved));temporary.replace(path)
             elif os.environ.get('WORKFLOW_DEPLOYMENT_MODE')=='hosted':
-                await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_catalog_put',env['ref']+':'+key,connector_cache_digest(connector),tools)
+                await save_discovered_catalog(Storage(os.environ['WORKFLOW_DATABASE_URL']),env['ref']+':'+key,connector,tools)
             allowed_names={t['name'] for t in allowed}
             return {'ok':True,'elapsedMs':elapsed_ms(started),'tools':[{'name':t['name'],'description':t.get('description',''),'allowed':t['name'] in allowed_names,**({'inputSchema':t['inputSchema']} if isinstance(t.get('inputSchema'),dict) else {})} for t in tools]}
         except ExecutionError as error:
