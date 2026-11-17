@@ -634,6 +634,27 @@ async def test_catalog_test_returns_mcp_tool_names(monkeypatch):
 
 # --- Generic API editor contract -----------------------------------------
 
+async def test_generic_http_connection_accepts_text_response_and_omits_default_json(local_fixtures):
+    with local_http(lambda request, body: (200, b'{}', {})) as base:
+        base_content = {
+            'type': 'http', 'name': 'O*NET wages', 'baseUrl': base, 'path': '/wages',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'},
+        }
+        text = await validate_connection({**base_content, 'settings': {'timeoutMs': 5000, 'responseFormat': 'text'}}, '', local_env())
+        default_json = await validate_connection({**base_content, 'settings': {'timeoutMs': 5000, 'responseFormat': 'json'}}, '', local_env())
+        with pytest.raises(ExecutionError) as invalid:
+            await validate_connection({**base_content, 'settings': {'responseFormat': 'html'}}, '', local_env())
+        with pytest.raises(ExecutionError) as result_path:
+            await validate_connection({**base_content, 'settings': {'responseFormat': 'text', 'resultPath': 'data'}}, '', local_env())
+        with pytest.raises(ExecutionError) as mapping_path:
+            await validate_connection({**base_content, 'settings': {'responseFormat': 'text'}, 'outputMap': [{'name': 'text', 'path': 'text', 'type': 'text'}]}, '', local_env())
+    assert text['settings'] == {'timeoutMs': 5000, 'responseFormat': 'text'}
+    assert default_json['settings'] == {'timeoutMs': 5000}
+    assert invalid.value.code == 'INVALID_CONNECTION'
+    assert result_path.value.code == 'INVALID_CONNECTION'
+    assert mapping_path.value.code == 'INVALID_CONNECTION'
+
+
 async def test_generic_http_connection_validates_params_headers_auth_and_output_map(local_fixtures):
     with local_http(lambda request, body: (200, b'{}', {})) as base:
         content = await validate_connection({
@@ -724,20 +745,133 @@ async def test_invoke_generic_http_connection_sends_bearer_path_query_and_maps_o
     assert result == {'items': [{'title': 'A'}]}
 
 
+async def test_invoke_generic_http_text_connection_decodes_bom_and_maps_output(local_fixtures):
+    def handler(request, body):
+        return 200, '\ufeff<html><body>中文</body></html>'.encode('utf-8'), {'Content-Type': 'text/html; charset=UTF-8'}
+
+    with local_http(handler) as base:
+        environment = local_env()
+        content = {
+            'type': 'http', 'name': 'O*NET wages', 'baseUrl': base, 'path': '/wages',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'},
+            'settings': {'timeoutMs': 5000, 'responseFormat': 'text'},
+            'outputMap': [{'name': 'text', 'path': '', 'type': 'text'}],
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'wages', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:wages:1')
+        result = await tools.invoke_tool(tool, environment, {}, 5)
+    assert result == {'text': '<html><body>中文</body></html>'}
+
+
+async def test_invoke_generic_http_text_connection_can_return_a_string(local_fixtures):
+    with local_http(lambda request, body: (200, b'plain text', {'Content-Type': 'text/plain'})) as base:
+        environment = local_env()
+        content = {
+            'type': 'http', 'name': 'Text', 'baseUrl': base, 'path': '/text',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'string'},
+            'settings': {'responseFormat': 'text'}, 'outputMap': [],
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'text', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:text:1')
+        result = await tools.invoke_tool(tool, environment, {}, 5)
+    assert result == 'plain text'
+
+
+@pytest.mark.parametrize('payload,content_type,code', [
+    (b'<html>json not text</html>', 'application/json', 'TOOL_RESPONSE_NOT_TEXT'),
+    (b'<html>latin</html>', 'text/html; charset=iso-8859-1', 'TOOL_RESPONSE_CHARSET_UNSUPPORTED'),
+    (b'\xff\xfeinvalid', 'text/html; charset=UTF-8', 'TOOL_RESPONSE_ENCODING_INVALID'),
+])
+async def test_invoke_generic_http_text_connection_fails_strictly(local_fixtures, payload, content_type, code):
+    with local_http(lambda request, body: (200, payload, {'Content-Type': content_type})) as base:
+        environment = local_env()
+        content = {
+            'type': 'http', 'name': 'Text', 'baseUrl': base, 'path': '/text',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'string'},
+            'settings': {'responseFormat': 'text'}, 'outputMap': [],
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'text', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:text:1')
+        with pytest.raises(ExecutionError) as caught:
+            await tools.invoke_tool(tool, environment, {}, 5)
+    assert caught.value.code == code
+
+
+async def test_http_test_preview_applies_text_format_checks(local_fixtures):
+    with local_http(lambda request, body: (200, '\ufeff<html>预览</html>'.encode(), {'Content-Type': 'text/html; charset=UTF-8'})) as base:
+        result = await http_test_preview(http_tool(base, settings={'responseFormat': 'text'}), local_env(), {})
+    assert result == {'ok': True, 'status': 200, 'preview': '<html>预览</html>'}
+    with local_http(lambda request, body: (200, b'not text', {'Content-Type': 'application/json'})) as base:
+        with pytest.raises(ExecutionError) as caught:
+            await http_test_preview(http_tool(base, settings={'responseFormat': 'text'}), local_env(), {})
+    assert caught.value.code == 'TOOL_RESPONSE_NOT_TEXT'
+
+
 async def test_fetch_model_reply_returns_first_reply_text(local_fixtures):
     seen = {}
 
     def handler(request, body):
         seen['path'] = request.path
         seen['body'] = json.loads(body.decode())
-        return 200, json.dumps({'choices': [{'message': {'content': '连接可用。'}}]}).encode(), {}
+        return 200, json.dumps({'choices': [{'message': {'role': 'assistant', 'content': '连接可用。'}, 'finish_reason': 'stop'}]}).encode(), {}
 
     with local_http(handler) as base:
-        reply = await extensions.fetch_model_reply(base, None, 'deepseek-flash', '请确认连接。', local_env())
+        reply = await extensions.fetch_model_reply({'baseUrl': base, 'adapter': 'openai'}, 'deepseek-flash', '请确认连接。', local_env())
     assert reply == '连接可用。'
     assert seen['path'] == '/chat/completions'
     assert seen['body']['model'] == 'deepseek-flash'
     assert seen['body']['messages'] == [{'role': 'user', 'content': '请确认连接。'}]
+
+
+@pytest.mark.parametrize("headers, session", [
+    ({"Authorization": "forbidden"}, None),
+    ({"Host": "wrong.example"}, None),
+    ({"x-test": "one", "X-Test": "two"}, None),
+    ({"x-test": "line\r\nbreak"}, None),
+    ({"x-test": "one"}, "X-Test"),
+    ({}, "Cookie"),
+])
+async def test_model_connection_rejects_unsafe_or_colliding_headers(headers, session):
+    with pytest.raises(ExecutionError) as caught:
+        await validate_connection(model_content(headers=headers, sessionAffinityHeader=session), "test-key", local_env())
+    assert caught.value.code == "INVALID_CONNECTION"
+
+
+async def test_streaming_probe_and_runtime_share_fixed_and_session_headers(local_fixtures):
+    from eduflow_workflow.model_transport import model_request_headers
+
+    seen = []
+
+    def handler(request, body):
+        seen.append((request.headers['X-Project'], request.headers['X-Session'], json.loads(body)))
+        chunks = [
+            {'choices': [{'index': 0, 'delta': {'role':'assistant','content':'{"summary":'}, 'finish_reason': None}]},
+            {'choices': [{'index': 0, 'delta': {'content':'"ok"}'}, 'finish_reason': 'stop'}]},
+        ]
+        payload = ''.join('data: '+json.dumps({'id':'reply','created':1,'model':'model-a','object':'chat.completion.chunk',**chunk})+'\n\n' for chunk in chunks)+'data: [DONE]\n\n'
+        return 200, payload.encode(), {'Content-Type':'text/event-stream'}
+
+    with local_http(handler) as base:
+        c = await validate_connection(model_content(baseUrl=base,headers={'X-Project':'review'},sessionAffinityHeader='X-Session'), '', local_env())
+        assert c['headers'] == {'x-project':'review'}
+        env = local_env()
+        row = {'kind':'connection','ref':'team','version':1,'disabled':False,'content':c}
+        hydrate_connections(env, 'owner', [row])
+        provider = env['providers'][0]
+        for _ in range(2):
+            assert json.loads(await extensions.fetch_model_reply(provider,'model-a','JSON',env,structured=True)) == {'summary':'ok'}
+
+        run = execution()
+        run.env = env
+        run.run['thread_id'] = 'persistent-thread'
+        config = llm_config(providerRef=provider['ref'])
+        async with tools.model_http_client(base,env) as client:
+            chunks = [chunk async for chunk in run.model_adapter(config,client).astream('JSON',response_format={'type':'json_object'})]
+        assert ''.join(chunk.text for chunk in chunks) == '{"summary":"ok"}'
+        assert seen[2][1] == model_request_headers(provider,'persistent-thread')['x-session']
+        assert model_request_headers(provider,'persistent-thread') != model_request_headers(provider,'another-thread')
+    assert len({session for _,session,_ in seen}) == 3
+    assert all(project=='review' and payload['stream'] and payload['response_format']=={'type':'json_object'} for project,_,payload in seen)
 
 
 def test_builtin_hacker_news_search_uses_optional_words_without_typo_fallback():

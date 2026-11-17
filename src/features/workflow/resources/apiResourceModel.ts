@@ -8,7 +8,8 @@ export type ApiBodyMode = "none" | "json" | "form-data" | "x-www-form-urlencoded
 export type ApiBody = { mode: ApiBodyMode; text: string };
 export type ApiAuthType = "none" | "api-key-header" | "api-key-query" | "bearer" | "basic";
 export type ApiAuth = { type: ApiAuthType; name: string };
-export type ApiSettings = { timeoutMs: number; retries: number; resultPath: string };
+export type ApiResponseFormat = "json" | "text";
+export type ApiSettings = { timeoutMs: number; retries: number; resultPath: string; responseFormat: ApiResponseFormat };
 export type ApiOutputField = { name: string; path: string; type: string };
 export type ApiDraft = {
   name: string;
@@ -48,7 +49,7 @@ export const API_PARAM_SOURCES: readonly { id: ApiParamSource; label: string }[]
 export function emptyApiDraft(): ApiDraft {
   return {
     name: "", description: "", method: "GET", url: "", params: [], headers: [], body: { mode: "none", text: "" },
-    auth: { type: "none", name: "" }, settings: { timeoutMs: 15000, retries: 0, resultPath: "" }, outputMap: [], credential: "",
+    auth: { type: "none", name: "" }, settings: { timeoutMs: 15000, retries: 0, resultPath: "", responseFormat: "json" }, outputMap: [], credential: "",
   };
 }
 
@@ -104,7 +105,12 @@ export function apiDraftFromContent(content: Record<string, JsonValue>): ApiDraf
     params, headers,
     body: { mode: (stringValue(body.mode) || "none") as ApiBodyMode, text: stringValue(body.text) },
     auth: { type: (stringValue(auth.type) || "none") as ApiAuthType, name: stringValue(auth.name) },
-    settings: { timeoutMs: typeof settings.timeoutMs === "number" ? settings.timeoutMs : 15000, retries: typeof settings.retries === "number" ? settings.retries : 0, resultPath: stringValue(settings.resultPath) },
+    settings: {
+      timeoutMs: typeof settings.timeoutMs === "number" ? settings.timeoutMs : 15000,
+      retries: typeof settings.retries === "number" ? settings.retries : 0,
+      resultPath: stringValue(settings.resultPath),
+      responseFormat: stringValue(settings.responseFormat) === "text" ? "text" : "json",
+    },
     outputMap, credential: "",
   };
 }
@@ -146,6 +152,8 @@ export function apiDraftIssue(draft: ApiDraft): string {
   }
   if (draft.settings.timeoutMs < 1000 || draft.settings.timeoutMs > 120000) return "超时应在 1–120 秒之间。";
   if (draft.settings.retries < 0 || draft.settings.retries > 3) return "重试次数应为 0–3。";
+  if (draft.settings.responseFormat === "text" && draft.settings.resultPath.trim()) return "文本响应不能设置结果取值路径；请在响应字段中映射整段文本。";
+  if (draft.settings.responseFormat === "text" && draft.outputMap.some(field => field.name.trim() && field.path.trim())) return "文本响应的输出字段取值位置必须留空。";
   return "";
 }
 
@@ -164,6 +172,8 @@ export function apiContentFromDraft(draft: ApiDraft): Record<string, JsonValue> 
     if (!field.name.trim()) continue;
     outputProperties[field.name.trim()] = field.type === "array" ? { type: "array", items: {} } : field.type === "number" ? { type: "number" } : field.type === "boolean" ? { type: "boolean" } : { type: "string" };
   }
+  const textResponse = draft.settings.responseFormat === "text";
+  const mappedOutput = Object.keys(outputProperties).length > 0;
   return {
     type: "http",
     name: draft.name.trim(),
@@ -175,10 +185,15 @@ export function apiContentFromDraft(draft: ApiDraft): Record<string, JsonValue> 
     headers: draft.headers.filter(header => header.name.trim()).map(header => ({ name: header.name.trim(), value: header.value })),
     body: { mode: draft.body.mode, text: draft.body.text },
     auth: { type: draft.auth.type, ...(draft.auth.type === "api-key-header" || draft.auth.type === "api-key-query" ? { name: draft.auth.name.trim() } : {}) },
-    settings: { timeoutMs: draft.settings.timeoutMs, retries: draft.settings.retries, ...(draft.settings.resultPath.trim() ? { resultPath: draft.settings.resultPath.trim() } : {}) },
+    settings: {
+      timeoutMs: draft.settings.timeoutMs,
+      retries: draft.settings.retries,
+      ...(draft.settings.resultPath.trim() ? { resultPath: draft.settings.resultPath.trim() } : {}),
+      ...(textResponse ? { responseFormat: "text" } : {}),
+    },
     outputMap: draft.outputMap.filter(field => field.name.trim()).map(field => ({ name: field.name.trim(), path: field.path.trim(), type: field.type })),
     inputSchema: { type: "object", properties, ...(required.length ? { required } : {}) },
-    outputSchema: Object.keys(outputProperties).length ? { type: "object", properties: outputProperties } : { type: "object" },
+    outputSchema: mappedOutput ? { type: "object", properties: outputProperties } : textResponse ? { type: "string" } : { type: "object" },
   };
 }
 

@@ -370,13 +370,14 @@ function ApiEditor({ environmentRef, target, onClose, onSaved, data, refresh }: 
         <p className="wf-editor-hint">认证凭据只保存在连接里；测试请求和节点输出都不会包含完整凭据。</p>
       </div> : null}
       {tab === "settings" ? <div className="wf-editor-grid-3">
+        <Field label="响应格式"><select aria-label="响应格式" value={draft.settings.responseFormat} onChange={event => update({ settings: { ...draft.settings, responseFormat: event.target.value === "text" ? "text" : "json" } })}><option value="json">JSON（默认）</option><option value="text">文本 text/* · UTF-8</option></select></Field>
         <Field label="超时（秒）"><input aria-label="超时秒数" type="number" min={1} max={120} value={Math.round(draft.settings.timeoutMs / 1000)} onChange={event => update({ settings: { ...draft.settings, timeoutMs: Math.max(1, Number(event.target.value)) * 1000 } })}/></Field>
         <Field label="重试"><input aria-label="重试次数" type="number" min={0} max={3} value={draft.settings.retries} onChange={event => update({ settings: { ...draft.settings, retries: Math.max(0, Math.min(3, Number(event.target.value))) } })}/></Field>
-        <Field label="结果取值路径"><input aria-label="结果取值路径" value={draft.settings.resultPath} onChange={event => update({ settings: { ...draft.settings, resultPath: event.target.value } })} placeholder="留空表示整个响应"/></Field>
-        <p className="wf-editor-hint">超时按节点本次执行的上限截断；只有读取连接会自动重试。</p>
+        <Field label="结果取值路径"><input aria-label="结果取值路径" value={draft.settings.resultPath} onChange={event => update({ settings: { ...draft.settings, resultPath: event.target.value } })} placeholder={draft.settings.responseFormat === "text" ? "文本响应不使用此路径" : "留空表示整个响应"}/></Field>
+        <p className="wf-editor-hint">超时按节点本次执行的上限截断；只有读取连接会自动重试。文本响应严格校验 text/* 与 UTF-8，并用响应字段映射整段文本。</p>
       </div> : null}
     </Section>
-    <Section title="响应" hint="节点输出字段，留空则把整个响应作为输出" extra={<span className="wf-editor-hint">返回内容类型 · JSON 自动识别</span>}>
+    <Section title="响应" hint={draft.settings.responseFormat === "text" ? "可选：添加输出字段并留空取值位置以映射整段文本；不添加则输出整段文本" : "节点输出字段，留空则把整个响应作为输出"} extra={<span className="wf-editor-hint">{draft.settings.responseFormat === "text" ? "text/* · UTF-8" : "JSON 自动解析"}</span>}>
       <div className="wf-editor-table-head wf-editor-cols-output"><span>字段名</span><span>取值位置</span><span>类型</span></div>
       {draft.outputMap.map((field, index) => <div className="wf-editor-table-row wf-editor-cols-output" key={index}>
         <input aria-label={`输出字段名 ${index + 1}`} value={field.name} onChange={event => updateOutput(index, { name: event.target.value })}/>

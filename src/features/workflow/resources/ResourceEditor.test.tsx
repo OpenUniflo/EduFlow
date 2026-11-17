@@ -264,3 +264,41 @@ describe("provider editor model history", () => {
     expect(textOf(after)).toContain("上次测试未在供应商返回的模型列表中找到");
   });
 });
+
+describe("api editor response format", () => {
+  it("reads and saves an explicit text response format", async () => {
+    const original = catalog.data.connections;
+    catalog.data.connections = [
+      ...original,
+      {
+        connectionKey: "p4:owner:onet:1", ref: "onet", version: 1, disabled: false, hasCredential: false,
+        content: {
+          type: "http", name: "O*NET National Wages", description: "",
+          baseUrl: "https://www.onetonline.org", path: "/link/localwages/15-1252.00",
+          method: "GET", sideEffect: "read", params: [], headers: [], body: { mode: "none", text: "" },
+          auth: { type: "none" }, settings: { timeoutMs: 15000, responseFormat: "text" },
+          outputMap: [{ name: "text", path: "", type: "text" }],
+          inputSchema: { type: "object", properties: {} },
+          outputSchema: { type: "object", properties: { text: { type: "string" } } },
+        },
+      },
+    ] as typeof original;
+    try {
+      const first = render({ kind: "api", mode: "edit", ref: "onet" }).tree;
+      const settingsTab = find(first, item => item.type === "button" && textOf(item).startsWith("设置"))!;
+      (settingsTab.props.onClick as () => void)();
+      const { tree } = render({ kind: "api", mode: "edit", ref: "onet" });
+      expect(input(tree, "响应格式").props.value).toBe("text");
+      const save = saveButton(tree);
+      expect(save.props.disabled).toBe(false);
+      (save.props.onClick as () => void)();
+      await flush();
+      expect(api.extension).toHaveBeenCalledWith("local", expect.objectContaining({
+        action: "publish", kind: "connection", ref: "onet", version: 2,
+        content: expect.objectContaining({ settings: expect.objectContaining({ responseFormat: "text" }) }),
+      }));
+    } finally {
+      catalog.data.connections = original;
+    }
+  });
+});

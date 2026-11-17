@@ -33,6 +33,7 @@ def connector_cache_digest(connector):
 HTTP_METHODS=('GET','POST','PUT','PATCH','DELETE')
 HTTP_BODY_MODES=('none','json','form-data','x-www-form-urlencoded','raw')
 HTTP_AUTH_TYPES=('none','api-key-header','api-key-query','bearer','basic')
+HTTP_RESPONSE_FORMATS=('json','text')
 HTTP_PARAM_SOURCES=('node','fixed','variable')
 HTTP_PARAM_NAME=re.compile(r'^[A-Za-z_][A-Za-z0-9_.-]{0,79}$')
 HTTP_HEADER_NAME=re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,80}$")
@@ -104,6 +105,12 @@ def http_settings(value):
     if result_path is not None:
         if not isinstance(result_path,str) or len(result_path)>300: raise ExecutionError('INVALID_CONNECTION','Result path must be at most 300 characters')
         settings['resultPath']=result_path.strip()
+    response_format=value.get('responseFormat')
+    if response_format is not None:
+        if response_format not in HTTP_RESPONSE_FORMATS: raise ExecutionError('INVALID_CONNECTION','Response format must be json or text')
+        # JSON is the existing default and remains absent from the immutable
+        # content so older connection digests and fingerprints stay identical.
+        if response_format=='text': settings['responseFormat']='text'
     return settings
 
 def http_output_map(value):
@@ -283,6 +290,10 @@ async def validate_connection(content,credential,env,credential_reused=False):
         c['auth']=http_auth(c.get('auth'))
         c['settings']=http_settings(c.get('settings'))
         c['outputMap']=http_output_map(c.get('outputMap'))
+        if c['settings'].get('responseFormat')=='text' and c['settings'].get('resultPath'):
+            raise ExecutionError('INVALID_CONNECTION','Text responses cannot use a result path; map the whole text with a response field')
+        if c['settings'].get('responseFormat')=='text' and any(row.get('path') for row in c['outputMap']):
+            raise ExecutionError('INVALID_CONNECTION','Text response fields must map the whole text with an empty path')
         if c['body']['mode']!='none' and method=='GET': raise ExecutionError('INVALID_CONNECTION','GET requests cannot carry a body')
     return c
 
@@ -479,6 +490,19 @@ async def catalog_operation(body,registry):
             return {'ok':True,'elapsedMs':elapsed_ms(started),'output':output}
         rows=await store.call('p4_catalog_read',owner,ref)
         saved=next((r for r in rows if r['kind']=='connection' and r['ref']==name and r['version']==version and not r['disabled']),None)
+        draft=body.get('content')
+        if isinstance(draft,dict) and draft.get('type') in MODEL_CONNECTION_TYPES:
+            credential=body.get('credential','')
+            if not isinstance(credential,str) or len(credential)>8000: raise ExecutionError('INVALID_CREDENTIAL','Credential must be bounded text')
+            if not isinstance(body.get('testMessage'),str): raise ExecutionError('INVALID_CONNECTION','Provide a model test message for the draft')
+            reused=reusable_secret_ref([saved] if saved else [],name,draft) if not credential else None
+            try:
+                c=await validate_connection(draft,credential,env,credential_reused=bool(reused))
+                if reused: c['secretRef']=reused
+                if credential and credential in json.dumps(c): raise ExecutionError('CREDENTIAL_IN_CONFIGURATION','Place credentials only in the protected credential field','policy')
+                return await test_model_connection(c,key,body,env,started,credential)
+            except ExecutionError as error:
+                return {'ok':False,'elapsedMs':elapsed_ms(started),'error':{'code':error.code,'message':str(error)}}
         if not saved: raise ExecutionError('CONNECTION_UNAVAILABLE','Connection unavailable','auth')
         c=saved['content']
         if c['type']=='http':

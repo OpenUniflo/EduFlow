@@ -27,8 +27,8 @@ def declared_effect(node, tools):
     per-tool effect instead.
     """
     refs=node['config'].get('allowedToolRefs',[]) if node['type'] in ('core.llm','core.tool_dispatch') else [node['config'].get('toolRef')] if node['type']=='core.tool' else []
-    if node['type']=='core.subgraph' and node['config'].get('persistence')=='stateless':
-        effects=[declared_effect(child,tools) for child in node['config']['graph']['nodes']]
+    if node['type']=='core.subgraph' and node['config'].get('persistence')=='stateless' and isinstance(node['config'].get('graph'),dict):
+        effects=[declared_effect(child,tools) for child in node['config']['graph'].get('nodes',[])]
         return 'write' if 'write' in effects else 'read' if 'read' in effects else 'none'
     return 'write' if any(t.get('sideEffect') in ('write','unknown') for t in tools if t['ref'] in refs) else 'read' if refs else 'none'
 
@@ -365,12 +365,43 @@ def _deep_value(value,path):
         else: raise ExecutionError("TOOL_OUTPUT_PATH_MISSING","Configured response field was not found","tool")
     return current
 
-def http_result(tool,payload):
+def http_result(tool,payload,text_mode=False):
     """Apply the optional result path and declared response field mapping."""
-    result=_deep_value(payload,(tool.get("settings") or {}).get("resultPath",""))
+    settings=tool.get("settings") or {}
+    if text_mode:
+        if settings.get("resultPath"): raise ExecutionError("INVALID_CONNECTION","Text responses cannot use a result path","policy")
+        result=payload
+    else:
+        result=_deep_value(payload,settings.get("resultPath",""))
     output_map=tool.get("outputMap") or []
     if not output_map: return result
     return {row["name"]:(_deep_value(result,row.get("path","")) if row.get("path") else result) for row in output_map}
+
+def response_format(tool):
+    value=(tool.get("settings") or {}).get("responseFormat","json")
+    if value not in ("json","text"): raise ExecutionError("INVALID_CONNECTION","Unsupported HTTP response format","policy")
+    return value
+
+def _text_charset(content_type):
+    charsets=[]
+    for parameter in str(content_type or "").split(";")[1:]:
+        name,separator,value=parameter.strip().partition("=")
+        if separator and name.strip().lower()=="charset":
+            charsets.append(value.strip().strip('"').strip("'").lower())
+    return charsets
+
+def decode_text_response(content,content_type):
+    """Strict text/* UTF-8 decoding shared by execution and connection tests."""
+    media_type=str(content_type or "").split(";",1)[0].strip().lower()
+    if not media_type.startswith("text/"):
+        raise ExecutionError("TOOL_RESPONSE_NOT_TEXT","HTTP response is not text/*","tool",reason="provider_error")
+    charsets=_text_charset(content_type)
+    if any(value not in ("utf-8","utf8") for value in charsets):
+        raise ExecutionError("TOOL_RESPONSE_CHARSET_UNSUPPORTED","HTTP text response is not UTF-8","tool",reason="provider_error")
+    try:
+        return bytes(content).decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ExecutionError("TOOL_RESPONSE_ENCODING_INVALID","HTTP text response is not valid UTF-8","tool",reason="provider_error") from None
 
 class PinnedTransport(httpx.AsyncHTTPTransport):
     def __init__(self,hostname,ip):
@@ -415,10 +446,12 @@ async def invoke_tool(tool, env, arguments, timeout):
                 parts=urlparse(url); query=dict(parse_qsl(parts.query)); query.update(secret_query)
                 url=urlunparse(parts._replace(query=urlencode(query)))
             hostname=urlparse(url).hostname
+            format=response_format(tool)
             timeout_ms=(tool.get("settings") or {}).get("timeoutMs")
             request_timeout=min(timeout,max(1,math.ceil(timeout_ms/1000))) if isinstance(timeout_ms,int) and timeout_ms>0 else timeout
             retries=(tool.get("settings") or {}).get("retries",0) if tool.get("sideEffect")=="read" else 0
             attempts=max(0,min(3,retries))+1
+            content_type=None
             async with httpx.AsyncClient(transport=PinnedTransport(hostname,ip),timeout=request_timeout,follow_redirects=False,trust_env=False) as client:
                 for attempt in range(attempts):
                     try:
@@ -428,15 +461,23 @@ async def invoke_tool(tool, env, arguments, timeout):
                                 content.extend(chunk)
                                 if len(content)>1048576: raise ExecutionError("TOOL_OUTPUT_TOO_LARGE","Tool response exceeds limit","policy",reason="provider_error",**_tool_context(tool))
                             status=response.status_code
+                            content_type=response.headers.get("content-type")
                         if status>=500 and attempt+1<attempts: continue
                         break
                     except (httpx.ConnectError,httpx.ReadError,httpx.RemoteProtocolError):
                         if attempt+1>=attempts: raise
             if 300<=status<400: raise ExecutionError("HTTP_REDIRECT_DENIED","Registered tool returned a redirect","policy",external_status=status,effect="unknown",reason="provider_error",http_status=status,**_tool_context(tool))
             if status>=400: raise ExecutionError("HTTP_TOOL_FAILED","HTTP tool returned status "+str(status),"auth" if status in (401,403) else "rate_limit" if status==429 else "tool",external_status=status,effect="unknown" if tool.get("sideEffect")=="write" else "none",reason=_status_reason(status),http_status=status,**_tool_context(tool))
-            try: payload=json.loads(content)
-            except json.JSONDecodeError: raise ExecutionError("TOOL_FAILED","Tool response could not be decoded","tool",effect="unknown" if tool.get("sideEffect")=="write" else "none",reason="provider_error",**_tool_context(tool)) from None
-            result=http_result(tool,payload)
+            if format=="text":
+                try:
+                    result=http_result(tool,decode_text_response(content,content_type),text_mode=True)
+                except ExecutionError as error:
+                    if error.effect is None: error.effect="unknown" if tool.get("sideEffect")=="write" else "none"
+                    raise
+            else:
+                try: payload=json.loads(content)
+                except json.JSONDecodeError: raise ExecutionError("TOOL_FAILED","Tool response could not be decoded","tool",effect="unknown" if tool.get("sideEffect")=="write" else "none",reason="provider_error",**_tool_context(tool)) from None
+                result=http_result(tool,payload)
         elif tool["adapter"]=="mcp":
             connector=next((c for c in env["connectors"] if c["ref"]==tool["connectorRef"] and not c.get("disabled")),None)
             if connector is None: raise ExecutionError("MCP_CONNECTION_DISABLED","MCP connection has been disconnected","auth")
