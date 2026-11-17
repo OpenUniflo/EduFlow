@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  h5p-standalone@3.8.2:
+    hash: quk52xxxfqbmbue67x6i3oapni
+    path: patches/h5p-standalone@3.8.2.patch
+
 importers:
 
   .:
@@ -85,7 +90,7 @@ importers:
         version: 0.12.0
       h5p-standalone:
         specifier: 3.8.2
-        version: 3.8.2
+        version: 3.8.2(patch_hash=quk52xxxfqbmbue67x6i3oapni)
       ipaddr.js:
         specifier: 2.5.0
         version: 2.5.0
@@ -6725,7 +6730,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  h5p-standalone@3.8.2: {}
+  h5p-standalone@3.8.2(patch_hash=quk52xxxfqbmbue67x6i3oapni): {}
 
   has-symbols@1.1.0: {}
 

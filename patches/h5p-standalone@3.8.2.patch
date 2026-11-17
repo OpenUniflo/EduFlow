@@ -1,0 +1,12 @@
+diff --git a/dist/styles/h5p.css b/dist/styles/h5p.css
+index d0881b9d66fd90c22eb4e0a062963640d61e3e0d..8230b1eb3b86757b2ece4e25e5ef03dfd200570a 100644
+--- a/dist/styles/h5p.css
++++ b/dist/styles/h5p.css
+@@ -293,7 +293,6 @@ div.h5p-fullscreen {
+   /* Hack for IOS landscape / portrait */
+   width: 10px;
+   min-width: 100%;
+-  *width: 100%;
+   /* End of hack */
+   height: 100%;
+   z-index: 10;
