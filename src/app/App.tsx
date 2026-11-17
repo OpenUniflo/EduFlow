@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { Network } from "lucide-react";
 import { AuthProvider } from "@/features/auth/AuthContext";
@@ -11,23 +11,14 @@ import { isPasswordResetEnabled } from "@/features/auth/passwordReset";
 import { AppChrome } from "@/app/components/AppChrome";
 import { GlobalCommandPalette } from "@/app/components/GlobalCommandPalette";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
-import { SettingsPage } from "@/features/settings/pages/SettingsPage";
 import { EMPTY_SETTINGS_PREVIEW } from "@/features/settings/model/settingsForm";
-import { RecordsPage } from "@/features/records/pages/RecordsPage";
 import { PublicHomePage } from "@/app/pages/PublicHomePage";
 import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices, resetAuthenticatedApplicationServices } from "@/app/services/applicationServices";
 import { resolveWorkflowAssignmentContext } from "@/app/integrations/workflowAssignmentIntegration";
 import { LearningPage } from "@/features/learning/pages/LearningPage";
 import { MicroLearningExperience } from "@/features/learning/micro/MicroLearningExperience";
-import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
-import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
-import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
-import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExperiencePage";
-import { LessonPage } from "@/features/material/pages/LessonPage";
-import { AdminPage } from "@/features/admin/AdminPage";
-import { WorkflowLibraryPage } from "@/features/workflow/pages/WorkflowLibraryPage";
 import { retireLegacyWorkflowStorage } from "@/features/workflow/editor/v2/retireLegacyStorage";
-import { WorkflowV2Route } from "@/features/workflow/pages/WorkflowV2Entry";
+import type { WorkflowEditorFocus } from "@/features/workflow/domain/v2/types";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
 import { ApiRequestError } from "@/shared/api/apiClient";
@@ -35,10 +26,23 @@ import { CapabilityEvidenceBoundary } from "@/app/integrations/CapabilityEvidenc
 import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
 import { Button } from "@/shared/ui/Button";
-import { ArchivePage } from "@/features/archive/pages/ArchivePage";
 import { ResourceCenterDialog } from "@/features/workflow/resources/ResourceCenterDialog";
 import type { McpTab } from "@/features/workflow/resources/mcpMarketModel";
+import { cleanMcpOAuthSearch, closeCurrentOAuthWindow, isMcpOAuthPopupReturn, notifyMcpOAuthResult, readMcpOAuthWindowResult } from "@/features/workflow/resources/mcpOAuthWindow";
 import { workflowApiV2 } from "@/features/workflow/application/v2/useWorkflowV2Controller";
+import { McpOAuthWindowResult } from "@/app/components/McpOAuthWindowResult";
+
+const AdminPage = lazy(() => import("@/features/admin/AdminPage").then(module => ({ default: module.AdminPage })));
+const ArchivePage = lazy(() => import("@/features/archive/pages/ArchivePage").then(module => ({ default: module.ArchivePage })));
+const AssignmentExperiencePage = lazy(() => import("@/features/course/pages/AssignmentExperiencePage").then(module => ({ default: module.AssignmentExperiencePage })));
+const CourseCreationWorkspacePage = lazy(() => import("@/features/course/pages/CourseCreationWorkspacePage").then(module => ({ default: module.CourseCreationWorkspacePage })));
+const CourseGraphPage = lazy(() => import("@/features/course/pages/CourseGraphPage").then(module => ({ default: module.CourseGraphPage })));
+const CourseManagementPage = lazy(() => import("@/features/course/pages/CourseManagementPage").then(module => ({ default: module.CourseManagementPage })));
+const LessonPage = lazy(() => import("@/features/material/pages/LessonPage").then(module => ({ default: module.LessonPage })));
+const RecordsPage = lazy(() => import("@/features/records/pages/RecordsPage").then(module => ({ default: module.RecordsPage })));
+const SettingsPage = lazy(() => import("@/features/settings/pages/SettingsPage").then(module => ({ default: module.SettingsPage })));
+const WorkflowLibraryPage = lazy(() => import("@/features/workflow/pages/WorkflowLibraryPage").then(module => ({ default: module.WorkflowLibraryPage })));
+const WorkflowV2Route = lazy(() => import("@/features/workflow/pages/WorkflowV2Entry").then(module => ({ default: module.WorkflowV2Route })));
 
 type GlobalResources = { tab: McpTab; focusRef: string; notice: string };
 
@@ -74,6 +78,17 @@ function GlobalResourceCenter({ view, onClose, onOpenReference }: { view: Global
   />;
 }
 
+function workflowFocusFromState(state: unknown): WorkflowEditorFocus | undefined {
+  if (!state || typeof state !== "object") return undefined;
+  const value = (state as { workflowFocus?: unknown }).workflowFocus;
+  if (!value || typeof value !== "object") return undefined;
+  const { nodeId, graphPath } = value as { nodeId?: unknown; graphPath?: unknown };
+  if (typeof nodeId !== "string" || !nodeId || nodeId.length > 200) return undefined;
+  if (!Array.isArray(graphPath) || graphPath.length > 8) return undefined;
+  if (!graphPath.every(segment => typeof segment === "string" && segment.length > 0 && segment.length <= 200)) return undefined;
+  return { nodeId, graphPath: graphPath as string[] };
+}
+
 const passwordResetEnabled = isPasswordResetEnabled();
 
 function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
@@ -107,8 +122,20 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [startupError, setStartupError] = useState("");
   const [globalResources, setGlobalResources] = useState<GlobalResources | null>(null);
+  const workflowFocus = useMemo(() => workflowFocusFromState(location.state), [location.state]);
+  const oauthWindowResult = useMemo(() => {
+    const result = readMcpOAuthWindowResult(location.search);
+    return result?.popup ? result : null;
+  }, [location.search]);
+  const notifiedOAuthRef = useRef(false);
 
   useEffect(() => {
+    // The authorization window only needs to announce the callback result and
+    // close; it must not hydrate authenticated product services or routes.
+    if (typeof window !== "undefined" && isMcpOAuthPopupReturn(window.location.search)) {
+      setReady(true);
+      return;
+    }
     try { retireLegacyWorkflowStorage(localStorage); } catch { /* Storage may be unavailable; no runtime reads old keys. */ }
     let active = true;
     async function restore() {
@@ -147,11 +174,27 @@ export default function App() {
     return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
   const assignmentContext = useMemo(
-    () => routeWorkflowId ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
-    [location.search, routeWorkflowId, ready]
+    () => routeWorkflowId && !oauthWindowResult ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
+    [location.search, routeWorkflowId, ready, oauthWindowResult]
   );
   useEffect(() => {
-    if (!ready) return;
+    if (!oauthWindowResult || typeof window === "undefined") return;
+    if (!notifiedOAuthRef.current) {
+      notifiedOAuthRef.current = true;
+      // The notification is only a wake-up signal. The original tab verifies
+      // the connection against the server catalog before changing any state.
+      notifyMcpOAuthResult(oauthWindowResult);
+      const clean = cleanMcpOAuthSearch(window.location.search);
+      try { window.history.replaceState(window.history.state, "", `${window.location.pathname}${clean}${window.location.hash}`); } catch { /* URL cleanup is best effort. */ }
+    }
+    const closeTimer = window.setTimeout(() => {
+      // Mobile tabs and iframe callbacks may refuse to close; the result screen remains.
+      closeCurrentOAuthWindow();
+    }, 1200);
+    return () => window.clearTimeout(closeTimer);
+  }, [oauthWindowResult]);
+  useEffect(() => {
+    if (!ready || oauthWindowResult) return;
     const params = new URLSearchParams(location.search);
     const outcome = params.get("mcpOAuth");
     if (!outcome) return;
@@ -166,9 +209,9 @@ export default function App() {
           ? `OAuth 已授权${ref ? `：${ref}` : ""}${toolCount ? ` · 服务端返回 ${toolCount} 个工具` : ""}。${message || "请明确选择允许使用的工具。"}`
           : `OAuth 连接未完成${message ? `：${message}` : ""}。可以重新尝试或改用 API Key。`,
     });
-    params.delete("mcpOAuth"); params.delete("ref"); params.delete("tools"); params.delete("message");
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  }, [ready, location.pathname, location.search, navigate]);
+    const clean = cleanMcpOAuthSearch(location.search);
+    navigate({ pathname: location.pathname, search: clean ? clean.slice(1) : "" }, { replace: true });
+  }, [ready, location.pathname, location.search, navigate, oauthWindowResult]);
 
   async function logout() {
     await Promise.all([
@@ -261,8 +304,16 @@ export default function App() {
     return session ? element : <Navigate to="/login" replace state={authGateState(location)} />;
   }
 
+  if (oauthWindowResult) {
+    return <McpOAuthWindowResult
+      result={oauthWindowResult}
+      onClose={closeCurrentOAuthWindow}
+      onReturn={() => { try { window.location.replace(`${window.location.pathname}${cleanMcpOAuthSearch(window.location.search)}${window.location.hash}`); } catch { /* leave the result visible */ } }}
+    />;
+  }
+
   const editor = routeWorkflowId && session
-    ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={null} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/works(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/works")} onOpen={(id) => navigate(`/works/${id}`, { state: location.state })} launchContext={assignmentContext ?? undefined} assistantProposal={applicationServices.preview?.assistantProposal ?? undefined} />
+    ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={null} focus={workflowFocus} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/works(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/works")} onOpen={(id) => navigate(`/works/${id}`, { state: typeof location.state?.workflowLibraryReturn === "string" ? { workflowLibraryReturn: location.state.workflowLibraryReturn } : undefined })} launchContext={assignmentContext ?? undefined} assistantProposal={applicationServices.preview?.assistantProposal ?? undefined} />
     : <NotFoundPage onHome={() => navigate("/")} onArchive={() => navigate("/archive")} />;
 
   if (!ready) return <ConnectionScreen />;
@@ -272,41 +323,43 @@ export default function App() {
     <AuthProvider value={{ session, signIn, signUp, logout, changePassword, requestPasswordReset, updatePassword }}>
       <AppChrome session={session} onLogout={logout} onOpenResources={() => setGlobalResources({ tab: "market", focusRef: "", notice: "" })}>
         <AssistantRuntimeBoundary session={session}>
-          <Routes>
-            <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
-            <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
-            <RouterRoute path="/forgot-password" element={session ? <Navigate to="/" replace /> : <ForgotPasswordPage enabled={passwordResetEnabled} />} />
-            <RouterRoute path="/reset-password" element={<ResetPasswordPage enabled={passwordResetEnabled} />} />
-            <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
-            <RouterRoute path="/archive" element={<ArchivePage session={session} onRetry={reloadArchiveData} />} />
-            <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
-            <RouterRoute path="/works" element={protectedElement(session ? <WorkflowLibraryPage userId={session.userId} learnerStateService={applicationServices.learnerStateService} onOpenWorkflow={(id, returnTo) => navigate(`/works/${id}`, { state: { workflowLibraryReturn: returnTo } })} versionPreviews={applicationServices.preview?.workflowVersions ?? []} /> : null)} />
-            <RouterRoute path="/works/:workflowId" element={protectedElement(editor)} />
-            <RouterRoute path="/courses" element={<LegacyRedirect />} />
-            <RouterRoute path="/courses/" element={<LegacyRedirect />} />
-            <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="learner" /> : null)} />
-            <RouterRoute path="/teaching" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
-            <RouterRoute path="/teaching/create" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="teacher" /> : <Navigate to="/" replace />} />
-            <RouterRoute path="/course-management" element={<LegacyRedirect />} />
-            <RouterRoute path="/courses/:courseId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
-            <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={<AssignmentExperiencePage session={session} onLogout={logout} />} />
-            <RouterRoute path="/courses/:courseId/materials/:materialId" element={<LessonPage session={session} onLogout={logout} />} />
-            <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
-            <RouterRoute path="/records" element={protectedElement(<RecordsPage />)} />
-            <RouterRoute path="/settings" element={protectedElement(session ? <SettingsPage session={session} preview={applicationServices.preview?.settings ?? EMPTY_SETTINGS_PREVIEW} onDisplayNameChange={(name) => setSession((previous) => previous ? { ...previous, name } : previous)} /> : null)} />
-            <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/settings" replace />)} />
-            <RouterRoute path="/admin" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <AdminPage session={session} previewUsers={applicationServices.preview?.adminUsers ?? []} /> : <Navigate to="/" replace />} />
-            <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
-            <RouterRoute path="/system/*" element={<LegacyRedirect />} />
-            <RouterRoute path="/tasks/*" element={protectedElement(<Navigate to="/" replace />)} />
-            <RouterRoute path="/profile" element={protectedElement(<LegacyRedirect />)} />
-            <RouterRoute path="/profile/*" element={protectedElement(<LegacyRedirect />)} />
-            <RouterRoute path="/notifications/*" element={protectedElement(<Navigate to="/" replace />)} />
-            <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
-            <RouterRoute path="/explore" element={<LegacyRedirect />} />
-            <RouterRoute path="/workflows/*" element={<LegacyRedirect />} />
-            <RouterRoute path="*" element={<NotFoundPage onHome={() => navigate("/")} onArchive={() => navigate("/archive")} />} />
-          </Routes>
+          <Suspense fallback={<main className="ef-connection" role="status">正在加载页面…</main>}>
+            <Routes>
+              <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
+              <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
+              <RouterRoute path="/forgot-password" element={session ? <Navigate to="/" replace /> : <ForgotPasswordPage enabled={passwordResetEnabled} />} />
+              <RouterRoute path="/reset-password" element={<ResetPasswordPage enabled={passwordResetEnabled} />} />
+              <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
+              <RouterRoute path="/archive" element={<ArchivePage session={session} onRetry={reloadArchiveData} />} />
+              <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
+              <RouterRoute path="/works" element={protectedElement(session ? <WorkflowLibraryPage userId={session.userId} learnerStateService={applicationServices.learnerStateService} onOpenWorkflow={(id, returnTo, focus) => navigate(`/works/${id}`, { state: { workflowLibraryReturn: returnTo, ...(focus ? { workflowFocus: focus } : {}) } })} versionPreviews={applicationServices.preview?.workflowVersions ?? []} /> : null)} />
+              <RouterRoute path="/works/:workflowId" element={protectedElement(editor)} />
+              <RouterRoute path="/courses" element={<LegacyRedirect />} />
+              <RouterRoute path="/courses/" element={<LegacyRedirect />} />
+              <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="learner" /> : null)} />
+              <RouterRoute path="/teaching" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
+              <RouterRoute path="/teaching/create" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="teacher" /> : <Navigate to="/" replace />} />
+              <RouterRoute path="/course-management" element={<LegacyRedirect />} />
+              <RouterRoute path="/courses/:courseId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
+              <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={<AssignmentExperiencePage session={session} onLogout={logout} />} />
+              <RouterRoute path="/courses/:courseId/materials/:materialId" element={<LessonPage session={session} onLogout={logout} />} />
+              <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
+              <RouterRoute path="/records" element={protectedElement(<RecordsPage />)} />
+              <RouterRoute path="/settings" element={protectedElement(session ? <SettingsPage session={session} preview={applicationServices.preview?.settings ?? EMPTY_SETTINGS_PREVIEW} onDisplayNameChange={(name) => setSession((previous) => previous ? { ...previous, name } : previous)} /> : null)} />
+              <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/settings" replace />)} />
+              <RouterRoute path="/admin" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <AdminPage session={session} previewUsers={applicationServices.preview?.adminUsers ?? []} /> : <Navigate to="/" replace />} />
+              <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
+              <RouterRoute path="/system/*" element={<LegacyRedirect />} />
+              <RouterRoute path="/tasks/*" element={protectedElement(<Navigate to="/" replace />)} />
+              <RouterRoute path="/profile" element={protectedElement(<LegacyRedirect />)} />
+              <RouterRoute path="/profile/*" element={protectedElement(<LegacyRedirect />)} />
+              <RouterRoute path="/notifications/*" element={protectedElement(<Navigate to="/" replace />)} />
+              <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="/explore" element={<LegacyRedirect />} />
+              <RouterRoute path="/workflows/*" element={<LegacyRedirect />} />
+              <RouterRoute path="*" element={<NotFoundPage onHome={() => navigate("/")} onArchive={() => navigate("/archive")} />} />
+            </Routes>
+          </Suspense>
         </AssistantRuntimeBoundary>
       </AppChrome>
       <GlobalResourceCenter view={globalResources} onClose={() => setGlobalResources(null)} onOpenReference={(workflowId) => navigate(`/works/${workflowId}`)} />
