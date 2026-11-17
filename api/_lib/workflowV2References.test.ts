@@ -137,6 +137,11 @@ import { handleWorkflowV2 } from "./workflowV2.js";
 type Fixture = { workflowId: string; currentRevision: number; archived?: boolean; definition: Row };
 
 function mockClient(fixtures: Fixture[], configuration?: Row, rpcHandlers: Record<string, (args: Row) => unknown> = {}) {
+  const defaultRpc: Record<string, (args: Row) => unknown> = {
+    // Phase 3 scans append current-root reachable fixed revisions; root-only
+    // fixtures have none, so the closure projection is empty here.
+    workflow_v2_reference_closure: () => ({ version: 1, targets: [], edges: [] }),
+  };
   const reads: { table: string; filters: Row }[] = [];
   const writes: { operation: string; value: unknown }[] = [];
   const client = {
@@ -181,7 +186,7 @@ function mockClient(fixtures: Fixture[], configuration?: Row, rpcHandlers: Recor
       return query;
     },
     rpc(name: string, args: Row) {
-      const handler = rpcHandlers[name];
+      const handler = rpcHandlers[name] ?? defaultRpc[name];
       if (!handler) throw new Error(`unexpected rpc: ${name}`);
       return Promise.resolve({ data: handler(args), error: null });
     },

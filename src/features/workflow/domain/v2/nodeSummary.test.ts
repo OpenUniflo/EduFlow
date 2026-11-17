@@ -28,6 +28,12 @@ describe("nodeCardSummary", () => {
     expect(nodeCardSummary(node("core.function", { language: "javascript" })).text).toBe("JavaScript · 1 个输出");
   });
 
+  it("describes a fixed call by target name and revision, never as an embedded graph", () => {
+    const call = node("core.subgraph", { workflowRef: { workflowId: "target", revision: 4 } });
+    expect(nodeCardSummary(call, { referenceName: "客服流程", referenceRevision: 4 })).toEqual({ text: "调用 客服流程 · 版本 4", mono: false });
+    expect(nodeCardSummary(call, { referenceRevision: 4 }).text).toBe("调用工作流 · 版本 4");
+  });
+
   it("summarizes a router by the field it tests", () => {
     const router = node("core.router", { cases: [{ id: "branch_1", priority: 1, predicate: { op: "eq", left: { source: "state", pointer: "/handling" }, right: { source: "literal", value: "reply" } } }] });
     expect(routerSummaryField(router)).toBe("handling");

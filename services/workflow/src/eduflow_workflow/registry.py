@@ -27,6 +27,19 @@ LLM_INPUTS = {"type":"object","properties":{"history":MESSAGES},"additionalPrope
 # shape stays open while the base items remain fixed.
 LLM_OUTPUT = {**obj({"messages":MESSAGES,"toolCalls":CALLS,"text":STRING}),"additionalProperties":True}
 
+# A subgraph node is either the legacy embedded graph or one fixed independent
+# Workflow reference. Both branches close their object, so a document carrying
+# both `graph` and `workflowRef` matches neither. Reference execution is
+# deliberately rejected at compile time until the parent-budget resolver lands.
+EMBEDDED_SUBGRAPH_CONFIG = obj({"graph":ANY_OBJ,"stateMode":{"enum":["independent","shared"]},"persistence":{"enum":["per-invocation","stateless","per-thread"]}},["graph"])
+REFERENCE_SUBGRAPH_CONFIG = obj({
+    "workflowRef": obj({"workflowId":{"type":"string","minLength":1,"maxLength":128},"revision":{"type":"integer","minimum":1}},["workflowId","revision"]),
+    "environmentRef": {"type":"string","minLength":1,"maxLength":160},
+    "stateMode": {"enum":["independent"]},
+    "persistence": {"enum":["per-invocation"]},
+},["workflowRef","environmentRef"])
+SUBGRAPH_CONFIG = {"anyOf":[EMBEDDED_SUBGRAPH_CONFIG,REFERENCE_SUBGRAPH_CONFIG]}
+
 def descriptor(kind, config, inputs=OBJ, output=OBJ, side_effect="none", outlets=None, version=1):
     return {"type":kind,"version":version,"configSchema":config,"inputSchema":inputs,"outputSchema":output,"outlets":["next"] if outlets is None else outlets,"sideEffect":side_effect,"requiredCapabilities":[]}
 
@@ -36,7 +49,7 @@ NODE_DESCRIPTORS = [
     descriptor("control.fork",obj({"branches":{"type":"array","items":STRING,"minItems":1}})),
     descriptor("control.join",obj({"waitFor":{"type":"array","items":STRING,"minItems":1},"strategy":{"enum":["all","any"]}})),
     descriptor("control.send",obj({"items":STRING,"target":STRING,"itemKey":STRING,"concurrency":{"type":"integer","minimum":1,"maximum":20}})),
-    descriptor("core.subgraph",obj({"graph":ANY_OBJ,"stateMode":{"enum":["independent","shared"]},"persistence":{"enum":["per-invocation","stateless","per-thread"]}},["graph"]),ANY_OBJ,ANY_OBJ),
+    descriptor("core.subgraph",SUBGRAPH_CONFIG,ANY_OBJ,ANY_OBJ),
     descriptor("core.function", obj({"implementation":{"enum":["registered","code"]},"functionRef":STRING,"functionVersion":{"type":"integer","minimum":1},"language":{"enum":["python","javascript"]},"code":STRING,"inputSchema":ANY_OBJ,"outputSchema":ANY_OBJ},["implementation"]),ANY_OBJ,ANY_OBJ),
     descriptor("core.start", OBJ), descriptor("core.end", OBJ, outlets=[]),
     descriptor("core.router", obj({"cases":{"type":"array","items":{"type":"object"}},"defaultOutlet":STRING,"defaultLabel":STRING,"mode":{"enum":["first","all"]}}, ["cases","defaultOutlet"]), output=obj({"outlet":{"type":["string","array"],"items":STRING}})),

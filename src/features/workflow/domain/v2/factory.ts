@@ -1,6 +1,6 @@
 import type { Binding, EditorDocumentV2, WorkflowDefinitionV2, WorkflowNodeV2 } from "./types";
 
-export const workflowPolicy = { timeoutMs: 120000, nodeTimeoutMs: 30000, maxNodeExecutions: 50, maxToolCalls: 10, maxInputBytes: 65536, maxStateBytes: 1048576, maxEventBytes: 65536, maxOutputTokens: 2048, maxAttempts: 1 };
+export const workflowPolicy = { timeoutMs: 120000, nodeTimeoutMs: 30000, maxNodeExecutions: 50, maxToolCalls: 10, maxInputBytes: 65536, maxStateBytes: 1048576, maxEventBytes: 65536, maxAttempts: 1 };
 const objectSchema = { type: "object", properties: {}, additionalProperties: false };
 export function createWorkflowV2(name = "新建工作流"): WorkflowDefinitionV2 {
   return { schemaVersion: "2.0", workflowId: "", revision: 0, name, description: "", inputSchema: { ...objectSchema }, outputSchema: { ...objectSchema },

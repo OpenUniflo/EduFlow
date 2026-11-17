@@ -16,10 +16,11 @@ export function historyRunSelection(hasSelectedNode: boolean): HistoryRunSelecti
 }
 
 /** Narrow banner copy for read-only history observation; the environment segment is omitted when absent. */
-export function historyRunBannerText(run: { createdAt: string; variableEnvironment?: string | null } | null, status: string, formatTime: (value: string) => string = value => new Date(value).toLocaleString()): string {
+export function historyRunBannerText(run: { createdAt: string; revision?: number; variableEnvironment?: string | null } | null, status: string, formatTime: (value: string) => string = value => new Date(value).toLocaleString()): string {
   const parts = ["正在查看历史运行"];
   if (run) parts.push(formatTime(run.createdAt));
   if (status) parts.push(status);
+  if (run?.revision !== undefined) parts.push(`流程版本 ${run.revision}（本 Run 实际版本）`);
   if (run?.variableEnvironment) parts.push(run.variableEnvironment);
   return parts.join(" · ");
 }

@@ -6,7 +6,7 @@ type Target = { target: "system" } | { target: "message"; message: number };
 type ChipMenu = Target & { index: number };
 
 export type PromptEditorProps = {
-  prompt: Prompt;
+  prompt: Omit<Prompt, "system"> & Partial<Pick<Prompt, "system">>;
   /** Declared node parameters; `history` is not a prompt parameter. */
   inputs: Record<string, Binding>;
   onChange: (prompt: Prompt) => void;
@@ -131,7 +131,8 @@ function PromptFlow({ segments, readOnly, ariaLabel, onChange, onChip }: {
  * sits on the text baseline and wraps with the sentence instead of becoming its own block.
  * The persisted PromptSegment structure is unchanged.
  */
-export function PromptEditor({ prompt, inputs, onChange, readOnly = false }: PromptEditorProps) {
+export function PromptEditor({ prompt: savedPrompt, inputs, onChange, readOnly = false }: PromptEditorProps) {
+  const prompt: Prompt = { ...savedPrompt, system: savedPrompt.system ?? [] };
   const [menu, setMenu] = useState<Target | null>(null);
   const [chipMenu, setChipMenu] = useState<ChipMenu | null>(null);
   const parameterNames = Object.keys(inputs).filter(name => name !== "history");

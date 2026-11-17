@@ -9,7 +9,7 @@ export const workflowApiV2 = new WorkflowApiV2();
 export type WorkflowRunOrigin = "current" | "history" | null;
 const terminal = new Set(["success", "failed", "cancelled", "continued"]);
 export const runSubmittedNotice = "运行已提交。编辑只影响下次运行。";
-export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchContext?: WorkflowLaunchContext, recovery?: WorkflowControllerRecovery, onRecoverySubmissionRejected?: (key: string) => void) {
+export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchContext?: WorkflowLaunchContext, recovery?: WorkflowControllerRecovery, onRecoverySubmissionRejected?: (key: string) => void, initialEnvironmentRef?: string) {
   const [definition, setDefinition] = useState(recovery?.timeline.present.definition ?? initial.definition);
   const [editor, setEditor] = useState(recovery?.timeline.present.editor ?? initial.editor);
   const edits = useRef(0);
@@ -53,7 +53,10 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   const [environments, setEnvironments] = useState<WorkflowEnvironment[]>([]);
   const [initialLoadStatus, setInitialLoadStatus] = useState<"loading" | "ready" | "failed">("loading");
   const [environmentError, setEnvironmentError] = useState("");
-  const environmentChoice = useRef(recovery?.environmentRef ?? "");
+  // A fixed-reference target opens with the environment selected on the caller
+  // node. Recovery wins after an auth interruption; otherwise an explicit
+  // initial environment must never be replaced by the catalog's first entry.
+  const environmentChoice = useRef(recovery?.environmentRef ?? initialEnvironmentRef ?? "");
   const [environmentRef, publishEnvironment] = useState(environmentChoice.current);
   function setEnvironmentRef(update: string | ((current: string) => string)) {
     const value = typeof update === "function" ? update(environmentChoice.current) : update;
@@ -167,9 +170,18 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     return () => { alive = false; };
   }, [activeWorkflowId]);
   useEffect(() => {
+    // Never probe a catalog for an environment the account cannot see. Doing
+    // so turns a clear "unavailable" state into repeated 403 console errors
+    // and tempts callers to treat it as a transient failure.
+    const known = environments.some(item => item.environmentRef === environmentRef);
+    if (!environmentRef || !known) {
+      toolsRequest.current += 1;
+      setTools([]); setToolsLoading(false); setToolsLoaded(false); setToolsError("");
+      return;
+    }
     void loadTools(environmentRef);
     return () => { toolsRequest.current += 1; };
-  }, [environmentRef, loadTools]);
+  }, [environmentRef, environments, loadTools]);
   useEffect(()=>{
     let alive=true;let timer:ReturnType<typeof setTimeout>;
     async function read(){
@@ -210,6 +222,11 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
         observationThread.current=record.threadId??observationThread.current;
         setError(current => current.startsWith("运行观察暂时中断：") ? "" : current);
         setEvents(current => [...new Map([...current, ...page.events].map(item => [item.eventId, item])).values()].sort((a, b) => a.seq - b.seq));
+        if (record.status === "waiting") {
+          // Acceptance feedback is not the waiting state: once the Run is
+          // actually waiting for a human response, the response entry owns it.
+          setRunNotice(current => current?.runId === record.runId ? null : current);
+        }
         if (terminal.has(record.status)) {
           setRunNotice(current => current?.runId===record.runId ? null : current);
           const latest = await workflowApiV2.history(activeWorkflowId); if (current()) { setHistory(latest.items); }

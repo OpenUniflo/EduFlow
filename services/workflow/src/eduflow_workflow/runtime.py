@@ -9,16 +9,14 @@ from urllib.parse import urlsplit
 import httpx
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
-from langchain_deepseek import ChatDeepSeek
-from langchain_openai import ChatOpenAI
 from langgraph.errors import GraphInterrupt
-from .compiler import compile_definition, graph_for, NodeResult, encode_state, decode_state, SDK_EXECUTION, SDK_MESSAGES, SDK_SCOPE
+from .compiler import compile_definition, graph_for, NodeResult, encode_state, decode_state, SDK_EXECUTION, SDK_MESSAGES, SDK_SCOPE, CHILD_BUDGET_METADATA_KEY, CHILD_BUDGET_SCOPE_METADATA_KEY, CHILD_BUDGETS_METADATA_KEY
 from .contracts import ExecutionError, bind, validate_value, canonical, pointer, apply_patch, predicate, reduce_field
 from .messages import from_langchain, to_langchain
 from .registry import OPERATIONS, restore_frozen_environment
-from .tools import invoke_tool, model_http_client, secret
-
-LOCAL_MODEL_KEY_PLACEHOLDER='local-fixture-no-credential'
+from .references import ReferenceSet, frozen_references_from_snapshot, authorize_frozen_references, current_reference_snapshot, reference_config, environment_for
+from .tools import invoke_tool, model_http_client
+from .model_transport import DEEPSEEK_BASE_URL, JSON_RESPONSE_FORMAT, create_model_client, model_output_limit, parse_structured_output, structured_instruction
 
 @dataclass(frozen=True)
 class InvocationContext:
@@ -89,48 +87,117 @@ def _value_type_name(value):
 def _write_source_label(node):
     return {"core.tool":"工具","core.llm":"模型","core.function":"函数","core.transform":"处理"}.get(node.get("type"),"节点")
 
-_STRUCTURED_FIELD_TYPES = {
-    "string": ({"type":"string"},"文本"),
-    "number": ({"type":"number"},"数字"),
-    "boolean": ({"type":"boolean"},"是否"),
-    "array": ({"type":"array"},"列表"),
-    "object": ({"type":"object"},"对象"),
-}
-
 def _structured_fields(config):
     structured = config.get("structuredOutput")
     fields = structured.get("fields") if isinstance(structured, dict) else None
     return fields if isinstance(fields, list) else []
 
-def _structured_instruction(fields):
-    lines = ["请只返回一个 JSON 对象，不要 Markdown 代码块，不要额外说明。JSON 字段如下："]
-    for field in fields:
-        label = _STRUCTURED_FIELD_TYPES[field["type"]][1]
-        description = field.get("description") or ""
-        lines.append(f"- {field['name']}（{label}）{('：' + description) if description else ''}")
-    return "\n".join(lines)
+class InvocationBudget:
+    """Per-subgraph-invocation compute budget, bounded by every ancestor.
 
-def _parse_structured_output(text, fields):
-    raw = (text or "").strip()
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        if lines and lines[0].startswith("```"): lines = lines[1:]
-        if lines and lines[-1].strip() == "```": lines = lines[:-1]
-        raw = "\n".join(lines).strip()
-    try: parsed = json.loads(raw)
-    except (TypeError, ValueError): raise ExecutionError("INVALID_MODEL_OUTPUT", "模型返回的内容不符合输出字段要求", "validation", effect="none") from None
-    if not isinstance(parsed, dict): raise ExecutionError("INVALID_MODEL_OUTPUT", "模型返回的内容不符合输出字段要求", "validation", effect="none")
-    values = {}
-    for field in fields:
-        name = field["name"]
-        if name not in parsed:
-            raise ExecutionError("INVALID_MODEL_OUTPUT", f"模型返回的内容不符合输出字段要求：缺少字段「{name}」", "validation", effect="none", pointer="/"+name)
-        schema, label = _STRUCTURED_FIELD_TYPES[field["type"]]
-        try: validate_value(schema, parsed[name], "INVALID_MODEL_OUTPUT")
-        except ExecutionError:
-            raise ExecutionError("INVALID_MODEL_OUTPUT", f"模型返回的内容不符合输出字段要求：字段「{name}」应为{label}", "validation", effect="none", pointer="/"+name) from None
-        values[name] = parsed[name]
-    return values
+    Each invocation owns its counters (a parent's already-used count is never
+    copied into a new child), but every executed node/tool also consumes every
+    ancestor budget and the root thread budget. Used time is checkpointed with
+    the child graph so an interrupt/resume continues the same budget instead of
+    restarting it; human wait time is excluded by restarting ``started`` while
+    keeping ``base_used_ms``.
+    """
+    def __init__(self, limit_ms, root_deadline, parent=None, base_used_ms=0, node_executions=0, tool_calls=0, node_limit=0, tool_limit=0, started=None):
+        self.limit_ms=float(limit_ms); self.root_deadline=root_deadline; self.parent=parent
+        self.base_used_ms=max(0.0,float(base_used_ms or 0)); self.started=time.monotonic() if started is None else started
+        self.node_executions=int(node_executions or 0); self.tool_calls=int(tool_calls or 0)
+        self.node_limit=max(0,int(node_limit or 0)); self.tool_limit=max(0,int(tool_limit or 0))
+    def chain(self):
+        current=self
+        while current is not None:
+            yield current
+            current=current.parent
+    def used_ms(self):
+        return self.base_used_ms+max(0.0,(time.monotonic()-self.started)*1000)
+    def remaining_ms(self):
+        remaining=self.limit_ms-self.used_ms()
+        if self.parent is not None: remaining=min(remaining,self.parent.remaining_ms())
+        remaining=min(remaining,(self.root_deadline-time.monotonic())*1000)
+        return remaining
+    def node_exhausted(self):
+        return any(item.node_limit<=item.node_executions for item in self.chain())
+    def tool_exhausted(self):
+        return any(item.tool_limit<=item.tool_calls for item in self.chain())
+    def consume_node(self):
+        for item in self.chain(): item.node_executions+=1
+    def consume_tool(self):
+        for item in self.chain(): item.tool_calls+=1
+    def checkpoint_state(self):
+        return {"usedMs":max(0,int(round(self.used_ms()))),"nodeExecutions":int(self.node_executions),"toolCalls":int(self.tool_calls)}
+
+def checkpoint_budget_metadata():
+    """Persist every scope in the call chain, not only the checkpoint owner.
+
+    A nested child writes its own checkpoints while its parent is suspended
+    inside the call node. If only the current scope were recorded, the parent
+    would resume from its last own checkpoint and lose all compute consumed by
+    the descendant after that point. Ancestor snapshots share the same
+    InvocationBudget objects, so they include parallel work and descendants.
+    """
+    scope=SDK_SCOPE.get() or {}
+    budget=scope.get('budget')
+    if not isinstance(budget,InvocationBudget): return {}
+    metadata={CHILD_BUDGET_METADATA_KEY:budget.checkpoint_state()}
+    scope_key=scope.get('budgetScopeKey')
+    if isinstance(scope_key,str) and scope_key: metadata[CHILD_BUDGET_SCOPE_METADATA_KEY]={"key":scope_key}
+    chain=scope.get('budgetScopes')
+    budgets={}
+    if isinstance(chain,(list,tuple)):
+        for entry in chain:
+            if not isinstance(entry,(list,tuple)) or len(entry)!=2: continue
+            key,item=entry
+            if isinstance(key,str) and key and isinstance(item,InvocationBudget):
+                budgets[key]=item.checkpoint_state()
+    elif isinstance(scope_key,str) and scope_key:
+        budgets[scope_key]=budget.checkpoint_state()
+    if budgets: metadata[CHILD_BUDGETS_METADATA_KEY]=budgets
+    return metadata
+
+def budget_state_from_metadata(metadata,scope_key):
+    """Return one scope's persisted counters from either metadata generation."""
+    if not isinstance(metadata,dict) or not isinstance(scope_key,str) or not scope_key: return None
+    states=metadata.get(CHILD_BUDGETS_METADATA_KEY)
+    if isinstance(states,dict) and isinstance(states.get(scope_key),dict): return states[scope_key]
+    scope=metadata.get(CHILD_BUDGET_SCOPE_METADATA_KEY)
+    state=metadata.get(CHILD_BUDGET_METADATA_KEY)
+    if isinstance(scope,dict) and scope.get('key')==scope_key and isinstance(state,dict): return state
+    return None
+
+def merge_budget_state(current,candidate):
+    """Counters and compute time are monotonic; the latest snapshot wins per field.
+
+    Checkpoints from parallel branches may arrive in any order. Merging by
+    maximum keeps a later branch snapshot from overwriting usage that another
+    branch already recorded for the same shared ancestor.
+    """
+    result={} if not isinstance(current,dict) else dict(current)
+    if not isinstance(candidate,dict): return result
+    for field in ('usedMs','nodeExecutions','toolCalls'):
+        value=candidate.get(field)
+        if isinstance(value,bool) or not isinstance(value,(int,float)) or value<0: continue
+        previous=result.get(field)
+        if not isinstance(previous,(int,float)) or isinstance(previous,bool): result[field]=value
+        else: result[field]=max(previous,value)
+    return result
+
+def stricter_policy(parent, child):
+    """Effective child policy is the per-key intersection with its parent budget."""
+    result=copy.deepcopy(child)
+    for key,value in child.items():
+        if key=='authoring' and isinstance(value,dict):
+            merged=dict(value)
+            for name in ('recursionLimit','waitTimeoutMs'):
+                if isinstance(merged.get(name),int) and not isinstance(merged.get(name),bool) and isinstance(parent.get('authoring',{}).get(name),int) and not isinstance(parent.get('authoring',{}).get(name),bool):
+                    merged[name]=min(merged[name],parent['authoring'][name])
+            result[key]=merged
+        elif isinstance(value,(int,float)) and not isinstance(value,bool) and isinstance(parent.get(key),(int,float)) and not isinstance(parent.get(key),bool):
+            result[key]=min(parent[key],value)
+    return result
 
 class RunExecution:
     def __init__(self,claim,registry,storage):
@@ -138,7 +205,7 @@ class RunExecution:
         self.registry,self.storage=registry,storage
         self.thread=claim.get("thread",{})
         self.root_input=self.run["input"]; self.state_version=self.thread.get("state_version",0); self.invocations=self.thread.get("node_executions",0); self.tool_count=self.thread.get("tool_calls",0)
-        self.deadline=time.monotonic()+max(0,self.definition["policy"]["timeoutMs"]-self.thread.get("compute_ms",0))/1000
+        self.deadline=time.monotonic()+max(0,self.root_policy["timeoutMs"]-self.thread.get("compute_ms",0))/1000
         self.messages_private={}
         self._invocation = ContextVar("workflow_invocation", default=None)
         self._commit_lock = asyncio.Lock()
@@ -147,14 +214,43 @@ class RunExecution:
         self._p4_attempts = {}
         self._static_waits = {}
         self._stream_attempts = {}
-        self.env=registry.environment(self.run["environment_ref"],self.run["owner_user_id"])
-        restore_frozen_environment(self.env,self.run.get("registry_snapshot",{}))
+        self._budget_states = {}
+        self._saver = None
+        self.max_concurrency=20
+        self.root_environment_ref=self.run["environment_ref"]
+        frozen_snapshot=self.run.get("registry_snapshot") if isinstance(self.run.get("registry_snapshot"),dict) else {}
+        self.variable_environment_id=frozen_snapshot.get("variableEnvironmentId") if isinstance(frozen_snapshot.get("variableEnvironmentId"),str) else None
+        self.root_env=environment_for(registry,self.root_environment_ref,self.run["owner_user_id"],self.variable_environment_id)
+        restore_frozen_environment(self.root_env,frozen_snapshot)
+        self.references=frozen_references_from_snapshot(frozen_snapshot)
+        self._reference_envs={}
+        if self.references is not None:
+            for environment_ref,frozen in sorted(self.references.environments.items()):
+                env=environment_for(registry,environment_ref,self.run["owner_user_id"],self.variable_environment_id)
+                restore_frozen_environment(env,frozen["registrySnapshot"])
+                if env["revision"]!=frozen["environmentRevision"]:
+                    raise ExecutionError("ENVIRONMENT_CHANGED","Fixed Workflow target environment authorization changed","auth")
+                self._reference_envs[environment_ref]=env
     @property
     def definition(self):
         scope=SDK_SCOPE.get()
         return scope['definition'] if scope else self.root_definition
     @definition.setter
     def definition(self,value): self.root_definition=value
+    @property
+    def env(self):
+        scope=SDK_SCOPE.get()
+        return scope.get('environment',self.root_env) if scope else self.root_env
+    @env.setter
+    def env(self,value): self.root_env=value
+    @property
+    def root_policy(self):
+        return self.root_definition.get("policy",{})
+
+    @property
+    def policy(self):
+        scope=SDK_SCOPE.get()
+        return (scope.get('policy') if scope else None) or self.root_policy
     @property
     def input(self):
         scope=SDK_SCOPE.get()
@@ -174,16 +270,65 @@ class RunExecution:
     def assert_no_secrets(self,value):
         from .credentials import assert_no_secrets
         assert_no_secrets(value,self.env)
+    def scope_budget(self):
+        scope=SDK_SCOPE.get()
+        budget=scope.get('budget') if scope else None
+        return budget if isinstance(budget,InvocationBudget) else None
+    def budget_error(self):
+        budget=self.scope_budget()
+        limit=budget.limit_ms if budget is not None else self.policy["timeoutMs"]
+        return ExecutionError("RUN_TIMEOUT","Workflow invocation exceeded its compute budget","timeout",effect="unknown",reason="timeout",timeout_ms=int(round(limit)))
+    def child_budget_expired(self):
+        budget=self.scope_budget()
+        return budget is not None and budget.remaining_ms()<=0
+    def checkpoint_thread_id(self):
+        return str(self.run.get('thread_id') or self.thread.get('thread_id') or self.run.get('resume_of_run_id') or self.run['run_id'])
+    async def resumed_budget_state(self,scope_key):
+        """Latest durable counters for this exact invocation anywhere in the thread.
+
+        A nested child's checkpoints carry ancestor snapshots because the parent
+        has no superstep checkpoint while it is suspended in the call node. On
+        resume, search backwards in the SDK checkpoint history and merge by
+        maximum instead of reading only the scope's own last checkpoint; that
+        keeps sequential descendants, parallel branches and a new run id from
+        resetting or overwriting shared ancestor usage.
+        """
+        if not scope_key: return {}
+        if scope_key in self._budget_states: return self._budget_states[scope_key]
+        if self._saver is None or not (self.run.get('resume_of_run_id') or self.thread.get('checkpoint_id')): return {}
+        best={}
+        config={"configurable":{"thread_id":self.checkpoint_thread_id()}}
+        async for item in self._saver.alist(config):
+            best=merge_budget_state(best,budget_state_from_metadata(item.metadata or {},scope_key))
+        self._budget_states[scope_key]=best
+        return best
+    def child_scope_key(self,node,path,child):
+        invocation=(SDK_EXECUTION.get() or {}).get('taskId') or 'direct'
+        return f"{self.checkpoint_thread_id()}:{invocation}:{node['id']}:{child.get('workflowId')}:{child.get('revision')}:{'/'.join(path)}"
+    def child_budget(self,policy,state):
+        state=state if isinstance(state,dict) else {}
+        return InvocationBudget(
+            policy['timeoutMs'],self.deadline,parent=self.scope_budget(),
+            base_used_ms=state.get('usedMs',0),node_executions=state.get('nodeExecutions',0),tool_calls=state.get('toolCalls',0),
+            node_limit=policy['maxNodeExecutions'],tool_limit=policy['maxToolCalls'])
     async def guard(self):
         from .server import refresh
         refresh()
         if time.monotonic()>=self.deadline: raise ExecutionError("RUN_TIMEOUT","Run exceeded deadline","timeout",effect="unknown")
+        budget=self.scope_budget()
+        if budget is not None and budget.remaining_ms()<=0: raise self.budget_error()
         await self.storage.check(self.run["run_id"],self.token)
         # Reload trusted config so secret/environment revocation dominates frozen snapshots.
-        current=self.registry.environment(self.env["ref"],self.run["owner_user_id"])
+        current=environment_for(self.registry,self.root_environment_ref,self.run["owner_user_id"],self.variable_environment_id)
+        restore_frozen_environment(current,self.run.get("registry_snapshot",{}))
         if current["revision"]!=self.run["environment_revision"]: raise ExecutionError("ENVIRONMENT_CHANGED","Environment or tool authorization changed","auth")
+        current_target_environments={}
+        if self.references is not None:
+            current_target_environments=await authorize_frozen_references(self.storage,self.registry,self.run["owner_user_id"],self.references,self.root_environment_ref,self.variable_environment_id)
         from .compiler import _function_versions
-        _function_versions(self.root_definition,self.registry.snapshot(current))
+        current_references=current_reference_snapshot(self.references,current_target_environments) if self.references is not None else None
+        current_root_snapshot=self.registry.snapshot(current)
+        _function_versions(self.root_definition,current_root_snapshot,current_references,root_snapshot=current_root_snapshot)
         for provider in current["providers"]:
             if provider.get("secretRef") and not (provider["secretRef"].startswith("vault:") or os.environ.get(provider["secretRef"])): raise ExecutionError("SECRET_REVOKED","Provider secret unavailable","auth")
     async def event(self,kind,payload):
@@ -192,7 +337,7 @@ class RunExecution:
         if context and context.sdk_execution:
             payload={**payload,"execution":context.sdk_execution}
         self.assert_no_secrets(payload)
-        if len(canonical(payload))>self.definition["policy"]["maxEventBytes"]: raise ExecutionError("EVENT_TOO_LARGE","Event exceeds size budget","policy")
+        if len(canonical(payload))>self.policy["maxEventBytes"]: raise ExecutionError("EVENT_TOO_LARGE","Event exceeds size budget","policy")
         await self.storage.call("emit",self.run["run_id"],self.token,kind,payload,self.step_id,self.node_id)
     async def tools(self,calls,refs):
         catalog={tool["ref"]:tool for tool in self.env["tools"] if tool["ref"] in refs}
@@ -211,8 +356,11 @@ class RunExecution:
             call_id=str(uuid.uuid4())
             try:
                 await self.guard()
-                if self.tool_count>=self.definition["policy"]["maxToolCalls"]: raise ExecutionError("TOOL_BUDGET_EXCEEDED","Tool call budget exhausted","policy")
+                budget=self.scope_budget()
+                if self.tool_count>=self.root_policy["maxToolCalls"] or budget is not None and budget.tool_exhausted():
+                    raise ExecutionError("TOOL_BUDGET_EXCEEDED","Tool call budget exhausted","policy")
                 self.tool_count+=1
+                if budget is not None: budget.consume_tool()
                 await self.event("tool.started",{"callId":call_id,"toolCallId":call["id"],"toolRef":tool["ref"],"contractDigest":tool["contractDigest"]})
                 await self.guard()
                 result=await asyncio.wait_for(invoke_tool(tool,self.env,call["arguments"],self.remaining()),timeout=self.remaining())
@@ -222,7 +370,10 @@ class RunExecution:
                 await self.event("tool.completed",{"callId":call_id,"toolCallId":call["id"],"result":result,"effect":effect,"effectSource":"adapter" if tool.get("adapter")=="mcp" else "declared",**({"declaredReadOnly":tool.get("declaredReadOnly") is True,"declaredDestructive":tool.get("declaredDestructive") is True} if tool.get("adapter")=="mcp" else {})})
                 messages.append({"id":str(uuid.uuid4()),"role":"tool","content":[{"type":"text","text":json.dumps(result,ensure_ascii=False)}],"toolCallId":call["id"]})
             except Exception as error:
-                error=error if isinstance(error,ExecutionError) else ExecutionError("TOOL_TIMEOUT","Tool call interrupted","timeout",effect="unknown")
+                if self.child_budget_expired() and (not isinstance(error,ExecutionError) or error.code in ("TOOL_TIMEOUT","TOOL_BUDGET_EXCEEDED")):
+                    error=self.budget_error()
+                else:
+                    error=error if isinstance(error,ExecutionError) else ExecutionError("TOOL_TIMEOUT","Tool call interrupted","timeout",effect="unknown")
                 if not error.tool:
                     error.tool=tool.get("name") or tool.get("ref")
                 if not error.host:
@@ -233,31 +384,31 @@ class RunExecution:
                 for pending in calls[index+1:]: await self.event("tool.skipped",{"toolCallId":pending["id"],"reason":"previous_tool_failed"})
                 raise error
         return messages
-    def remaining(self): return max(.001,min(self.deadline-time.monotonic(),self.definition["policy"]["nodeTimeoutMs"]/1000))
-    def model_adapter(self,config):
+    def remaining(self):
+        remaining=min(self.deadline-time.monotonic(),self.policy["nodeTimeoutMs"]/1000)
+        budget=self.scope_budget()
+        if budget is not None: remaining=min(remaining,budget.remaining_ms()/1000)
+        return max(.001,remaining)
+    def model_adapter(self,config,http_client=None):
         """Initialize the mature provider SDK; never expose raw proxy/SDK exceptions."""
         providers=[p for p in self.env["providers"] if p["ref"]==config["providerRef"] and config["modelRef"] in p["modelRefs"]]
         if not providers:
             configured=next((p for p in self.env["providers"] if p["ref"]==config["providerRef"]),None)
             raise ExecutionError("MODEL_FORBIDDEN","Model is not authorized","auth",reason="model_not_found",provider=(configured or {}).get("name") or config.get("providerRef"),model=config.get("modelRef"),host=_provider_host(configured or {}))
         provider=providers[0]
-        allowed_parameters={"temperature","top_p","frequency_penalty","presence_penalty","thinking"}
+        allowed_parameters={"temperature","top_p","frequency_penalty","presence_penalty","thinking","maxOutputTokens"}
         if set(config["modelParameters"])-allowed_parameters: raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Unsupported model parameter")
         parameters=dict(config["modelParameters"])
-        thinking=parameters.pop("thinking",None)
+        max_tokens=model_output_limit(parameters)
+        parameters.pop("maxOutputTokens", None)
+        thinking=parameters.get("thinking")
         if "thinking" in config["modelParameters"] and (not isinstance(thinking,dict) or set(thinking)!={"type"} or thinking["type"] not in ("enabled","disabled")):
             raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Thinking must explicitly select enabled or disabled")
-        adapter=provider.get("adapter","deepseek")
-        provider_headers=provider.get("headers") if isinstance(provider.get("headers"),dict) else {}
-        provider_headers={str(name):str(value) for name,value in provider_headers.items() if isinstance(name,str) and isinstance(value,str) and name and len(name)<=200 and len(value)<=1000}
         try:
-            if adapter=="openai":
-                if thinking is not None: raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Thinking is only available on DeepSeek connections")
-                api_key=secret(provider["secretRef"]) if provider.get("secretRef") else LOCAL_MODEL_KEY_PLACEHOLDER
-                model=ChatOpenAI(model=config["modelRef"],api_key=api_key,base_url=provider.get("baseUrl",""),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,http_async_client=model_http_client(provider.get("baseUrl",""),self.env),**({"default_headers":provider_headers} if provider_headers else {}),**parameters)
-            elif adapter=="deepseek":
-                model=ChatDeepSeek(model=config["modelRef"],api_key=secret(provider["secretRef"]),api_base=provider.get("baseUrl","https://api.deepseek.com"),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,**({"extra_body":{"thinking":thinking}} if thinking is not None else {}),**({"default_headers":provider_headers} if provider_headers else {}),**parameters)
-            else: raise ExecutionError("MODEL_ADAPTER_FAILED","Unsupported model adapter","infrastructure",effect="none")
+            session_key=str(self.run.get("thread_id") or self.run.get("run_id") or uuid.uuid4())
+            model=create_model_client(provider,config["modelRef"],self.env,session_key,
+                                      max_tokens,self.remaining(),
+                                      parameters=parameters,http_client=http_client)
             refs=config["allowedToolRefs"]
             if refs:
                 functions=[{"type":"function","function":{"name":t["name"],"description":t.get("description",""),"parameters":t["inputSchema"]}} for t in self.env["tools"] if t["ref"] in refs and t["available"]]
@@ -279,10 +430,8 @@ class RunExecution:
         system,payloads=render_prompt(config["prompt"],parameters)
         fields=_structured_fields(config)
         if fields:
-            instruction=_structured_instruction(fields)
+            instruction=structured_instruction(fields)
             system=f"{system}\n\n{instruction}" if system else instruction
-        model=self.model_adapter(config)
-        if fields: model=model.bind(response_format={"type":"json_object"})
         from langchain_core.messages import messages_from_dict
         persisted={key:messages_from_dict([value])[0] for key,value in SDK_MESSAGES.get().items()}
         def convert(message):
@@ -296,7 +445,11 @@ class RunExecution:
         def elapsed_ms(): return round((time.monotonic()-started)*1000)
         try:
             from .session_memory_history import stream_model
-            response=await stream_model(self,model,messages)
+            base_url=provider.get("baseUrl") or DEEPSEEK_BASE_URL
+            async with model_http_client(base_url,self.env) as http_client:
+                model=self.model_adapter(config,http_client)
+                if fields: model=model.bind(response_format=JSON_RESPONSE_FORMAT)
+                response=await stream_model(self,model,messages)
         except ExecutionError as error:
             if not error.reason:
                 error.reason="auth_failed" if error.code=="SECRET_REVOKED" else "provider_error"
@@ -315,7 +468,7 @@ class RunExecution:
         usage=response.usage_metadata or {}
         text="".join(block["text"] for block in message.get("content",[]) if isinstance(block,dict) and block.get("type")=="text")
         output={"messages":[message],"toolCalls":message.get("toolCalls",[]),"text":text}
-        if fields: output.update(_parse_structured_output(text,fields))
+        if fields: output.update(parse_structured_output(text,fields))
         return output,{"inputTokens":usage.get("input_tokens"),"outputTokens":usage.get("output_tokens")}
     async def execute(self,node,state):
         # Bind the version before the first await: guard can yield while another
@@ -330,6 +483,8 @@ class RunExecution:
                 saved=json.loads(receipt['outlet']) if receipt['outlet'].startswith(('[','{')) else receipt['outlet']
                 result=NodeResult(self.apply_node_patch(node,state,receipt['patch']),saved.get('outlet','next') if isinstance(saved,dict) else saved,receipt['patch'])
                 if isinstance(saved,dict):
+                    if node['config'].get('graph') is None and reference_config(node) is not None:
+                        raise ExecutionError('WORKFLOW_REFERENCE_BOUNDARY','A fixed Workflow reference cannot control or write its parent graph','validation',effect='none')
                     from langgraph.types import Command
                     result.parent_command=Command(goto=saved['parentGoto'])
                 result.provider_messages=receipt.get('provider_messages') if node['type'] in ('core.llm','core.subgraph') else None
@@ -342,9 +497,14 @@ class RunExecution:
             response=interrupt({'nodeId':node['id'],'title':interaction['title'],'schema':interaction['schema'],'graphPath':(SDK_SCOPE.get() or {}).get('graphPath',[]),'taskId':(SDK_EXECUTION.get() or {}).get('taskId'),'namespace':(SDK_EXECUTION.get() or {}).get('namespace',''),'checkpointId':(SDK_EXECUTION.get() or {}).get('checkpointId')})
             response_patch=response_patch_for(self.definition,node,response)
             state=apply_patch(state,response_patch,self.definition)
+        budget=self.scope_budget()
         if not (self.coordinated and hasattr(self.storage,'url')):
-            if self.invocations>=self.definition['policy']['maxNodeExecutions']: raise ExecutionError('NODE_BUDGET_EXCEEDED','Node execution budget exhausted','policy')
+            if self.invocations>=self.root_policy['maxNodeExecutions'] or budget is not None and budget.node_exhausted():
+                error=ExecutionError('NODE_BUDGET_EXCEEDED','Node execution budget exhausted','policy')
+                error.graph_path=(SDK_SCOPE.get() or {}).get('graphPath',[])
+                raise error
             self.invocations+=1
+            if budget is not None: budget.consume_node()
         context=InvocationContext(node["id"],self.invocations,self.state_version,sdk_execution=SDK_EXECUTION.get())
         token=self._invocation.set(context)
         try:
@@ -391,12 +551,16 @@ class RunExecution:
                 error=ExecutionError(error.code,"Node input preparation failed",error.category,effect="none")
             raise error from None
         context=replace(context,step_id=str(uuid.uuid4()))
+        budget=self.scope_budget()
         if self.coordinated and hasattr(self.storage,'url'):
             from .tools import declared_effect
+            if budget is not None and budget.node_exhausted():
+                raise ExecutionError('NODE_BUDGET_EXCEEDED','Node execution budget exhausted','policy')
             effect=declared_effect(node,self.env['tools'])
             invocation=await self.storage.call('begin_task',self.run['run_id'],self.token,context.step_id,node['id'],resolved,context.state_version,context.sdk_execution,effect)
             context=replace(context,invocation=invocation)
             self.invocations=max(self.invocations,invocation)
+            if budget is not None: budget.consume_node()
         else:
             await self.storage.call('step_start',self.run['run_id'],self.token,context.step_id,node['id'],context.invocation,resolved,context.state_version,*([context.sdk_execution] if context.sdk_execution else []))
         self._invocation.set(context)
@@ -441,14 +605,14 @@ class RunExecution:
             for field,value in patch.items():
                 combined[field]=reduce_field(combined[field],value,self.definition['state']['reducers'].get(field,{'name':'replace'})['name']) if field in combined else value
             patch=combined
-            if len(canonical({"output":output}))>self.definition["policy"]["maxEventBytes"]: raise ExecutionError("EVENT_TOO_LARGE","Node output event exceeds budget","policy")
+            if len(canonical({"output":output}))>self.policy["maxEventBytes"]: raise ExecutionError("EVENT_TOO_LARGE","Node output event exceeds budget","policy")
             await self.guard()
             if self.coordinated:
                 if hasattr(self.storage, 'url'):
                     from langchain_core.messages import message_to_dict
                     provider_messages={**SDK_MESSAGES.get(),**{key:message_to_dict(value) for key,value in self.messages_private.items()}}
                     self.assert_no_secrets(provider_messages)
-                    if len(canonical(provider_messages))>self.definition['policy']['maxStateBytes']: raise ExecutionError('STATE_TOO_LARGE','Provider continuation exceeds checkpoint budget','policy')
+                    if len(canonical(provider_messages))>self.policy['maxStateBytes']: raise ExecutionError('STATE_TOO_LARGE','Provider continuation exceeds checkpoint budget','policy')
                     await self.storage.call('prepare_step',self.run['run_id'],self.token,context.step_id,output,patch,json.dumps({'outlet':outlet,'parentGoto':parent_command.goto}) if parent_command else json.dumps(outlet) if isinstance(outlet,list) else outlet or '',usage,provider_messages)
                     if (SDK_SCOPE.get() or {}).get('stateless'): await self.storage.call('complete_stateless_task',self.run['run_id'],self.token,context.step_id)
                 else:
@@ -522,40 +686,90 @@ class RunExecution:
         else: raise ExecutionError("UNKNOWN_NODE_TYPE","Executor not registered")
         return {"output":output,"outlet":outlet,"usage":usage}
 
+    def reference_target(self,node):
+        reference=reference_config(node)
+        if reference is None or self.references is None:
+            raise ExecutionError('WORKFLOW_REFERENCE_UNAVAILABLE','Fixed Workflow reference target was not frozen','auth',effect='none')
+        return self.references.target_for(reference)
+
+    def reference_environment(self,target):
+        environment_ref=target['environmentRef']
+        if environment_ref==self.root_environment_ref:
+            return self.root_env
+        env=self._reference_envs.get(environment_ref)
+        if env is None:
+            raise ExecutionError('WORKFLOW_REFERENCE_ENVIRONMENT','Fixed Workflow target environment was not frozen','auth',effect='none')
+        return env
+
     async def subgraph(self,node,resolved,state):
-        child=node['config']['graph']; mode=node['config'].get('stateMode','independent')
+        embedded=node['config'].get('graph')
+        fixed=embedded is None
+        if fixed:
+            target=self.reference_target(node)
+            child=copy.deepcopy(target['definition'])
+            mode='independent'
+            environment=self.reference_environment(target)
+        else:
+            child=embedded; mode=node['config'].get('stateMode','independent'); environment=self.env
         parent_scope=SDK_SCOPE.get() or {}; path=[*parent_scope.get('graphPath',[]),node['id']]
+        effective_policy=stricter_policy(self.policy,child['policy'])
+        runtime_child=copy.deepcopy(child); runtime_child['policy']=effective_policy
         validate_value(child['inputSchema'],resolved,'INVALID_SUBGRAPH_INPUT')
         initial=copy.deepcopy(state) if mode=='shared' else {**copy.deepcopy(child['state']['initial']),**bind(child['state']['inputBindings'],resolved,{})}
         validate_value(child['state']['schema'],initial,'INVALID_INITIAL_STATE')
-        token=SDK_SCOPE.set({'definition':child,'input':resolved,'graphPath':path,'parentDefinition':self.definition,'parentTaskId':(SDK_EXECUTION.get() or {}).get('taskId'),'parentCheckpoint':(SDK_EXECUTION.get() or {}).get('checkpointId'),'stateless':node['config'].get('persistence')=='stateless'})
+        invocation=(SDK_EXECUTION.get() or {}).get('taskId')
+        workflow_path=[*parent_scope.get('workflowPath',[]),{
+            'parentWorkflowId':self.definition.get('workflowId'),
+            'parentRevision':self.definition.get('revision'),
+            'nodeId':node['id'],
+            'workflowId':child.get('workflowId') or None,
+            'revision':child.get('revision') or None,
+            **({'environmentRef':target['environmentRef']} if fixed else {}),
+            **({'invocationId':invocation} if invocation else {}),
+        }]
+        persistence=node['config'].get('persistence','per-invocation')
+        scope_key=self.child_scope_key(node,path,child)
+        resumed=await self.resumed_budget_state(scope_key) if persistence!='stateless' else {}
+        budget=self.child_budget(effective_policy,resumed)
+        ancestors=parent_scope.get('budgetScopes')
+        budget_scopes=((scope_key,budget),*(ancestors if isinstance(ancestors,(list,tuple)) else ()))
+        scope={'definition':runtime_child,'input':resolved,'graphPath':path,'parentDefinition':None if fixed else self.definition,'parentTaskId':invocation,'parentCheckpoint':(SDK_EXECUTION.get() or {}).get('checkpointId'),'stateless':persistence=='stateless','environment':environment,'policy':effective_policy,'workflowId':child.get('workflowId') or None,'revision':child.get('revision') or None,'workflowPath':workflow_path,'fixedReference':fixed,'budget':budget,'budgetScopeKey':scope_key,'budgetScopes':budget_scopes}
+        token=SDK_SCOPE.set(scope)
         try:
-            persistence=node['config'].get('persistence','per-invocation')
-            graph=graph_for(child,self.execute,self.run['compile_fingerprint'],checkpointer=False if persistence=='stateless' else True if persistence=='per-thread' else None)
-            child_input=encode_state(child,initial)
-            from .graph_control import advanced_graph
+            graph=graph_for(runtime_child,self.execute,self.run['compile_fingerprint'],checkpointer=False if persistence=='stateless' else True if persistence=='per-thread' else None)
+            child_input=encode_state(runtime_child,initial)
             child_input['eduflow_graph_input']=resolved
-            try: result=await graph.ainvoke(child_input,durability='async' if persistence=='stateless' else 'sync')
+            child_config={'max_concurrency':max(1,min(self.max_concurrency,20)),'recursion_limit':max(1,min(effective_policy.get('authoring',{}).get('recursionLimit',effective_policy['maxNodeExecutions']+2),effective_policy['maxNodeExecutions']+2))}
+            remaining=budget.remaining_ms()
+            if remaining<=0:
+                error=self.budget_error(); error.graph_path=path; raise error
+            try: result=await asyncio.wait_for(graph.ainvoke(child_input,config=child_config,durability='async' if persistence=='stateless' else 'sync'),timeout=max(.001,remaining/1000))
+            except asyncio.TimeoutError:
+                error=self.budget_error(); error.graph_path=path; raise error from None
             except GraphInterrupt as error:
                 if not error.args[0] and not any(item['graphPath'][:len(path)]==path for item in self._static_waits.values()):
                     from langgraph.config import get_config
                     cfg=get_config(); cfg={**cfg,'configurable':{**cfg['configurable']}}
                     cfg['configurable'].pop('checkpoint_id',None)
                     snapshot=await graph.aget_state(cfg)
-                    self.record_breakpoints(child,snapshot,path)
+                    self.record_breakpoints(runtime_child,snapshot,path)
                 raise
             except Exception as error:
                 from langgraph.errors import ParentCommand
-                if isinstance(error,ParentCommand): return {'__parent_command__':error.args[0]}
+                if isinstance(error,ParentCommand):
+                    if fixed:
+                        boundary=ExecutionError('WORKFLOW_REFERENCE_BOUNDARY','A fixed Workflow reference cannot control or write its parent graph','validation',effect='none')
+                        boundary.graph_path=path; raise boundary from None
+                    return {'__parent_command__':error.args[0]}
                 from langgraph.errors import InvalidUpdateError
                 if isinstance(error,InvalidUpdateError):
                     from .compiler import state_channels
                     message=str(error).split('For troubleshooting')[0]
-                    for field,channel in sorted(state_channels(child).items(),key=lambda item:len(item[1]),reverse=True): message=message.replace(channel,field)
+                    for field,channel in sorted(state_channels(runtime_child).items(),key=lambda item:len(item[1]),reverse=True): message=message.replace(channel,field)
                     conflict=ExecutionError('CONCURRENT_STATE_CONFLICT',message,'validation',effect='none');conflict.graph_path=path
                     raise conflict from None
                 raise
-            final=decode_state(child,result)
+            final=decode_state(runtime_child,result)
             output=bind(child['outputBindings'],resolved,final)
             validate_value(child['outputSchema'],output,'INVALID_SUBGRAPH_OUTPUT')
             if mode=='shared':
@@ -580,7 +794,7 @@ class RunExecution:
             self._static_waits[key]={'id':key,'nodeId':node['id'],'title':'调试断点 · 下一步 '+node['label'],'schema':{'type':'object','properties':{},'additionalProperties':False},'graphPath':path,'breakpoint':True,'checkpointId':checkpoint,'namespace':snapshot.config['configurable'].get('checkpoint_ns','')+'|'+name}
 
     async def run_graph(self):
-        current=compile_definition(self.definition,self.registry.snapshot(self.env))
+        current=compile_definition(self.definition,self.registry.snapshot(self.env),self.references)
         if not current["valid"] or current["compileFingerprint"]!=self.run["compile_fingerprint"]: raise ExecutionError("COMPILE_FINGERPRINT_CHANGED","Compiler registry differs from accepted Run")
         self.assert_no_secrets(self.input)
         validate_value(self.definition["inputSchema"],self.input,"INVALID_RUN_INPUT")
@@ -591,15 +805,28 @@ class RunExecution:
         from .checkpoints import PostgresCoordinator, MemoryCoordinator
         self.coordinated=True
         saver=PostgresCoordinator(self) if hasattr(self.storage,'url') else MemoryCoordinator(self)
+        self._saver=saver
         graph=graph_for(self.definition,self.execute,current["compileFingerprint"],checkpointer=saver)
         from .telemetry import record_cache_info
         record_cache_info()
         config={"configurable":{"thread_id":str(self.run.get('thread_id') or self.run['run_id'])},"recursion_limit":self.definition['policy'].get('authoring',{}).get('recursionLimit',self.definition['policy']['maxNodeExecutions']+2)}
-        def concurrency(d):
+        def concurrency(d,seen=None):
+            seen=seen if seen is not None else set()
             caps=[n['config']['concurrency'] for n in d['nodes'] if n['type']=='control.send']
-            caps.extend(concurrency(n['config']['graph']) for n in d['nodes'] if n['type']=='core.subgraph')
+            for n in d['nodes']:
+                if n['type']!='core.subgraph': continue
+                child=n['config'].get('graph')
+                if isinstance(child,dict): caps.append(concurrency(child,seen))
+                elif self.references is not None:
+                    try: target=self.references.target_for(reference_config(n))
+                    except ExecutionError: target=None
+                    if target is not None:
+                        identity=(target['workflowId'],target['revision'],target['environmentRef'])
+                        if identity not in seen:
+                            seen.add(identity); caps.append(concurrency(target['definition'],seen))
             return min([20,*caps])
-        config['max_concurrency']=concurrency(self.definition)
+        self.max_concurrency=concurrency(self.definition)
+        config['max_concurrency']=self.max_concurrency
         graph_input=encode_state(self.definition,state)
         if self.run.get('operation')=='next':
             graph_input=encode_state(self.definition,bind(self.definition['state']['inputBindings'],self.input,{}))

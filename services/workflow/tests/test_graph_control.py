@@ -38,6 +38,18 @@ async def test_independent_subgraph_maps_outputs_and_paths():
     calls=[args for name,args in r.storage.calls if name=='step_start']
     assert any(args[-1].get('graphPath')==['a'] for args in calls)
 
+
+async def test_embedded_subgraph_identity_omits_empty_workflow_identity():
+    # Real recovered embedded graphs carry workflowId="" / revision=0. Those are
+    # execution metadata, not a persisted Workflow identity, and the SQL identity
+    # guard rejects an empty workflowId or a zero revision.
+    d=sample();child=sample();child['workflowId']='';child['revision']=0
+    d['nodes'][1].update(type='core.subgraph',config={'graph':child},inputs={},writes={'value':'/value'})
+    r=execution(d);assert await r.run_graph()=={'value':5}
+    child_calls=[args for name,args in r.storage.calls if name=='step_start' and args[-1].get('graphPath')==['a']]
+    assert child_calls
+    assert all(args[-1] is not None and 'workflowId' not in args[-1] and 'revision' not in args[-1] for args in child_calls)
+
 @pytest.mark.parametrize('size',[0,1,3])
 async def test_send_native_task_inputs(size):
     d=sample();d['state']={'schema':obj({'items':{'type':'array'},'item':{},'results':{'type':'array'}}),'initial':{'items':list(range(size)),'item':None,'results':[]},'inputBindings':{},'reducers':{'results':{'name':'append','version':1}}}

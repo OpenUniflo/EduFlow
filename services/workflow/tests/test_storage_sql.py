@@ -311,6 +311,17 @@ def test_p6_cleanup_batches_preserve_live_rows_and_finish_on_later_ticks():
     prefix='p6-'+str(uuid.uuid4())
     run_sql(f"""
     begin;
+    -- Schema pre-check: this test's bounds rely on the 128-row limits in migration
+    -- 20261019042510. It reports stale unbounded functions as MIGRATION_DRIFT so a
+    -- schema mismatch is not mistaken for a cleanup-logic bug. It does not prove
+    -- the historical root cause, and it cannot by itself fix an intermittent test.
+    do $$ begin
+      if (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+          where n.nspname='workflow_private' and p.proname in ('p5_sweep','watchdog')
+            and pg_get_functiondef(p.oid) ~* 'limit[[:space:]]+128') <> 2 then
+        raise exception 'MIGRATION_DRIFT: workflow cleanup functions are not bounded at 128';
+      end if;
+    end $$;
     insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
     select public.workflow_v2_save('{owner}','{workflow}',null,null,{q(definition)},{q(editor)},'hash',null);
     insert into public.workflow_execution_threads(thread_id,owner_user_id,workflow_id,revision,snapshot,status,updated_at)
@@ -824,5 +835,100 @@ def test_platform_deepseek_does_not_block_same_named_user_connection_but_real_p4
         if sqlerrm not like '%CONNECTION_IN_USE%' then raise; end if;
       end;
     end $$;
+    rollback;
+    """)
+
+
+def test_waiting_run_frozen_child_resource_blocks_connection_delete():
+    owner = str(uuid.uuid4())
+    run = str(uuid.uuid4())
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select workflow_private.p4_connection_save('{owner}','local','probe',1,
+      jsonb_build_object('type','openai-compatible','name','Probe','baseUrl','https://models.example/v1','modelRefs',jsonb_build_array('m1')),'');
+    select workflow_v2_save('{owner}','probe-child',null,null,
+      jsonb_build_object(
+        'schemaVersion','2.0','workflowId','probe-child','revision',1,'name','Probe child','description','',
+        'inputSchema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),
+        'outputSchema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),
+        'state',jsonb_build_object('schema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),'initial','{{}}','inputBindings','{{}}','reducers','{{}}'),
+        'entryNodeId','start',
+        'nodes',jsonb_build_array(
+          jsonb_build_object('id','start','label','Start','type','core.start','typeVersion',1,'config','{{}}','inputs','{{}}','writes','{{}}'),
+          jsonb_build_object('id','tool','label','Tool','type','core.tool','typeVersion',2,
+            'config',jsonb_build_object('toolRef','p4:{owner}:probe:1','contractDigest','x'),'inputs','{{}}','writes','{{}}')),
+        'transitions',jsonb_build_array(
+          jsonb_build_object('id','st','from','start','outlet','next','to','tool')),
+        'outputBindings','{{}}','policy','{{}}','requiredCapabilities','[]'),
+      jsonb_build_object('schemaVersion',1,'workflowId','probe-child','editorRevision',1,'definitionRevision',1,'nodes','{{}}','edges','{{}}'),
+      'hash',null,'local');
+    select workflow_v2_save('{owner}','probe-parent',null,null,
+      jsonb_build_object(
+        'schemaVersion','2.0','workflowId','probe-parent','revision',1,'name','Probe parent','description','',
+        'inputSchema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),
+        'outputSchema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),
+        'state',jsonb_build_object('schema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),'initial','{{}}','inputBindings','{{}}','reducers','{{}}'),
+        'entryNodeId','start',
+        'nodes',jsonb_build_array(
+          jsonb_build_object('id','start','label','Start','type','core.start','typeVersion',1,'config','{{}}','inputs','{{}}','writes','{{}}'),
+          jsonb_build_object('id','call','label','Call','type','core.subgraph','typeVersion',1,
+            'config',jsonb_build_object('workflowRef',jsonb_build_object('workflowId','probe-child','revision',1),'environmentRef','local'),
+            'inputs','{{}}','writes','{{}}')),
+        'transitions',jsonb_build_array(
+          jsonb_build_object('id','sc','from','start','outlet','next','to','call')),
+        'outputBindings','{{}}','policy','{{}}','requiredCapabilities','[]'),
+      jsonb_build_object('schemaVersion',1,'workflowId','probe-parent','editorRevision',1,'definitionRevision',1,'nodes','{{}}','edges','{{}}'),
+      'hash',null,'local');
+    insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot)
+    values('{run}','{owner}','probe-parent',1,'waiting','d','s','c','local','1','{{}}',
+      jsonb_build_object('workflowReferences',jsonb_build_object(
+        'version',1,'rootEnvironmentRef','local',
+        'targets',jsonb_build_array(jsonb_build_object(
+          'workflowId','probe-child','revision',1,'environmentRef','local',
+          'definition',(select definition from public.workflow_revisions where owner_user_id='{owner}' and workflow_id='probe-child' and revision=1))),
+        'environments','[]')));
+    -- The current roots stop using the connection, but the waiting Run's frozen
+    -- target closure still does.
+    update public.workflow_revisions set definition=jsonb_set(definition,'{{nodes}}','[]'::jsonb)
+      where owner_user_id='{owner}' and workflow_id in ('probe-parent','probe-child') and revision=1;
+    do $$ begin
+      begin perform workflow_private.p4_connection_delete('{owner}','local','probe',1);
+        raise exception 'FAILED delete with frozen child resource';
+      exception when others then
+        if sqlerrm not like '%CONNECTION_BUSY%' then raise; end if;
+      end;
+    end $$;
+    update public.workflow_live_runs set status='success' where run_id='{run}';
+    do $$ declare result jsonb; begin
+      result:=workflow_private.p4_connection_delete('{owner}','local','probe',1);
+      if (result->>'deleted')::integer<>1 then raise exception 'FAILED delete after run end'; end if;
+    end $$;
+    rollback;
+    """)
+
+
+def test_workflow_save_accepts_builtin_registered_function_references():
+    owner = str(uuid.uuid4())
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select public.workflow_v2_save('{owner}','builtin-function',null,null,
+      jsonb_build_object(
+        'schemaVersion','2.0','workflowId','builtin-function','revision',1,'name','Builtin function','description','',
+        'inputSchema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),
+        'outputSchema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),
+        'state',jsonb_build_object('schema',jsonb_build_object('type','object','properties','{{}}'::jsonb,'additionalProperties',false),'initial','{{}}','inputBindings','{{}}','reducers','{{}}'),
+        'entryNodeId','start',
+        'nodes',jsonb_build_array(
+          jsonb_build_object('id','start','label','Start','type','core.start','typeVersion',1,'config','{{}}','inputs','{{}}','writes','{{}}'),
+          jsonb_build_object('id','fn','label','Fn','type','core.function','typeVersion',1,
+            'config',jsonb_build_object('implementation','registered','functionRef','edu.scale','functionVersion',1),
+            'inputs','{{}}','writes','{{}}')),
+        'transitions',jsonb_build_array(
+          jsonb_build_object('id','sf','from','start','outlet','next','to','fn')),
+        'outputBindings','{{}}','policy','{{}}','requiredCapabilities','[]'),
+      jsonb_build_object('schemaVersion',1,'workflowId','builtin-function','editorRevision',1,'definitionRevision',1,'nodes','{{}}','edges','{{}}'),
+      'hash',null,'local');
     rollback;
     """)

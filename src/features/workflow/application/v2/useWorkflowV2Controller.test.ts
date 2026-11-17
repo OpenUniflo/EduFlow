@@ -27,14 +27,15 @@ const oldRun: WorkflowRunV2 = { runId: "old", workflowId: "workflow", revision: 
 let hookDocument = initial;
 let hookRecovery: WorkflowControllerRecovery | undefined;
 let hookContext: WorkflowLaunchContext | undefined;
+let hookEnvironment: string | undefined;
 const recoveryRejected = vi.fn();
 const authenticationFailure = { sessionUserId: "owner", method: "POST", path: "/api/workflows", status: 401 as const, occurredAt: 0, requestId: "request-401" };
 function remountRecovery(recovery: WorkflowControllerRecovery, document = initial, context?: WorkflowLaunchContext) {
   dispose(); host.slots = []; host.index = 0; host.effects = [];
-  hookRecovery = structuredClone(recovery); hookDocument = document; hookContext = context;
+  hookRecovery = structuredClone(recovery); hookDocument = document; hookContext = context; hookEnvironment = undefined;
   return render();
 }
-function render() { host.index = 0; const control = useWorkflowV2Controller(hookDocument, hookContext, hookRecovery, recoveryRejected); host.effects.splice(0).forEach(effect => effect()); return control; }
+function render() { host.index = 0; const control = useWorkflowV2Controller(hookDocument, hookContext, hookRecovery, recoveryRejected, hookEnvironment); host.effects.splice(0).forEach(effect => effect()); return control; }
 async function flush() { for (let i = 0; i < 8; i += 1) await Promise.resolve(); }
 async function boot() { render(); await flush(); return render(); }
 function dispose() { host.slots.forEach(slot => slot?.cleanup?.()); }
@@ -46,7 +47,7 @@ function deferred<T>() {
 }
 beforeEach(() => {
   dispose(); host.slots = []; host.index = 0; host.effects = [];
-  hookDocument = initial; hookRecovery = undefined; hookContext = undefined; recoveryRejected.mockReset();
+  hookDocument = initial; hookRecovery = undefined; hookContext = undefined; hookEnvironment = undefined; recoveryRejected.mockReset();
   Object.values(api).forEach(mock => mock.mockReset());
   vi.useFakeTimers(); vi.stubGlobal("document", { visibilityState: "visible" });
   api.environments.mockResolvedValue({ items: [{ environmentRef: "local" }] });
@@ -67,6 +68,24 @@ beforeEach(() => {
 afterEach(() => { dispose(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("initial data and submission feedback", () => {
+  it("starts a fixed-reference target on the environment selected by its caller, not the catalog default", async () => {
+    api.environments.mockResolvedValue({ items: [{ environmentRef: "local" }, { environmentRef: "secondary" }] });
+    hookEnvironment = "secondary";
+    await boot();
+    expect(render().environmentRef).toBe("secondary");
+    expect(api.tools).toHaveBeenCalledWith("secondary");
+    expect(api.tools).not.toHaveBeenCalledWith("local");
+  });
+
+  it("keeps an explicitly selected but unavailable environment instead of silently falling back to the first one", async () => {
+    api.environments.mockResolvedValue({ items: [{ environmentRef: "local" }] });
+    hookEnvironment = "removed-environment";
+    await boot();
+    expect(render().environmentRef).toBe("removed-environment");
+    expect(render().environmentRef).not.toBe("local");
+    expect(api.tools).not.toHaveBeenCalled();
+    expect(render().toolsLoading).toBe(false);
+  });
   it("distinguishes a pending environment read from an empty configured catalog", async () => {
     const catalog = deferred<{ items: { environmentRef: string }[] }>();
     api.environments.mockReturnValueOnce(catalog.promise);
@@ -147,6 +166,25 @@ describe("initial data and submission feedback", () => {
     await vi.advanceTimersByTimeAsync(1000); render(); await flush();
     expect(render().run?.status).toBe("failed");
     expect(render().notice).not.toContain("运行已提交");
+    expect(api.createRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("converges a live Run to waiting and retires the accepted-submission notice without a history refresh", async () => {
+    api.history.mockResolvedValue({ items: [] });
+    let observed: WorkflowRunV2 = { ...oldRun, runId: "new", threadId: "new", status: "running" };
+    api.run.mockImplementation(async () => observed);
+    await boot(); await render().startRun(); render(); await flush();
+    expect(render().notice).toContain("运行已提交");
+    observed = { ...observed, status: "waiting" };
+    const waitingThread = { threadId: "new", workflowId: "workflow", revision: 3, status: "waiting" as const, currentRunId: "new", checkpointId: "checkpoint", state: {}, stateVersion: 1, interrupts: [{ id: "interrupt", nodeId: "correct", title: "请补件", schema: { type: "object" } }], updatedAt: "2026-01-01T00:00:00Z", nodeExecutions: 1, toolCalls: 0, computeMs: 0 };
+    api.threads.mockResolvedValue({ items: [waitingThread] });
+    api.thread.mockResolvedValue(waitingThread);
+    await vi.advanceTimersByTimeAsync(1000); render(); await flush();
+    expect(render().run?.status).toBe("waiting");
+    expect(render().notice).not.toContain("运行已提交");
+    expect(render().observedRunId).toBe("new");
+    await vi.advanceTimersByTimeAsync(2000); render(); await flush();
+    expect(render().currentThread?.interrupts[0]?.nodeId).toBe("correct");
     expect(api.createRun).toHaveBeenCalledTimes(1);
   });
 });

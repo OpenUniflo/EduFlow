@@ -66,6 +66,25 @@ describe("Workflow V2 Schema boundary", () => {
     expect(validateSchemaValue(schema,{result:['Overview']}).valid).toBe(true);
     expect(validateSchemaValue(schema,{result:42}).valid).toBe(false);
   });
+  it("accepts anyOf and examples while retaining branch validation", () => {
+    const schema = { anyOf: [{ type: "string" }, { type: "integer" }, { type: "null" }], examples: ["151252", 151252, null] };
+    expect(schemaDiagnostics(schema)).toEqual([]);
+    expect(["151252", 151252, null].every(value => validateSchemaValue(schema, value).valid)).toBe(true);
+    expect(validateSchemaValue(schema, true).valid).toBe(false);
+    expect(validateSchemaValue(schema, 1.5).valid).toBe(false);
+    const bis = { type: "object", properties: { flow_ref: { type: "string" } }, required: ["flow_ref"], examples: [{ flow_ref: "BIS,WS_XRU,1.0" }] };
+    expect(schemaDiagnostics(bis)).toEqual([]);
+    expect(validateSchemaValue(bis, { flow_ref: "BIS,WS_XRU,1.0" }).valid).toBe(true);
+    expect(validateSchemaValue(bis, {}).valid).toBe(false);
+  });
+  it("keeps offline reference boundaries inside anyOf", () => {
+    const local = { $defs: { N: { type: "number" } }, anyOf: [{ $ref: "#/$defs/N" }] };
+    expect(schemaDiagnostics(local)).toEqual([]);
+    expect(validateSchemaValue(local, 3).valid).toBe(true);
+    expect(schemaDiagnostics({ anyOf: [{ $ref: "https://example.com/schema" }] })[0].code).toBe("UNSUPPORTED_SCHEMA_REFERENCE");
+    expect(schemaDiagnostics({ $defs: { A: { anyOf: [{ $ref: "#/$defs/A" }] } }, $ref: "#/$defs/A" }).some(item => item.code === "UNSUPPORTED_SCHEMA_REFERENCE")).toBe(true);
+    expect(schemaDiagnostics({ anyOf: [{ type: "string", pattern: ".*" }] })[0].code).toBe("UNSUPPORTED_SCHEMA_KEYWORD");
+  });
 });
 
 describe("v2 node diagnostics", () => {

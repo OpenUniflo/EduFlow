@@ -7,10 +7,14 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.runtime import Runtime
 from contextvars import ContextVar
 from .contracts import ExecutionError, VERSION, bind, digest, semantic_hash, schema_check, validate_value, check_json, HARD_LIMITS, DEPENDENCY_MANIFEST, reduce_field
+from .references import ReferenceSet, reference_config, MAX_REFERENCE_NODES, MAX_REFERENCE_TARGETS, MAX_DIRECT_REFERENCES
 
 SDK_EXECUTION = ContextVar("workflow_sdk_execution", default=None)
 SDK_SCOPE = ContextVar("workflow_graph_scope", default=None)
 SDK_MESSAGES = ContextVar("workflow_provider_messages", default={})
+CHILD_BUDGET_METADATA_KEY = "eduflowChildBudget"
+CHILD_BUDGET_SCOPE_METADATA_KEY = "eduflowChildScope"
+CHILD_BUDGETS_METADATA_KEY = "eduflowChildBudgets"
 
 DEFINITION_KEYS={"schemaVersion","workflowId","revision","name","description","inputSchema","outputSchema","state","entryNodeId","nodes","transitions","outputBindings","policy","requiredCapabilities"}
 
@@ -117,6 +121,11 @@ def validate_llm_authoring(node, definition, diagnostics):
     """core.llm v2: declared parameters and structured prompt references."""
     from .prompts import PARAM_NAME, RESERVED_PARAM, estimate_prompt_bytes, prompt_param_positions
     nid = node["id"]; pointer = node_pointer(nid); inputs = node["inputs"]
+    from .model_transport import model_output_limit
+    try:
+        model_output_limit(node["config"].get("modelParameters"))
+    except ExecutionError as error:
+        diagnostics.append({"code":error.code,"severity":"error","nodeId":nid,"pointer":pointer+"/config/modelParameters/maxOutputTokens","message":str(error)})
     parameters = [name for name in inputs if name != RESERVED_PARAM]
     for name in parameters:
         if not PARAM_NAME.fullmatch(name): diagnostics.append({"code":"INVALID_PROMPT_PARAMETER","severity":"error","nodeId":nid,"pointer":pointer+"/inputs/"+escape_token(name),"message":"Parameter names must match ^[A-Za-z_][A-Za-z0-9_]{0,63}$"})
@@ -187,8 +196,12 @@ def validate_tool_authoring(node, definition, registry_snapshot, tools, diagnost
         if name not in node["inputs"]:
             diagnostics.append({"code":"TOOL_ARGUMENT_REQUIRED","severity":"error","nodeId":nid,"pointer":pointer+"/inputs/"+escape_token(name),"message":"A required tool argument has no input binding"})
 
-def _validate_definition(definition, registry_snapshot, environment_checks, parent=None, depth=0):
+def _validate_definition(definition, registry_snapshot, environment_checks, parent=None, depth=0, references=None, stack=None, root_snapshot=None, budget=None, direct_scope=True, reference_boundary=False):
     diagnostics=[]
+    root_snapshot = registry_snapshot if root_snapshot is None else root_snapshot
+    budget = budget if budget is not None else {'direct':0,'nodes':0,'targets':set()}
+    current_identity = f"{definition.get('workflowId','')}:{definition.get('revision','')}" if isinstance(definition,dict) else ''
+    reference_stack = (*stack, current_identity) if stack is not None and current_identity else ((current_identity,) if current_identity and stack is None else (stack or ()))
     if depth>8: return {'valid':False,'diagnostics':[{'code':'SUBGRAPH_DEPTH_EXCEEDED','severity':'error','message':'Subgraphs support at most 8 nesting levels'}],'requiredCapabilities':[]}
     def inspect(function, pointer="", node=None, edge=None):
         try: function(); return True
@@ -227,7 +240,7 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
     for key,value in definition["policy"].items():
         if key=='authoring': continue
         if key not in HARD_LIMITS or isinstance(value,bool) or not isinstance(value,int) or value<1 or value>HARD_LIMITS[key]: diagnostics.append({"code":"UNSUPPORTED_CAPABILITY" if key=="maxCost" else "INVALID_POLICY","severity":"error","pointer":"/policy/"+key,"message":"Unsupported or excessive execution limit"})
-    if set(definition["policy"])-{"authoring"}!=set(HARD_LIMITS): diagnostics.append({"code":"INVALID_POLICY","severity":"error","pointer":"/policy","message":"All M1 policy fields required"})
+    if set(definition["policy"])-{"authoring","maxOutputTokens"}!=set(HARD_LIMITS)-{"maxOutputTokens"}: diagnostics.append({"code":"INVALID_POLICY","severity":"error","pointer":"/policy","message":"All M1 policy fields required"})
     unsupported=set(definition["requiredCapabilities"])-set(registry_snapshot["capabilities"])
     if unsupported: diagnostics.append({"code":"UNSUPPORTED_CAPABILITY","severity":"error","message":"Unsupported capabilities: "+",".join(sorted(unsupported))})
     nodes={node["id"]:node for node in definition["nodes"]}
@@ -242,7 +255,10 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
         if not desc:
             diagnostics.append({"code":"UNKNOWN_NODE_TYPE","severity":"error","nodeId":nid,"message":"Unknown node executor"}); continue
         if node['config'].get('authoring',{}).get('command',{}).get('graph')=='parent' and parent is None:
-            diagnostics.append({'code':'INVALID_COMMAND','severity':'error','nodeId':nid,'message':'Parent Command requires a subgraph'})
+            if reference_boundary:
+                diagnostics.append({'code':'WORKFLOW_REFERENCE_BOUNDARY','severity':'error','nodeId':nid,'message':'A fixed Workflow reference cannot control or write its parent graph'})
+            else:
+                diagnostics.append({'code':'INVALID_COMMAND','severity':'error','nodeId':nid,'message':'Parent Command requires a subgraph'})
         from .execution_policies import validate_node
         inspect(lambda:validate_node(node,registry_snapshot,environment_checks),'/nodes/'+nid+'/config',nid)
         from .interrupts import interaction_check
@@ -283,9 +299,79 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
         if node["type"]=="control.fork": outlets[nid]=config.get("branches",[])
         if node["type"]=="control.send": outlets[nid]=["next"]
         if node["type"]=="core.subgraph":
-            child=config.get("graph",{})
-            nested=_validate_definition(child,registry_snapshot,environment_checks,parent=definition,depth=depth+1)
-            for diagnostic in nested["diagnostics"]: diagnostics.append({**diagnostic,"graphPath":[nid,*diagnostic.get("graphPath",[])]})
+            child=config.get("graph")
+            if isinstance(child,dict):
+                nested=_validate_definition(child,registry_snapshot,environment_checks,parent=definition,depth=depth+1,references=references,stack=reference_stack,root_snapshot=root_snapshot,budget=budget,direct_scope=direct_scope)
+                for diagnostic in nested["diagnostics"]: diagnostics.append({**diagnostic,"graphPath":[nid,*diagnostic.get("graphPath",[])]})
+            elif environment_checks or references is not None:
+                try:
+                    reference=reference_config(node)
+                except ExecutionError as error:
+                    diagnostics.append({"code":error.code,"severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":str(error)})
+                    reference=None
+                if reference is None:
+                    if not config.get("workflowRef"):
+                        diagnostics.append({"code":"INVALID_SUBGRAPH_REFERENCE","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config","message":"Subgraph requires an embedded graph or a fixed Workflow reference"})
+                else:
+                    target_identity=f"{reference['workflowId']}:{reference['revision']}"
+                    budget['nodes']+=1
+                    if direct_scope:
+                        budget['direct']+=1
+                        if budget['direct']>MAX_DIRECT_REFERENCES:
+                            diagnostics.append({"code":"WORKFLOW_REFERENCE_LIMIT","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":"More than 64 direct fixed references"})
+                    if budget['nodes']>MAX_REFERENCE_NODES:
+                        diagnostics.append({"code":"WORKFLOW_REFERENCE_LIMIT","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":"More than 256 reference nodes in closure"})
+                    budget['targets'].add(target_identity)
+                    if len(budget['targets'])>MAX_REFERENCE_TARGETS:
+                        diagnostics.append({"code":"WORKFLOW_REFERENCE_LIMIT","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":"More than 32 target revisions in closure"})
+                    if target_identity in reference_stack:
+                        diagnostics.append({"code":"WORKFLOW_REFERENCE_CYCLE","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":"The fixed reference chain is cyclic"})
+                    elif references is None:
+                        diagnostics.append({"code":"WORKFLOW_REFERENCE_UNAVAILABLE","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":"The fixed reference closure was not resolved by the server"})
+                    else:
+                        try:
+                            target=references.target_for(reference)
+                        except ExecutionError as error:
+                            diagnostics.append({"code":error.code,"severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/workflowRef","message":str(error)})
+                            target=None
+                        if target is not None:
+                            target_definition=target['definition']
+                            # Mapping keys and direct JSON types are validated against
+                            # this exact frozen revision, not a latest version.
+                            try:
+                                input_schema=target_definition.get('inputSchema') if isinstance(target_definition.get('inputSchema'),dict) else {}
+                                properties=input_schema.get('properties') if isinstance(input_schema.get('properties'),dict) else {}
+                                required=input_schema.get('required') if isinstance(input_schema.get('required'),list) else []
+                                for field in required:
+                                    if field not in node['inputs']:
+                                        diagnostics.append({"code":"WORKFLOW_REFERENCE_MAPPING","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/inputs","message":"A required target input is not mapped: "+str(field)})
+                                if input_schema.get('additionalProperties',True) is False:
+                                    for field in node['inputs']:
+                                        if field not in properties:
+                                            diagnostics.append({"code":"WORKFLOW_REFERENCE_MAPPING","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/inputs/"+escape_token(field),"message":"The target does not declare this input"})
+                                for field,value in node['inputs'].items():
+                                    target_schema=properties.get(field,{})
+                                    binding_check(value,("input","state","literal","environment"))
+                                    binding_schema_check(value,definition,target_schema)
+                                    if value.get('source')=='literal':
+                                        validate_value(target_schema,value.get('value'),"INVALID_NODE_INPUT")
+                                state_properties=(definition.get('state',{}).get('schema',{}).get('properties') or {})
+                                output_schema=target_definition.get('outputSchema') if isinstance(target_definition.get('outputSchema'),dict) else {}
+                                for field,path in node['writes'].items():
+                                    if not isinstance(path,str): continue
+                                    source_schema=schema_pointer(output_schema,path)
+                                    source_types=declared_root_types(source_schema)
+                                    target_types=declared_root_types(state_properties.get(field,{}))
+                                    if source_types is not None and target_types is not None and source_types.isdisjoint(target_types):
+                                        diagnostics.append({"code":"WORKFLOW_REFERENCE_MAPPING","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/writes/"+escape_token(field),"message":"Target output type is incompatible with the parent State field"})
+                            except ExecutionError as error:
+                                diagnostics.append({"code":error.code if error.code.startswith('WORKFLOW_REFERENCE') else 'WORKFLOW_REFERENCE_MAPPING',"severity":"error","nodeId":nid,"pointer":node_pointer(nid)+(error.pointer or ""),"message":str(error)})
+                            child_snapshot=references.environment_snapshot(reference['environmentRef'], references.root_environment_ref, root_snapshot)
+                            # A fixed reference is an independent Workflow boundary: its root
+                            # command cannot target the graph that invoked it. Embedded subgraphs
+                            # inside the target keep their ordinary parent-command semantics.
+                            nested=_validate_definition(target_definition,child_snapshot,environment_checks,parent=None,depth=depth+1,references=references,stack=reference_stack,root_snapshot=root_snapshot,budget=budget,direct_scope=False,reference_boundary=True)
+                            for diagnostic in nested["diagnostics"]: diagnostics.append({**diagnostic,"graphPath":[nid,*diagnostic.get("graphPath",[])]})
         if node["type"]=="control.send" and config.get("target") in nodes:
             pass
         if node["type"]=="core.router":
@@ -317,23 +403,43 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
         seen.add(nid); pending.extend(edge["to"] for edge in outgoing.get(nid,[]))
         if nodes.get(nid,{}).get("type")=="control.send": pending.append(nodes[nid]["config"].get("target"))
         pending.extend(nodes.get(nid,{}).get("config",{}).get("authoring",{}).get("command",{}).get("destinations",[]))
-        if nodes.get(nid,{}).get('type')=='core.subgraph':
-            pending.extend(t for cn in nodes[nid]['config']['graph']['nodes'] for t in cn['config'].get('authoring',{}).get('command',{}).get('destinations',[]) if cn['config'].get('authoring',{}).get('command',{}).get('graph')=='parent')
+        if nodes.get(nid,{}).get('type')=='core.subgraph' and isinstance(nodes[nid]['config'].get('graph'),dict):
+            pending.extend(t for cn in nodes[nid]['config']['graph'].get('nodes',[]) for t in cn.get('config',{}).get('authoring',{}).get('command',{}).get('destinations',[]) if cn.get('config',{}).get('authoring',{}).get('command',{}).get('graph')=='parent')
     for nid in set(nodes)-seen: diagnostics.append({"code":"UNREACHABLE_NODE","severity":"error","nodeId":nid,"message":"Node is unreachable"})
     if not any(nodes[nid]["type"]=="core.end" for nid in seen if nid in nodes): diagnostics.append({"code":"MISSING_END","severity":"error","message":"Reachable end required"})
     result={"valid":not any(item.get("severity")=="error" for item in diagnostics),"diagnostics":diagnostics,"requiredCapabilities":definition["requiredCapabilities"]}
     if result["valid"]:
         result["semanticHash"]=semantic_hash(definition)
+        if references is not None and references.targets:
+            result["referenceDigest"]=references.definition_digest()
         if environment_checks:
-            result["compileFingerprint"]=digest({"semanticHash":result["semanticHash"],"compilerVersion":VERSION,"dependencyManifest":DEPENDENCY_MANIFEST,"registryDigest":registry_snapshot["digest"],"functionVersions":_function_versions(definition,registry_snapshot)})
+            fingerprint={"semanticHash":result["semanticHash"],"compilerVersion":VERSION,"dependencyManifest":DEPENDENCY_MANIFEST,"registryDigest":registry_snapshot["digest"],"functionVersions":_function_versions(definition,registry_snapshot,references,root_snapshot=root_snapshot)}
+            if result.get("referenceDigest"): fingerprint["referenceDigest"]=result["referenceDigest"]
+            result["compileFingerprint"]=digest(fingerprint)
     return result
 
 
-def _function_versions(definition,snapshot):
+def _function_versions(definition,snapshot,references=None,root_snapshot=None,seen=None):
     from .execution_policies import function
     entries=[]
+    root_snapshot=snapshot if root_snapshot is None else root_snapshot
+    seen=seen if seen is not None else set()
     for node in definition['nodes']:
-        if node['type']=='core.subgraph': entries.extend(_function_versions(node['config']['graph'],snapshot))
+        if node['type']=='core.subgraph':
+            child=node['config'].get('graph')
+            if isinstance(child,dict):
+                entries.extend(_function_versions(child,snapshot,references,root_snapshot,seen))
+            elif references is not None:
+                try:
+                    reference=reference_config(node);target=references.target_for(reference)
+                except ExecutionError:
+                    target=None
+                if target is not None:
+                    identity=f"{target['workflowId']}:{target['revision']}:{target['environmentRef']}"
+                    if identity not in seen:
+                        seen.add(identity)
+                        child_snapshot=references.environment_snapshot(target['environmentRef'],references.root_environment_ref,root_snapshot)
+                        entries.extend(_function_versions(target['definition'],child_snapshot,references,root_snapshot,seen))
         cfg=node['config'];refs=[]
         if node['type']=='core.function' and cfg.get('implementation')=='registered': refs.append((cfg['functionRef'],cfg['functionVersion']))
         if cfg.get('authoring',{}).get('errorHandler'):
@@ -351,9 +457,10 @@ def validate_structure(definition, node_descriptors, operations):
               "capabilities":["serial","bounded-loop","llm","http","mcp","function","interrupt","checkpoint","parallel","join","send","command","subgraph"]}
     return _validate_definition(definition,snapshot,environment_checks=False)
 
-def compile_definition(definition, registry_snapshot):
+def compile_definition(definition, registry_snapshot, references=None):
     """Execution preflight always enforces frozen authorized catalog contracts."""
-    return _validate_definition(definition,registry_snapshot,environment_checks=True)
+    reference_set = references if isinstance(references, ReferenceSet) else ReferenceSet.from_snapshot(references if references is not None else registry_snapshot.get("workflowReferences"))
+    return _validate_definition(definition,registry_snapshot,environment_checks=True,references=reference_set)
 
 class NodeResult(dict):
     """Business result plus the unmerged update for native StateGraph channels."""
@@ -437,7 +544,11 @@ def graph_for(definition, execute, compile_fingerprint, *, checkpointer=None):
         async def call(state, runtime: Runtime, node_id=node.node_id):
             values=decode_state(definition,state)
             info=runtime.execution_info
-            identity={"taskId":info.task_id,"namespace":info.checkpoint_ns,"graphNamespace":info.checkpoint_ns.rsplit("|",1)[0] if "|" in info.checkpoint_ns else "","checkpointId":info.checkpoint_id or (SDK_SCOPE.get() or {}).get("parentCheckpoint"),"attempt":info.node_attempt,"graphPath":(SDK_SCOPE.get() or {}).get("graphPath",[]),"parentTaskId":(SDK_SCOPE.get() or {}).get("parentTaskId")} if info else None
+            scope=SDK_SCOPE.get() or {}
+            identity={"taskId":info.task_id,"namespace":info.checkpoint_ns,"graphNamespace":info.checkpoint_ns.rsplit("|",1)[0] if "|" in info.checkpoint_ns else "","checkpointId":info.checkpoint_id or scope.get("parentCheckpoint"),"attempt":info.node_attempt,"graphPath":scope.get("graphPath",[]),"parentTaskId":scope.get("parentTaskId"),"workflowId":scope.get("workflowId",definition.get("workflowId")),"revision":scope.get("revision",definition.get("revision")),"workflowPath":scope.get("workflowPath",[])} if info else None
+            if identity:
+                for key in ('workflowId','revision'):
+                    if identity.get(key) is None: identity.pop(key,None)
             token=SDK_EXECUTION.set(identity)
             message_token=SDK_MESSAGES.set(state.get("eduflow_provider_messages",{}))
             try:

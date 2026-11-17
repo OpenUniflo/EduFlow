@@ -15,7 +15,7 @@ def advanced_graph(d):
 
 
 def has_suspension(d):
-    return any(n.get('config',{}).get('authoring',{}).get('interrupt') or n['type']=='core.subgraph' and has_suspension(n['config']['graph']) for n in d.get('nodes',[])) or any(d.get('policy',{}).get('authoring',{}).get(k) for k in ('interruptBefore','interruptAfter'))
+    return any(n.get('config',{}).get('authoring',{}).get('interrupt') or n['type']=='core.subgraph' and isinstance(n.get('config',{}).get('graph'),dict) and has_suspension(n['config']['graph']) for n in d.get('nodes',[])) or any(d.get('policy',{}).get('authoring',{}).get(k) for k in ('interruptBefore','interruptAfter'))
 
 
 def validate_control(d):
@@ -38,7 +38,7 @@ def validate_control(d):
             for field,binding in command.get('update',{}).items():
                 if field not in d['state']['schema'].get('properties',{}): raise ExecutionError('INVALID_COMMAND','Unknown Command field')
                 binding_check(binding,('input','state','literal'))
-        if n['type']=='core.subgraph' and c.get('stateMode')=='shared' and any(cn['config'].get('authoring',{}).get('overwrite') for cn in c['graph']['nodes']):
+        if n['type']=='core.subgraph' and isinstance(c.get('graph'),dict) and c.get('stateMode')=='shared' and any(cn['config'].get('authoring',{}).get('overwrite') for cn in c['graph'].get('nodes',[])):
             raise ExecutionError('INVALID_OVERWRITE_COMBINATION','Explicit overwrite is not supported in shared child State transfer')
         if n['type']=='control.join':
             incoming={e['from'] for e in d['transitions'] if e['to']==n['id']}
@@ -49,7 +49,7 @@ def validate_control(d):
             if nodes[c['target']]['type']=='core.subgraph' and nodes[c['target']]['config'].get('persistence')=='per-thread': raise ExecutionError('INVALID_SUBGRAPH_PERSISTENCE','Concurrent Send requires per-invocation subgraph persistence')
             if c.get('itemKey') not in d['state']['schema'].get('properties',{}): raise ExecutionError('INVALID_SEND','Declare the Send item field in State')
             if not isinstance(c.get('items'),str) or not c['items'].startswith('/'): raise ExecutionError('INVALID_SEND','Send list requires State JSON Pointer')
-        if n['type']=='core.subgraph':
+        if n['type']=='core.subgraph' and isinstance(c.get('graph'),dict):
             child=c.get('graph',{})
             if c.get('persistence')=='stateless' and has_suspension(child): raise ExecutionError('INVALID_SUBGRAPH_PERSISTENCE','Stateless subgraphs cannot suspend; use per-invocation persistence')
             if len(str(child))>1500000: raise ExecutionError('DEFINITION_TOO_LARGE','Subgraph exceeds size budget')
@@ -80,7 +80,10 @@ def build_control_graph(definition, execute, compile_fingerprint, *, checkpointe
         async def call(state,runtime:Runtime,node=node):
             values=decode_state(definition,state); info=runtime.execution_info
             scope=SDK_SCOPE.get(); path=scope.get('graphPath',[]) if scope else []
-            identity={'taskId':info.task_id,'namespace':info.checkpoint_ns,'graphNamespace':info.checkpoint_ns.rsplit('|',1)[0] if '|' in info.checkpoint_ns else '', 'checkpointId':info.checkpoint_id or (SDK_SCOPE.get() or {}).get('parentCheckpoint'),'attempt':info.node_attempt,'graphPath':path,'parentTaskId':(scope or {}).get('parentTaskId')} if info else None
+            identity={'taskId':info.task_id,'namespace':info.checkpoint_ns,'graphNamespace':info.checkpoint_ns.rsplit('|',1)[0] if '|' in info.checkpoint_ns else '', 'checkpointId':info.checkpoint_id or (scope or {}).get('parentCheckpoint'),'attempt':info.node_attempt,'graphPath':path,'parentTaskId':(scope or {}).get('parentTaskId'),'workflowId':(scope or {}).get('workflowId',definition.get('workflowId')),'revision':(scope or {}).get('revision',definition.get('revision')),'workflowPath':(scope or {}).get('workflowPath',[])} if info else None
+            if identity:
+                for key in ('workflowId','revision'):
+                    if identity.get(key) is None: identity.pop(key,None)
             token=SDK_EXECUTION.set(identity); mt=SDK_MESSAGES.set(state.get('eduflow_provider_messages',{}))
             try: result=await execute(node,values)
             finally: SDK_EXECUTION.reset(token); SDK_MESSAGES.reset(mt)
@@ -95,6 +98,7 @@ def build_control_graph(definition, execute, compile_fingerprint, *, checkpointe
             cmd=node['config'].get('authoring',{}).get('command',{})
             if cmd.get('enabled'):
                 parent=cmd.get('graph')=='parent'
+                if parent and (scope or {}).get('fixedReference'): raise ExecutionError('WORKFLOW_REFERENCE_BOUNDARY','A fixed Workflow reference cannot control or write its parent graph','validation')
                 parent_def=scope.get('parentDefinition') if scope else None
                 targets={n['id']:'eduflow_node_'+str(i) for i,n in enumerate(sorted(parent_def['nodes'],key=lambda n:n['id']))} if parent and parent_def else names
                 if parent and not parent_def: raise ExecutionError('INVALID_COMMAND','Parent Command requires subgraph')

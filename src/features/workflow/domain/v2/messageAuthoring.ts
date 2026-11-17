@@ -9,12 +9,14 @@ export function withModelState(definition: WorkflowDefinitionV2): WorkflowDefini
   }
   return { ...definition, state: { ...definition.state, schema: { ...definition.state.schema, properties }, initial, reducers } };
 }
-export function insertAuthoringNode(current: WorkflowDocumentV2, node: WorkflowNodeV2, x: number, y: number): WorkflowDocumentV2 {
+export function insertAuthoringNode(current: WorkflowDocumentV2, node: WorkflowNodeV2, x: number, y: number, options: { defaultOutput?: boolean } = {}): WorkflowDocumentV2 {
   const empty = current.definition.nodes.every(item => ["core.start", "core.end"].includes(item.type));
   let definition = ["core.llm", "core.tool_dispatch"].includes(node.type) ? withModelState(current.definition) : current.definition;
-  const withOutput = withDefaultNodeOutput(definition, node);
-  definition = withOutput.definition;
-  node = withOutput.node;
+  if (options.defaultOutput !== false) {
+    const withOutput = withDefaultNodeOutput(definition, node);
+    definition = withOutput.definition;
+    node = withOutput.node;
+  }
   if (node.type === "core.llm" && empty && !Object.keys(definition.outputBindings).length) {
     // The first model node becomes the readable graph output; later nodes still write State.
     const field = Object.keys(node.writes)[0] ?? "answer";

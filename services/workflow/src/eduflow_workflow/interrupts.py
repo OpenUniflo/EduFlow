@@ -38,7 +38,7 @@ def response_patch_for(definition,node,response):
     return {target:response[source] for source,target in spec['resumeWrites'].items() if source in response}
 
 
-def validate_resume(definition,thread,responses,env):
+def validate_resume(definition,thread,responses,env,references=None):
     from .credentials import assert_no_secrets
     from .contracts import apply_patch
     if not isinstance(responses,dict): raise ExecutionError('INVALID_INTERRUPT_RESPONSE','Responses must be keyed by interrupt identity')
@@ -55,7 +55,13 @@ def validate_resume(definition,thread,responses,env):
         for node_id in item.get('graphPath',[]):
             parent=next((n for n in scoped['nodes'] if n['id']==node_id and n['type']=='core.subgraph'),None)
             if not parent: raise ExecutionError('INTERRUPT_ID_CONFLICT','Invalid frozen graph path')
-            scoped=parent['config']['graph']
+            embedded=parent['config'].get('graph')
+            if isinstance(embedded,dict):
+                scoped=embedded
+                continue
+            from .references import reference_config
+            if references is None: raise ExecutionError('INTERRUPT_ID_CONFLICT','Invalid frozen graph path')
+            scoped=references.target_for(reference_config(parent))['definition']
         node=next((n for n in scoped['nodes'] if n['id']==item['nodeId']),None)
         if not node or not node['config'].get('authoring',{}).get('interrupt'): raise ExecutionError('INTERRUPT_ID_CONFLICT','Interrupt no longer matches its frozen node')
         patch=response_patch_for(scoped,node,responses[item['id']])

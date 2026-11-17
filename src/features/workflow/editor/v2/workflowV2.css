@@ -67,7 +67,7 @@ body:has(.wf-library-page){min-width:0}
 .wf-floating-left,.wf-floating-tools{position:absolute;top:16px;z-index:9;display:flex;align-items:center;gap:var(--sp-8);max-width:calc(100% - 32px)}
 .wf-floating-left{left:16px}.wf-floating-tools{right:16px;padding:var(--sp-4);background:color-mix(in srgb, var(--surface) 93%, transparent);border:1px solid var(--wf-line);border-radius:var(--r-12);box-shadow:var(--sh-2)}
 .wf-floating-left>button,.wf-graph-crumb{background:var(--surface);border:1px solid var(--wf-line);box-shadow:var(--sh-2);border-radius:var(--r-12)}
-.wf-graph-crumb{display:flex;gap:1px;padding:3px;max-width:360px;overflow:auto}.wf-graph-crumb button{border:0;white-space:nowrap;font-size:var(--fs-12);padding:5px var(--sp-8)}
+.wf-graph-crumb{display:flex;align-items:center;gap:1px;padding:3px;max-width:420px;overflow:auto}.wf-graph-crumb button{border:0;white-space:nowrap;font-size:var(--fs-12);padding:5px var(--sp-8);border-radius:var(--r-8);color:var(--ink-2)}.wf-graph-crumb button:hover{background:var(--brand-soft);color:var(--brand-ink)}.wf-graph-crumb .wf-graph-back{display:inline-flex;align-items:center;gap:var(--sp-4);background:var(--brand-soft);color:var(--brand-ink);font-weight:var(--fw-600);padding:5px var(--sp-8)}.wf-graph-crumb .wf-graph-back:hover{background:color-mix(in srgb,var(--brand) 18%,var(--surface))}.wf-graph-crumb .wf-graph-back svg{flex:0 0 auto}.wf-graph-current{display:inline-flex;align-items:center;white-space:nowrap;font-size:var(--fs-12);font-weight:var(--fw-600);color:var(--ink-2);padding:5px var(--sp-8)}.wf-graph-separator{width:1px;align-self:stretch;margin:3px 2px;background:var(--line);flex:0 0 auto}
 .wf-floating-tools button{border-color:transparent;font-size:var(--fs-12);min-height:32px;padding:6px 9px}
 .wf-v2-palette{position:absolute;left:16px;top:72px;bottom:82px;width:236px;padding:var(--sp-16);border:1px solid var(--wf-line);border-radius:var(--r-16);box-shadow:var(--sh-2);z-index:8}
 .wf-v2-inspector{position:absolute;right:16px;top:72px;bottom:16px;width:min(var(--wf-inspector-width,480px),calc(100% - 32px));border:1px solid var(--wf-line);border-radius:var(--r-16);box-shadow:var(--sh-2);overflow:hidden;z-index:8}
@@ -109,7 +109,8 @@ body:has(.wf-library-page){min-width:0}
 .wf-library-notice{padding:9px var(--sp-12);background:var(--target-soft);color:color-mix(in srgb, var(--target) 54%, var(--ink));border-radius:var(--r-12)}.wf-library-pending{min-height:160px;padding:30px;text-align:center}
 .wf-v2-migration.wf-library-dialog{inset:auto;width:min(760px,calc(100vw - 40px));max-height:88dvh;margin:auto;padding:22px;box-sizing:border-box;top:50%;left:50%;transform:translate(-50%,-50%)}
 @media(max-width:900px){.wf-v2-migration.wf-library-dialog{max-height:calc(100dvh - var(--ef-mobile-nav-clearance) - var(--ef-mobile-nav-clearance));}}
-.wf-v2-migration.wf-action-dialog{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,calc(100vw - 32px));max-height:88dvh;margin:0;padding:var(--sp-20);box-sizing:border-box}.wf-v2-migration.wf-confirm-dialog{background:var(--surface)}
+.wf-v2-migration.wf-action-dialog{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,calc(100vw - 32px));max-height:88dvh;margin:0;padding:var(--sp-20);box-sizing:border-box}
+.wf-v2-migration.wf-leave-dialog{inset:auto;top:50%;left:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 32px));height:auto;max-height:calc(100dvh - var(--sp-48));margin:0;padding:var(--sp-20);box-sizing:border-box}.wf-v2-migration.wf-leave-dialog .wf-dialog-actions{bottom:calc(-1 * var(--sp-20))}.wf-v2-migration.wf-confirm-dialog{background:var(--surface)}
 .wf-v2-migration.wf-confirm-dialog .wf-v2-dialog-header,
 .wf-v2-migration.wf-confirm-dialog .wf-dialog-actions{background:var(--surface)}.wf-action-dialog .primary{background:var(--brand);color:var(--surface);border-color:var(--brand)}.wf-action-dialog .danger{color:var(--danger)}.wf-action-dialog .wf-dialog-actions .danger{background:var(--danger);color:var(--surface);border-color:var(--danger)}.wf-action-dialog p{margin:10px 0;line-height:1.7}.wf-confirm-list{margin:var(--sp-8) 0;padding-left:var(--sp-20);color:var(--danger)}.wf-confirm-list li{padding:2px 0}
 .wf-library-dialog .primary{background:var(--brand);color:var(--surface);border-color:var(--brand)}.wf-library-dialog button:disabled{opacity:.45;cursor:not-allowed}.wf-library-dialog button:focus-visible,.wf-library-dialog input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
@@ -130,11 +131,10 @@ body:has(.wf-library-page){min-width:0}
 main.atlas-page-shell.wf-library-page{padding:0}
 
 /* Response editing belongs to the waiting node; execution panels contain no forms. */
-.wf-unified .wf-response-bubble{width:320px;max-height:min(46vh,400px);padding:var(--sp-12) 14px;border:2px solid var(--brand);box-shadow:var(--sh-2);z-index:8;font-size:var(--fs-13);overflow:auto;overscroll-behavior:contain}
-.wf-response-bubble .wf-bubble-handle{position:sticky;top:0;background:var(--surface);z-index:2}
+.wf-response-bubble .wf-bubble-handle{flex:none;background:var(--surface)}
 .wf-response-bubble .wf-bubble-handle small{font-size:var(--fs-12);white-space:normal}
-.wf-node-response{margin-top:var(--sp-12);max-height:360px;overflow:auto;overscroll-behavior:contain}
-.wf-node-response>strong{display:block;font-size:var(--fs-16);line-height:1.5}
+.wf-node-response{display:flex;flex-direction:column;min-height:0;margin:0}
+.wf-node-response .wf-response-title{display:block;font-size:var(--fs-16);line-height:1.5}
 .wf-node-response fieldset{min-width:0;border:0;margin:0;padding:0}
 .wf-node-response .wf-form-tabs{justify-content:flex-end;margin:var(--sp-8) 0}
 .wf-node-response .wf-form-tabs>strong,.wf-node-response .wf-form-body>.wf-form-group>legend{display:none}
@@ -142,7 +142,6 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-node-response .wf-form-field>label{font-weight:var(--fw-600)}
 .wf-node-response input,.wf-node-response select,.wf-node-response textarea{font-size:var(--fs-14);min-height:38px}
 .wf-node-response small{font-size:var(--fs-12);line-height:1.5}
-.wf-node-response fieldset>button.primary{width:100%;margin-top:10px}
 .wf-thread-status{padding:var(--sp-12);border:1px solid var(--brand-soft);border-radius:var(--r-12);margin-bottom:var(--sp-12)}
 .wf-thread-status small{display:block;overflow-wrap:anywhere}
 .wf-thread-status button{margin:var(--sp-4) var(--sp-4) var(--sp-4) 0}
@@ -151,7 +150,6 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-wait-expired>strong{display:block;white-space:normal}
 .wf-wait-expired>p{margin:var(--sp-8) 0;line-height:1.65}
 .wf-wait-expired>details{display:block;margin-top:var(--sp-8)}
-.wf-node-response fieldset>button.primary{position:sticky;bottom:0;z-index:1}
 
 /* Keep the narrow response submit area clear without changing graph coordinates. */
 @media(max-width:600px){
@@ -574,7 +572,7 @@ main.atlas-page-shell.wf-library-page{padding:0}
 /* Floating canvas chrome. */
 .wf-floating-left{top:16px;left:16px;gap:var(--sp-8)}
 .wf-floating-left>button{min-height:40px;padding:7px 14px;border-radius:var(--r-12);font-size:var(--fs-13);box-shadow:var(--sh-1)}
-.wf-graph-crumb{border-radius:var(--r-12);overflow:hidden}
+.wf-graph-crumb{border-radius:var(--r-12);overflow-x:auto;overflow-y:hidden}
 .wf-floating-tools{top:16px;right:16px;padding:var(--sp-4);border:1px solid var(--line);border-radius:var(--r-12);background:var(--surface);gap:2px;box-shadow:var(--sh-1);z-index:9}
 .wf-floating-tools>button{height:32px;min-height:32px;padding:5px 11px;border:0;border-radius:var(--r-12);background:transparent;color:var(--ink-2);font-size:var(--fs-12)}
 .wf-floating-tools>button:hover{background:var(--brand-soft)}
@@ -735,10 +733,12 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-run-bubble-failure{margin:6px 10px 0;font-size:var(--fs-12);line-height:1.5;color:var(--danger)}
 .wf-run-bubble-footer{display:flex;align-items:center;gap:var(--sp-8);padding:6px 10px 7px;margin-top:5px;border-top:1px solid var(--line)}
 .wf-unified .wf-run-bubble-footer button{border:0;background:transparent;color:var(--brand-ink);padding:0;min-height:20px;font:inherit;font-size:var(--fs-12)}
-.wf-unified .wf-response-bubble{width:320px;padding:0;border:2px solid var(--brand);box-shadow:var(--sh-2);z-index:8;font-size:var(--fs-13);overflow:hidden;background:var(--surface)}
+.wf-unified .wf-response-bubble{display:flex;flex-direction:column;box-sizing:border-box;padding:0;border:2px solid var(--brand);box-shadow:var(--sh-2);z-index:11;font-size:var(--fs-13);overflow:hidden;background:var(--surface)}
 .wf-response-bubble .wf-bubble-handle{padding:var(--sp-8) 10px;border-bottom:1px solid var(--line)}
 .wf-response-bubble .wf-bubble-handle small{font-size:var(--fs-12)}
-.wf-response-bubble-body{padding:10px var(--sp-12);max-height:min(46vh,400px);overflow:auto;overscroll-behavior:contain}
+.wf-response-bubble-body{min-height:0;padding:10px var(--sp-12);overflow:auto;overscroll-behavior:contain;touch-action:pan-y}
+.wf-response-actions{display:grid;gap:var(--sp-4);flex:none;padding:var(--sp-8) var(--sp-12);border-top:1px solid var(--line);background:var(--surface)}
+.wf-response-actions>button{min-height:36px}
 
 /* Run summary and value rows shared by the run-data tab and data panel. */
 .wf-run-data-meta{display:flex;align-items:center;gap:var(--sp-8);font-size:var(--fs-12);color:var(--muted);flex-wrap:wrap}
@@ -819,6 +819,21 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-history-banner{top:76px;display:flex;align-items:center;gap:9px;background:var(--warn-soft);border:1px solid var(--line);border-radius:var(--r-full);padding:var(--sp-4) 6px var(--sp-4) 13px;box-shadow:var(--sh-1);font-size:var(--fs-12);white-space:nowrap}
 .wf-history-banner>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--warn)}
 .wf-unified .wf-history-banner>button{border:1px solid var(--warn);border-radius:var(--r-full);background:var(--surface);color:var(--warn);min-height:24px;padding:1px 9px;font:inherit;font-size:var(--fs-12);white-space:nowrap}
+.wf-history-banner.ready{background:var(--target-soft);border-color:color-mix(in srgb, var(--target) 22%, transparent)}
+.wf-history-banner.ready>span{color:color-mix(in srgb, var(--target) 58%, var(--ink))}
+.wf-unified .wf-history-banner.ready>button{border-color:var(--target);color:var(--target)}
+.wf-history-banner.failed{background:var(--danger-soft);border-color:color-mix(in srgb, var(--danger) 22%, transparent)}
+.wf-history-banner.failed>span{color:var(--danger)}
+.wf-unified .wf-history-banner.failed>button{border-color:var(--danger);color:var(--danger)}
+.wf-history-banner.running{background:var(--brand-soft);border-color:color-mix(in srgb, var(--brand) 22%, transparent)}
+.wf-history-banner.running>span{color:var(--brand-ink)}
+.wf-unified .wf-history-banner.running>button{border-color:var(--brand);color:var(--brand-ink)}
+.wf-history-banner.waiting{background:var(--warn-soft);border-color:color-mix(in srgb, var(--warn) 22%, transparent)}
+.wf-history-banner.waiting>span{color:var(--warn)}
+.wf-unified .wf-history-banner.waiting>button{border-color:var(--warn);color:var(--warn)}
+.wf-history-banner.cancelled,.wf-history-banner.neutral{background:var(--surface);border-color:var(--line)}
+.wf-history-banner.cancelled>span,.wf-history-banner.neutral>span{color:var(--muted)}
+.wf-unified .wf-history-banner.cancelled>button,.wf-unified .wf-history-banner.neutral>button{border-color:var(--line-strong);color:var(--muted)}
 
 /* Loading card centered in the viewport. */
 .wf-v2-loading{position:relative;padding:0;min-height:100dvh;background:var(--page);display:block}
@@ -963,6 +978,12 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-save-state{background:var(--target-soft);border:1px solid color-mix(in srgb, var(--target) 24%, transparent);border-radius:var(--r-full);padding:2px 8px;color:color-mix(in srgb, var(--target) 58%, var(--ink))}
 .wf-save-state.saving,.wf-save-state.dirty{background:var(--warn-soft);border-color:color-mix(in srgb, var(--warn) 22%, transparent);color:var(--warn)}
 .wf-save-state.failed{background:var(--danger-soft);border-color:color-mix(in srgb, var(--danger) 22%, transparent);color:var(--danger)}
+.wf-save-state.running{background:var(--brand-soft);border-color:color-mix(in srgb, var(--brand) 24%, transparent);color:var(--brand-ink)}
+.wf-save-state.running>i{background:var(--brand)}
+.wf-save-state.waiting{background:var(--warn-soft);border-color:color-mix(in srgb, var(--warn) 22%, transparent);color:var(--warn)}
+.wf-save-state.waiting>i{background:var(--warn)}
+.wf-save-state.cancelled,.wf-save-state.neutral{background:var(--surface);border-color:var(--line);color:var(--muted)}
+.wf-save-state.cancelled>i,.wf-save-state.neutral>i{background:var(--muted)}
 .wf-variable-environment{border-color:var(--line);border-radius:var(--r-12);background:var(--surface);box-shadow:var(--sh-1)}
 .wf-variable-environment-badge{background:var(--target-soft);color:color-mix(in srgb, var(--target) 58%, var(--ink));border-radius:var(--r-8)}
 .wf-variable-environment-divider{background:var(--line)}
@@ -1347,3 +1368,37 @@ main.atlas-page-shell.wf-library-page{padding:0}
   .wf-v2-inspector{top:calc(var(--wf-floating-bottom,102px) + 8px);bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--sp-4))}
   .wf-history-dock{bottom:calc(var(--ef-mobile-nav-clearance,88px) + var(--sp-4))}
 }
+
+/* Narrow graph chrome: the workspace tools stay a compact right-aligned strip
+   and the subgraph path gets its own row, so "返回调用节点" is never covered. */
+@media(max-width:900px){
+  .wf-floating-left{right:184px;flex-wrap:wrap;align-items:flex-start}
+  .wf-floating-tools,
+  .wf-v2-body:has(.wf-v2-inspector:not(.closed)) .wf-floating-tools,
+  .wf-v2-workspace:has(.wf-resource-panel) .wf-floating-tools{left:auto;right:12px;width:auto;max-width:calc(100% - 32px)}
+  .wf-graph-crumb{flex:0 0 100%;max-width:100%}
+  .wf-graph-crumb .wf-graph-back{min-height:32px}
+}
+
+/* Archive uses the library dialog chrome but needs room for blocking chains. */
+.wf-v2-migration.wf-library-dialog.wf-archive-dialog{width:min(680px,calc(100vw - 32px));}
+@media(max-width:900px){.wf-v2-migration.wf-library-dialog.wf-archive-dialog{width:calc(100vw - 24px);max-height:calc(100dvh - 24px)}}
+
+/* Run history: fixed-reference trace and non-shrinking notice actions. */
+.wf-v2-notice:not(.wf-v2-env-notice)>span,.wf-v2-alert>span{flex:1;min-width:0}
+.wf-v2-notice>button,.wf-v2-alert>button{flex:0 0 auto;white-space:nowrap}
+.wf-run-reference-summary{margin:8px 0 0;color:var(--muted);font-size:var(--fs-12);line-height:1.6;overflow-wrap:anywhere}
+.wf-subgraph-invocations h5{margin:14px 0 6px;font-size:var(--fs-12);font-weight:var(--fw-600);color:var(--ink-2)}
+.wf-subgraph-invocations h6{margin:10px 0 4px;font-size:var(--fs-12);font-weight:var(--fw-500);color:var(--muted)}
+.wf-subgraph-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-8);margin:var(--sp-8) 0}
+.wf-subgraph-actions button{min-height:28px;padding:4px var(--sp-8);font-size:var(--fs-12);white-space:nowrap}
+.wf-subgraph-actions .wf-field-note{flex:1 1 240px;min-width:0;margin:0}
+.wf-subgraph-error{margin:var(--sp-8) 0;padding:var(--sp-8) 10px;border:1px solid color-mix(in srgb,var(--danger) 26%,var(--line));border-radius:var(--r-8);background:var(--danger-soft);color:var(--danger);font-size:var(--fs-12);line-height:1.6;overflow-wrap:anywhere}
+.wf-subgraph-invocations .wf-data-fields dd .wf-data-text{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:900px){.wf-subgraph-actions button{flex:1 1 auto;max-width:100%;white-space:normal;text-align:center}.wf-run-reference-summary{max-width:100%}}
+.wf-run-ref-tag{border:1px solid var(--line);border-radius:var(--r-full);padding:1px 7px;color:var(--brand-ink);background:var(--brand-soft);font-size:var(--fs-12);white-space:nowrap}
+.wf-graph-reference-version{font-size:var(--fs-12);font-weight:var(--fw-400);color:var(--muted);white-space:nowrap}
+@media(max-width:900px){.wf-graph-reference-version{white-space:normal}}
+.wf-graph-crumb .wf-graph-current{flex-wrap:wrap;white-space:normal;min-width:0}
+.wf-graph-crumb .wf-graph-reference-version{white-space:normal}
+.wf-subgraph-target-id{display:block;margin-top:2px;font-size:var(--fs-12);color:var(--muted);word-break:break-all}

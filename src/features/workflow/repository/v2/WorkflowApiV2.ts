@@ -1,6 +1,7 @@
 import { apiRequest as sharedApiRequest, ApiRequestError, ApiResponseError } from "@/shared/api/apiClient";
 import { z } from "zod";
-import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow, McpMarketPage, McpMarketSync, McpOAuthDiscovery, WorkflowEvaluation, WorkflowEvaluationConfig } from "../../domain/v2/types";
+import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow, McpMarketPage, McpMarketSync, McpOAuthDiscovery, WorkflowEvaluation, WorkflowEvaluationConfig, WorkflowReferenceItem, WorkflowReferencedByResult } from "../../domain/v2/types";
+import type { RunReferenceSnapshot } from "../../domain/v2/runReferences";
 
 const endpoint = (resource: string, query: Record<string, string | number | undefined> = {}) => `/api/workflows?${new URLSearchParams({ resource, ...Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) })}`;
 const runSubmissionReceipt = z.object({
@@ -48,7 +49,18 @@ export function workflowErrorMessage(reason: unknown): string {
     CONNECTION_BUSY: "仍有未完成或等待回应的运行正在使用此连接。请先等待运行结束或取消运行，再删除。",
     INVALID_CONNECTION_REFERENCE: "工作流中的连接引用格式无效。请先打开原工作流，在节点中重新选择连接后再复制或保存。",
     ENVIRONMENT_REQUIRED: "保存前请选择运行环境，以便校验工作流引用的连接。",
-    CONNECTION_IN_USE: "此供应商仍被当前工作流引用，不能删除。请先替换或移除这些引用，再重试。",
+    CONNECTION_IN_USE: "此连接仍被当前工作流引用，不能删除。请先替换或移除这些引用，再重试。",
+    FUNCTION_IN_USE: "此函数仍被当前工作流引用，不能删除。请先替换或移除这些引用，再重试。",
+    FUNCTION_BUSY: "仍有未完成或等待回应的运行正在使用此函数。请先等待运行结束或取消运行，再删除。",
+    FUNCTION_VERSION_CONFLICT: "函数已被其他操作更新，请刷新确认后再试。",
+    INVALID_SUBGRAPH_REFERENCE: "子图引用无效：请只保留内嵌子图或固定版本引用之一，并填写目标修订与运行环境。",
+    WORKFLOW_REFERENCE_UNAVAILABLE: "固定版本引用的目标工作流或修订不存在，或当前账号无权访问。",
+    WORKFLOW_REFERENCE_ARCHIVED: "目标工作流已归档，不能继续被引用。请选择可用修订或移除引用。",
+    WORKFLOW_REFERENCE_MAPPING: "引用的输入或输出映射与目标修订的接口不兼容，请重新选择字段。",
+    WORKFLOW_REFERENCE_CYCLE: "固定版本引用形成循环，无法保存。请调整引用链后再试。",
+    WORKFLOW_REFERENCE_LIMIT: "固定版本引用层级或规模超过上限，请减少嵌套或拆分流程。",
+    WORKFLOW_REFERENCE_ENVIRONMENT: "引用指定的目标运行环境当前不可用，请选择已授权环境。",
+    WORKFLOW_REFERENCED: "此工作流仍被当前修订固定引用，不能归档或删除。请先更新引用它的工作流。",
     CONNECTION_VERSION_CONFLICT: "供应商已被其他操作更新，请刷新确认后再试。",
     CONNECTION_NOT_DISABLED: "此连接已恢复可用，无需再次恢复。",
     CONNECTION_DISABLED: "此连接已停用，请先恢复连接再修改名称或测试。",
@@ -119,6 +131,10 @@ export class WorkflowApiV2 {
   template(templateId: string, purpose?: "starter" | "course") { return apiRequest<WorkflowTemplateDetail>(endpoint("templates", { id: templateId, purpose })); }
   useTemplate(templateId: string, options: {name?:string;fresh?:boolean;creationId?:string;environmentRef?:string;bindings?:{nodeId:string;graphPath:string[];field:"providerRef"|"toolRef";reference:string;modelRef?:string;contractDigest?:string}[]} = {}) { return jsonRequest<{workflowId:string;revision:number}>("definitions","POST",{templateId,...options},{op:"template"}); }
   get(workflowId: string, revision?: number) { return apiRequest<WorkflowDocumentV2>(endpoint("definitions", { id: workflowId, revision })); }
+  /** Outgoing fixed references of one source revision, including target name/current revision/availability. */
+  references(workflowId: string, revision?: number) { return apiRequest<{ workflowId: string; revision: number; items: WorkflowReferenceItem[] }>(endpoint("definitions", { id: workflowId, op: "references", revision }), { cache: "no-store" }); }
+  /** Incoming current-closure relationships. Historical index rows are not used by the Works detail. */
+  referencedBy(workflowId: string, revision?: number) { return apiRequest<WorkflowReferencedByResult>(endpoint("definitions", { id: workflowId, op: "referenced-by", revision }), { cache: "no-store" }); }
   create(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, creationId?: string, environmentRef?: string) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "POST", { definition, editor, ...(creationId ? {creationId} : {}), ...(environmentRef ? {environmentRef} : {}) }); }
   save(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, baseRevision: number, baseEditorRevision: number, environmentRef: string) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "PUT", { definition, editor, baseRevision, baseEditorRevision, environmentRef }, { id: definition.workflowId }); }
   saveEditor(editor: EditorDocumentV2, baseEditorRevision: number) { return jsonRequest<{ editorRevision: number }>("editor", "PUT", { editor, baseEditorRevision }, { id: editor.workflowId }); }
@@ -170,6 +186,8 @@ export class WorkflowApiV2 {
     return receipt.data;
   }
   run(runId: string) { return apiRequest<WorkflowRunV2>(endpoint("runs", { id: runId })); }
+  /** Exact launch-time fixed-reference closure of one owner-authorized Run. */
+  runReferences(runId: string) { return apiRequest<RunReferenceSnapshot>(endpoint("runs", { id: runId, op: "references" }), { cache: "no-store" }); }
   history(workflowId: string) { return apiRequest<{ items: WorkflowRunV2[] }>(endpoint("runs", { workflowId })); }
   events(runId: string, afterSeq = 0) { return apiRequest<{ events: WorkflowEventV2[]; nextSeq: number; hasMore: boolean; status: string; gap?:boolean }>(endpoint("events", { runId, afterSeq, limit: 100 })); }
   async steps(runId: string) {

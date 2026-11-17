@@ -68,3 +68,35 @@ it("renders expand, duplicate, delete and close actions from props", () => {
   expect(html).toContain("关闭节点面板");
   expect(render()).not.toContain("展开为大窗口");
 });
+
+it("offers the subgraph canvas as a labelled panel action below the header", () => {
+  const html = render({ subgraphNav: { label: "进入子图编辑", description: "打开子图独立画布；返回时恢复此节点、面板与视图", onClick: vi.fn() } });
+  const headerEnd = html.indexOf("wf-nodepanel-header");
+  const action = html.indexOf("wf-nodepanel-subgraph-enter");
+  expect(headerEnd).toBeGreaterThan(-1);
+  expect(action).toBeGreaterThan(headerEnd);
+  expect(html).toContain("进入子图编辑");
+  expect(html).toContain("返回时恢复此节点、面板与视图");
+  expect(html).toContain("wf-nodepanel-subgraph-icon");
+  expect(render()).not.toContain("wf-nodepanel-subgraph-enter");
+});
+
+it("labels a fixed call as 调用工作流 and keeps embedded graphs as 子图", () => {
+  const call = createNodeV2("core.subgraph", "node-call");
+  call.label = "调用客服";
+  call.config = { workflowRef: { workflowId: "target", revision: 2 }, environmentRef: "local", stateMode: "independent", persistence: "per-invocation" };
+  const html = renderToStaticMarkup(createElement(NodePanel, {
+    node: call,
+    readOnly: false,
+    activeTab: "config",
+    onTabChange: vi.fn(),
+    showRunData: false,
+    sections: [],
+    onRename: vi.fn(),
+    onClose: vi.fn(),
+    subgraphNav: { label: "打开目标工作流", description: "固定版本 2", onClick: vi.fn() },
+  }));
+  expect(html).toContain("调用工作流");
+  expect(html).not.toContain(">子图<");
+  expect(html).toContain("打开目标工作流");
+});

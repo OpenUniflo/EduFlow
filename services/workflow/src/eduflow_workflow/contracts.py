@@ -11,9 +11,9 @@ from importlib.metadata import version as dependency_version
 from pathlib import Path
 DEPENDENCY_MANIFEST = {"serviceVersion": VERSION, "packages": {name: dependency_version(name) for name in ("langgraph", "langgraph-checkpoint", "langgraph-prebuilt", "langgraph-checkpoint-postgres", "langchain-deepseek", "langchain-core", "mcp", "jsonschema", "rfc8785", "psycopg", "httpx", "httpcore", "socksio", "openai", "langchain-openai", "vercel-sandbox", "vercel-oidc")}}
 # Import-time identity tracks the actual loaded build, not future on-disk edits.
-DEPENDENCY_MANIFEST["executorDigest"] = hashlib.sha256(b"".join((Path(__file__).parent/name).read_bytes() for name in ("contracts.py", "compiler.py", "runtime.py", "tools.py", "registry.py", "messages.py", "prompts.py", "storage.py", "credentials.py", "telemetry.py", "support.py", "checkpoints.py", "interrupts.py", "graph_control.py", "execution_policies.py", "sandbox.py", "extensions.py", "cli.py", "session_memory_history.py", "operations.py", "cloud_sandbox.py", "cloud_launcher.py"))).hexdigest()
-KEYWORDS = {"type", "properties", "required", "additionalProperties", "items", "enum", "const", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "$defs", "$ref", "title", "description", "default", "$schema"}
-DEFAULT_POLICY = {"timeoutMs": 120000, "nodeTimeoutMs": 30000, "maxNodeExecutions": 50, "maxToolCalls": 10, "maxInputBytes": 65536, "maxStateBytes": 1048576, "maxEventBytes": 65536, "maxOutputTokens": 2048, "maxAttempts": 1}
+DEPENDENCY_MANIFEST["executorDigest"] = hashlib.sha256(b"".join((Path(__file__).parent/name).read_bytes() for name in ("contracts.py", "compiler.py", "runtime.py", "references.py", "model_transport.py", "tools.py", "registry.py", "messages.py", "prompts.py", "storage.py", "credentials.py", "telemetry.py", "support.py", "checkpoints.py", "interrupts.py", "graph_control.py", "execution_policies.py", "sandbox.py", "extensions.py", "cli.py", "session_memory_history.py", "operations.py", "cloud_sandbox.py", "cloud_launcher.py"))).hexdigest()
+KEYWORDS = {"type", "properties", "required", "additionalProperties", "items", "anyOf", "enum", "const", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties", "$defs", "$ref", "title", "description", "default", "examples", "$schema"}
+DEFAULT_POLICY = {"timeoutMs": 120000, "nodeTimeoutMs": 30000, "maxNodeExecutions": 50, "maxToolCalls": 10, "maxInputBytes": 65536, "maxStateBytes": 1048576, "maxEventBytes": 65536, "maxAttempts": 1}
 HARD_LIMITS = {**DEFAULT_POLICY, "timeoutMs": 600000, "nodeTimeoutMs": 120000, "maxNodeExecutions": 200, "maxToolCalls": 50, "maxOutputTokens": 8192}
 
 class ExecutionError(Exception):
@@ -92,6 +92,9 @@ def schema_check(schema, root=None, stack=()):
         schema_check(pointer(root, ref[1:]), root, (*stack, ref))
     for value in schema.get("properties", {}).values(): schema_check(value, root, stack)
     for value in schema.get("$defs", {}).values(): schema_check(value, root, stack)
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        for value in any_of: schema_check(value, root, stack)
     for key in ("items", "additionalProperties"):
         if isinstance(schema.get(key), dict): schema_check(schema[key], root, stack)
     jsonschema.Draft202012Validator.check_schema(schema)

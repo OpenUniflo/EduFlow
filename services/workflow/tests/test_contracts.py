@@ -105,6 +105,28 @@ def test_hash_presentation_and_order():
 def test_schema_supported(schema,value):
     schema_check(schema);validate_value(schema,value)
 
+def test_anyof_and_examples_are_supported_with_branch_validation():
+    schema={"anyOf":[{"type":"string"},{"type":"integer"},{"type":"null"}],"examples":["151252",151252,None]}
+    schema_check(schema)
+    for value in ("151252",151252,None): validate_value(schema,value)
+    with pytest.raises(ExecutionError): validate_value(schema,True)
+    with pytest.raises(ExecutionError): validate_value(schema,1.5)
+    annotated={"type":"number","examples":["annotation is not validation input"]}
+    schema_check(annotated);validate_value(annotated,3)
+
+def test_anyof_keeps_offline_reference_boundaries():
+    local={"$defs":{"N":{"type":"number"}},"anyOf":[{"$ref":"#/$defs/N"}]}
+    schema_check(local);validate_value(local,3)
+    with pytest.raises(ExecutionError) as remote:
+        schema_check({"anyOf":[{"$ref":"https://example.org/schema"}]})
+    assert remote.value.code=="UNSUPPORTED_SCHEMA"
+    with pytest.raises(ExecutionError) as recursive:
+        schema_check({"$defs":{"A":{"anyOf":[{"$ref":"#/$defs/A"}]}},"$ref":"#/$defs/A"})
+    assert recursive.value.code=="UNSUPPORTED_SCHEMA"
+    with pytest.raises(ExecutionError) as unsupported:
+        schema_check({"anyOf":[{"type":"string","pattern":".*"}]})
+    assert unsupported.value.code=="UNSUPPORTED_SCHEMA"
+
 @pytest.mark.parametrize("schema",[{"format":"email"},{"pattern":"x"},{"$ref":"https://example.org/schema"},{"$defs":{"A":{"$ref":"#/$defs/A"}},"$ref":"#/$defs/A"}])
 def test_schema_unsupported(schema):
     with pytest.raises(ExecutionError):schema_check(schema)

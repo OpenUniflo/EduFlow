@@ -1,4 +1,5 @@
 import type { JsonSchema, JsonValue, WorkflowDiagnostic, WorkflowDefinitionV2, WorkflowRunV2, WorkflowStepV2 } from "../../domain/v2/types";
+import { nodeAtGraphPath } from "../../domain/v2/authoring";
 const explanations: Record<string, [string,string]> = {
   INVALID_RUN_INPUT: ["外部调用数据不符合要求", "请补齐标记的必填字段，并检查输入格式。"],
   INVALID_OUTLETS: ["节点出口尚未连接完整", "为每个出口选择一个下游节点；同一出口只连接一次。"],
@@ -71,12 +72,19 @@ export function diagnosticText(item: WorkflowDiagnostic, definition: WorkflowDef
 export function runFailureTarget(run: WorkflowRunV2, steps: WorkflowStepV2[], definition?: WorkflowDefinitionV2) {
   if (run.status !== "failed" || !definition) return undefined;
   const error = run.error;
-  const step = [...steps].reverse().find(item => item.runId === run.runId && item.status === "failed");
+  // The deepest failed Step is the concrete internal failure, even when its
+  // parent subgraph call also recorded a failure. Path length is evidence, not
+  // a guess; equal depths keep the latest observed attempt.
+  const failed = steps
+    .filter(item => item.runId === run.runId && item.status === "failed")
+    .sort((left, right) => (right.graphPath?.length ?? 0) - (left.graphPath?.length ?? 0) || (right.startedAt ?? "").localeCompare(left.startedAt ?? "") || (right.invocation ?? 0) - (left.invocation ?? 0));
+  const step = failed[0];
   const context = error?.stage === "input_resolution" && error.nodeId && Number.isInteger(error.invocation) && error.invocation! > 0
-    ? { nodeId: error.nodeId, invocation: error.invocation!, beforeExecution: true, pointer: error.pointer }
-    : step ? { nodeId: step.nodeId, invocation: step.invocation, beforeExecution: false, pointer: undefined } : undefined;
-  const node = definition.nodes.find(node => node.id === context?.nodeId);
-  return context && node ? { ...context, label: node.label } : undefined;
+    ? { nodeId: error.nodeId, invocation: error.invocation!, beforeExecution: true, pointer: error.pointer, graphPath: Array.isArray(error.graphPath) ? error.graphPath : [] }
+    : step ? { nodeId: step.nodeId, invocation: step.invocation, beforeExecution: false, pointer: undefined, graphPath: step.graphPath ?? step.execution?.graphPath ?? [] } : undefined;
+  const node = context ? nodeAtGraphPath(definition, context.graphPath, context.nodeId) : undefined;
+  if (!context || !node) return undefined;
+  return { ...context, label: node.label, ...(step?.execution?.workflowPath ? { workflowPath: step.execution.workflowPath } : {}) };
 }
 
 // Compiler pointers address Definition V2; they are distinct from this run's input pointers.

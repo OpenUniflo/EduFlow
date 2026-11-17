@@ -32,6 +32,17 @@
 .wf-nodepanel-info p{margin:3px 0;display:flex;justify-content:space-between;gap:10px}
 .wf-nodepanel-info code{color:var(--ink-2);font-size:var(--fs-12)}
 .wf-nodepanel-tabs{display:flex;gap:var(--sp-20);padding:0 var(--sp-16);border-bottom:1px solid var(--line);flex-shrink:0}
+/* Subgraph entry: a full-width action between the node header and its tabs.
+   It never overlaps the title or close action and stays visible on every tab. */
+.wf-nodepanel-subgraph{padding:10px var(--wf-panel-pad);border-bottom:1px solid var(--line);background:color-mix(in srgb, var(--brand-soft) 60%, transparent);flex-shrink:0}
+.wf-unified button.wf-nodepanel-subgraph-enter{width:100%;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid color-mix(in srgb, var(--brand) 22%, transparent);border-radius:var(--r-12);background:var(--surface);color:var(--ink);padding:9px 10px;min-height:50px;cursor:pointer;box-shadow:var(--sh-1);transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)}
+.wf-unified button.wf-nodepanel-subgraph-enter:hover:not(:disabled){background:var(--brand-soft);border-color:color-mix(in srgb, var(--brand) 38%, transparent);box-shadow:var(--sh-2)}
+.wf-unified button.wf-nodepanel-subgraph-enter:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.wf-nodepanel-subgraph-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:0 0 32px;border-radius:var(--r-8);background:var(--brand-soft);color:var(--brand-ink)}
+.wf-nodepanel-subgraph-copy{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.wf-nodepanel-subgraph-copy strong{font-size:var(--fs-13);font-weight:var(--fw-600);color:var(--brand-ink);line-height:1.4}
+.wf-nodepanel-subgraph-copy small{font-size:var(--fs-12);color:var(--muted);line-height:1.45;overflow-wrap:anywhere}
+.wf-nodepanel-subgraph-chevron{flex:0 0 auto;color:var(--brand-ink)}
 .wf-unified .wf-nodepanel-tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);min-height:37px;padding:0 2px;font-size:var(--fs-13);cursor:pointer}
 .wf-unified .wf-nodepanel-tabs button:hover:not(:disabled){background:transparent;color:var(--ink-2)}
 .wf-unified .wf-nodepanel-tabs button.active{color:var(--brand-ink);border-bottom-color:var(--brand);font-weight:var(--fw-600)}

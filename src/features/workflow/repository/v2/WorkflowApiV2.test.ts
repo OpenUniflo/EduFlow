@@ -175,3 +175,30 @@ describe("Variable environment contract (M13)", () => {
     expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=runs&id=ca72a44b-7a80-47b1-a93b-451775c03ddb");
   });
 });
+
+describe("Workflow relationship reads", () => {
+  beforeEach(() => request.mockReset());
+
+  it("reads the current incoming closure without substituting a target revision", async () => {
+    request.mockResolvedValueOnce({ workflowId: "workflow-id", mode: "current-closure", items: [] });
+    await expect(new WorkflowApiV2().referencedBy("workflow-id")).resolves.toMatchObject({ mode: "current-closure" });
+    expect(request).toHaveBeenCalledWith("/api/workflows?resource=definitions&id=workflow-id&op=referenced-by", { cache: "no-store" });
+  });
+
+  it("reads one exact source revision for outgoing pins and bypasses a stale cache", async () => {
+    request.mockResolvedValueOnce({ workflowId: "workflow-id", revision: 3, items: [] });
+    await expect(new WorkflowApiV2().references("workflow-id", 3)).resolves.toMatchObject({ revision: 3 });
+    expect(request).toHaveBeenCalledWith("/api/workflows?resource=definitions&id=workflow-id&op=references&revision=3", { cache: "no-store" });
+  });
+});
+
+describe("Run reference history request", () => {
+  beforeEach(() => request.mockReset());
+  it("requests the exact owner-scoped Run snapshot endpoint without caching", async () => {
+    request.mockResolvedValueOnce({ available: true, targets: [], environments: [] });
+    await new WorkflowApiV2().runReferences("ca72a44b-7a80-47b1-a93b-451775c03ddb");
+    const [path, init] = request.mock.calls[0];
+    expect(path).toBe("/api/workflows?resource=runs&id=ca72a44b-7a80-47b1-a93b-451775c03ddb&op=references");
+    expect(init).toMatchObject({ cache: "no-store" });
+  });
+});

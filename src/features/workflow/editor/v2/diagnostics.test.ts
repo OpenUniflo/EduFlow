@@ -13,6 +13,17 @@ it("locates a real pre-Step input failure only in its immutable execution defini
   expect(runFailureTarget(run, [], { ...definition, nodes: [] })).toBeUndefined();
   expect(runFailureTarget({ ...run, status: "success" }, [], definition)).toBeUndefined();
 });
+it("locates the deepest internal failure through the execution graph path", () => {
+  const child = createWorkflowV2("子流程");
+  child.nodes.push({ ...createNodeV2("core.transform", "inner"), label: "内部处理" });
+  const parent = { ...definition, nodes: [...definition.nodes, { ...createNodeV2("core.subgraph", "group"), label: "调用组", config: { graph: child } }] };
+  const run = { runId: "run", status: "failed", error: { code: "NODE_EXECUTION_FAILED" } } as WorkflowRunV2;
+  const steps = [
+    { stepId: "parent", runId: "run", nodeId: "group", invocation: 4, attempt: 1, status: "failed", graphPath: [], startedAt: "2026-01-01T00:00:02Z" },
+    { stepId: "child", runId: "run", nodeId: "inner", invocation: 5, attempt: 1, status: "failed", graphPath: ["group"], startedAt: "2026-01-01T00:00:01Z" },
+  ] as WorkflowStepV2[];
+  expect(runFailureTarget(run, steps, parent)).toMatchObject({ nodeId: "inner", label: "内部处理", graphPath: ["group"], invocation: 5 });
+});
 it("keeps historical failed invocation identity and never guesses a node for legacy or system failures", () => {
   const run = { runId: "run", status: "failed", error: { code: "TIMEOUT" } } as WorkflowRunV2;
   const steps = [1, 3].map(invocation => ({ stepId: `step${invocation}`, runId: "run", nodeId: "start", invocation, status: "failed" } as WorkflowStepV2));

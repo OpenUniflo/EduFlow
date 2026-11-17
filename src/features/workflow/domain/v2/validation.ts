@@ -15,9 +15,10 @@ function executionSchema(schema: JsonSchema): JsonSchema {
   for (const key of ["items", "additionalProperties"]) {
     const child = normalized[key]; if (child && typeof child === "object" && !Array.isArray(child)) normalized[key] = executionSchema(child);
   }
+  if (Array.isArray(normalized.anyOf)) normalized.anyOf = normalized.anyOf.map(value => value && typeof value === "object" && !Array.isArray(value) ? executionSchema(value) : value);
   return normalized;
 }
-const allowedKeywords = new Set(["$schema", "$defs", "$ref", "title", "description", "default", "type", "properties", "required", "additionalProperties", "items", "enum", "const", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties"]);
+const allowedKeywords = new Set(["$schema", "$defs", "$ref", "title", "description", "default", "examples", "type", "properties", "required", "additionalProperties", "items", "anyOf", "enum", "const", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minLength", "maxLength", "minItems", "maxItems", "minProperties", "maxProperties"]);
 export function schemaDiagnostics(schema: JsonSchema, pointer = ""): WorkflowDiagnostic[] {
   const diagnostics: WorkflowDiagnostic[] = [];
   const references = new Set<string>();
@@ -28,6 +29,10 @@ export function schemaDiagnostics(schema: JsonSchema, pointer = ""): WorkflowDia
       if (!allowedKeywords.has(key) && !key.startsWith('x-')) diagnostics.push({ code: "UNSUPPORTED_SCHEMA_KEYWORD", severity: "error", pointer: `${path}/${key}`, message: `M1 不支持 Schema 关键字 ${key}。` });
       if (key === "$ref" && (typeof child !== "string" || !child.startsWith("#/$defs/"))) diagnostics.push({ code: "UNSUPPORTED_SCHEMA_REFERENCE", severity: "error", pointer: `${path}/$ref`, message: "仅支持本地 $defs 引用。" });
       if ((key === "properties" || key === "$defs") && child && typeof child === "object") for (const [name, nested] of Object.entries(child)) visit(nested, `${path}/${key}/${name}`);
+      if (key === "anyOf") {
+        if (!Array.isArray(child)) diagnostics.push({ code: "INVALID_SCHEMA", severity: "error", pointer: `${path}/anyOf`, message: "Schema 的 anyOf 必须是数组。" });
+        else child.forEach((nested, index) => visit(nested, `${path}/anyOf/${index}`));
+      }
       if (key === "items" || (key === "additionalProperties" && typeof child !== "boolean")) visit(child, `${path}/${key}`);
     }
   }
@@ -41,6 +46,7 @@ export function schemaDiagnostics(schema: JsonSchema, pointer = ""): WorkflowDia
     }
     if (record.properties && typeof record.properties === "object") Object.values(record.properties).forEach(nested => inspectReferences(nested, active));
     if (record.$defs && typeof record.$defs === "object") Object.values(record.$defs).forEach(nested => inspectReferences(nested, active));
+    if (Array.isArray(record.anyOf)) record.anyOf.forEach(nested => inspectReferences(nested, active));
     inspectReferences(record.items, active); inspectReferences(record.additionalProperties, active);
   }
   visit(schema, pointer); inspectReferences(schema, new Set());
