@@ -192,6 +192,23 @@ describe("Service-authenticated compiler requests", () => {
       .rejects.toMatchObject({ status: 409, code: "CONNECTION_IN_USE" });
   });
 
+  it("maps function reference and busy conflicts to a retryable 409", async () => {
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "http://127.0.0.1:18110");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "internal-token");
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: "FUNCTION_IN_USE", message: "referenced", category: "validation" } }),
+    })));
+    await expect(workflowCompiler("/v1/extensions", { action: "delete", kind: "function" }))
+      .rejects.toMatchObject({ status: 409, code: "FUNCTION_IN_USE" });
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: "FUNCTION_BUSY", message: "run active", category: "validation" } }),
+    })));
+    await expect(workflowCompiler("/v1/extensions", { action: "delete", kind: "function" }))
+      .rejects.toMatchObject({ status: 409, code: "FUNCTION_BUSY" });
+  });
+
   it("maps an unfinished-run deletion conflict to 409", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: false, status: 422,

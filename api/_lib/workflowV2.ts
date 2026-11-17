@@ -374,7 +374,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       json(response, 200, { ...market, canAdmin: await mcpAdministrator(client, owner) }); return true;
     }
     if (request.method === "POST") {
-      const body = workflowStrictBody(request.body, ["action", "maxPages", "title", "name", "description", "url", "category", "sourceId", "transport", "authHint", "version", "iconUrl", "websiteUrl", "repositoryUrl", "featured", "id"], ["action"]);
+      const body = workflowStrictBody(request.body, ["action", "maxPages", "title", "name", "description", "url", "category", "sourceId", "transport", "authHint", "connectMode", "oauthScopes", "version", "iconUrl", "websiteUrl", "repositoryUrl", "featured", "id"], ["action"]);
       if (body.action === "sync") {
         const admin = await mcpAdministrator(client, owner);
         const maxPages = admin && body.maxPages !== undefined ? Math.max(1, Math.min(Number(body.maxPages) || 4, 20)) : 4;
@@ -440,25 +440,28 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     if(request.method === "GET" && queryString(request,"view") === "references") {
       // Read-only reference scan; the user client keeps the query RLS-scoped to its owner.
       const ref = workflowString(queryString(request,"ref"));
-      const workflows = await loadReferenceWorkflows(userClient ?? client, owner);
-      json(response,200,{items:connectionReferenceRows(workflows,ref)});return true;
+      const kind = queryString(request,"kind")==="function" ? "function" : "connection";
+      const workflows = await loadReferenceWorkflowsWithClosure(userClient ?? client, owner);
+      json(response,200,{items:kind==="function"?functionReferenceRows(workflows,ref):connectionReferenceRows(workflows,ref)});return true;
     }
     if(request.method === "GET") json(response,200,await workflowCompiler("/v1/extensions",{ownerId:owner,environmentRef:workflowString(queryString(request,"environmentRef"))}));
     else if(request.method === "POST") {
-      const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect","testModel","testMessage"],["environmentRef","action","kind",...(request.body?.action==="inspect"?["content"]:["ref","version"])]);
+      const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect","testModel","testMessage","testMode"],["environmentRef","action","kind",...(request.body?.action==="inspect"?["content"]:["ref","version"])]);
       workflowString(body.environmentRef);if(body.action!=="inspect")workflowString(body.ref);
-      if(body.action==="delete" && body.kind==="connection") {
+      if(body.action==="delete" && (body.kind==="connection" || body.kind==="function")) {
         // Fast owner-scoped preflight that returns actionable reference rows.
         // The Worker repeats this check inside the deleting transaction, where
         // it is serialized with definition saves; this scan is not authority.
-        const references=connectionReferenceRows(await loadReferenceWorkflows(userClient??client,owner),body.ref);
-        if(references.length) throw new ApiError(409,"CONNECTION_IN_USE","This connection is referenced by a current Workflow",{
+        const workflows=await loadReferenceWorkflowsWithClosure(userClient??client,owner);
+        const references=body.kind==="function"?functionReferenceRows(workflows,body.ref):connectionReferenceRows(workflows,body.ref);
+        if(references.length) throw new ApiError(409,body.kind==="function"?"FUNCTION_IN_USE":"CONNECTION_IN_USE",body.kind==="function"?"This function is referenced by a current Workflow":"This connection is referenced by a current Workflow",{
           referenceCount:references.length,
           workflowCount:new Set(references.map(row=>row.workflowId)).size,
           references:references.slice(0,50),
         });
       }
-      json(response,200,await workflowCompiler("/v1/extensions",{...body,ownerId:owner}));
+      const modelTest = body.action === "test" && body.kind === "connection" && typeof body.testMessage === "string";
+      json(response,200,await workflowCompiler("/v1/extensions",{...body,ownerId:owner},modelTest ? 45_000 : undefined));
     } else throw new ApiError(405,"METHOD_NOT_ALLOWED","Unsupported extension operation");
     return true;
   }

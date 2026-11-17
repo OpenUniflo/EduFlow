@@ -30,18 +30,18 @@ export function resolveWorkflowCompilerBase(env: Record<string, string | undefin
   }
   return env.WORKFLOW_COMPILER_URL?.trim() || undefined;
 }
-export async function workflowCompiler<T = WorkflowRow>(path: string, body?: unknown): Promise<T> {
+export async function workflowCompiler<T = WorkflowRow>(path: string, body?: unknown, timeoutMs?: number): Promise<T> {
   const url = resolveWorkflowCompilerBase(process.env);
   const token = process.env.WORKFLOW_INTERNAL_TOKEN;
   if (!url || !token) throw new ApiError(503, "WORKFLOW_SERVICE_UNAVAILABLE", "Workflow execution service is not configured");
   let response: Response;
   try {
-    response = await fetch(workflowCompilerUrl(url, path), { method: body === undefined ? "GET" : "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(path === "/v1/discover" ? 60000 : path === "/v1/test-node" ? 45000 : path === "/v1/p5" ? 45000 : 15000) });
+    response = await fetch(workflowCompilerUrl(url, path), { method: body === undefined ? "GET" : "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(timeoutMs ?? (path === "/v1/discover" ? 60000 : path === "/v1/test-node" || path === "/v1/p5" ? 45000 : 15000)) });
   } catch { throw new ApiError(503, "WORKFLOW_SERVICE_UNAVAILABLE", "Workflow execution service is unavailable"); }
   const result = await response.json() as { error?: { code: string; message: string; category?: string } };
   if (!response.ok) {
     const code = result.error?.code ?? "WORKFLOW_SERVICE_ERROR";
-    const conflict = ["CONNECTION_IN_USE", "CONNECTION_BUSY", "CONNECTION_VERSION_CONFLICT", "CONNECTION_NOT_DISABLED", "CONNECTION_DISABLED"].includes(code);
+    const conflict = ["CONNECTION_IN_USE", "CONNECTION_BUSY", "CONNECTION_VERSION_CONFLICT", "CONNECTION_NOT_DISABLED", "CONNECTION_DISABLED", "FUNCTION_IN_USE", "FUNCTION_BUSY", "FUNCTION_VERSION_CONFLICT"].includes(code);
     const missing = ["CONNECTION_UNAVAILABLE", "CATALOG_NOT_FOUND"].includes(code);
     const status = result.error?.category === "auth" ? 403 : conflict ? 409 : missing ? 404 : response.status === 422 ? 422 : 503;
     throw new ApiError(status, code, result.error?.message ?? "Workflow service request failed");

@@ -1,5 +1,7 @@
+import { createServer } from "node:http";
+import { getDefaultAutoSelectFamily, setDefaultAutoSelectFamily } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { assertPublicDestination, publicHttpUrl } from "./outbound";
+import { assertPublicDestination, pinnedRequest, publicHttpUrl } from "./outbound";
 
 const original = process.env.MCP_ALLOW_LOCAL_FIXTURES;
 afterEach(() => { if (original === undefined) delete process.env.MCP_ALLOW_LOCAL_FIXTURES; else process.env.MCP_ALLOW_LOCAL_FIXTURES = original; });
@@ -52,6 +54,31 @@ describe("MCP outbound destination policy", () => {
     process.env.MCP_ALLOW_LOCAL_FIXTURES = "1";
     const checked = await assertPublicDestination("http://127.0.0.1:19090/mcp");
     expect(checked.url.hostname).toBe("127.0.0.1");
+  });
+
+  it("uses the checked address even when Node defaults to automatic address family selection", async () => {
+    process.env.MCP_ALLOW_LOCAL_FIXTURES = "1";
+    const originalFamilySelection = getDefaultAutoSelectFamily();
+    const server = createServer((_request, response) => response.end("pinned"));
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      setDefaultAutoSelectFamily(true);
+      const bound = server.address();
+      if (!bound || typeof bound === "string") throw new Error("Expected a TCP listener");
+      const destination = {
+        url: new URL(`http://localhost:${bound.port}/`),
+        hostname: "localhost",
+        address: "127.0.0.1",
+        family: 4 as const,
+      };
+      await expect(pinnedRequest(destination)).resolves.toMatchObject({ status: 200, body: "pinned" });
+    } finally {
+      setDefaultAutoSelectFamily(originalFamilySelection);
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
   });
 
   it("only projects HTTP(S) URLs without credentials or fragments", () => {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { classifyMcpServer, normalizeRegistryServer, suggestedConnectionRef } from "./mcpRegistry";
+import {
+  classifyMcpServer, marketSourceId, normalizeMcpConnectMode, normalizeMcpOauthScopes, normalizeRegistryServer,
+  suggestedConnectionRef, validateMcpRecommendation,
+} from "./mcpRegistry";
 
 const latest = (server: Record<string, unknown>) => ({ server, _meta: { "io.modelcontextprotocol.registry/official": { status: "active", isLatest: true } } });
 
@@ -56,5 +59,30 @@ describe("official MCP Registry normalization", () => {
     expect(classifyMcpServer("io.example/pages", "LivePage", "Turn work into a shareable web page for WeChat.")).not.toBe("finance");
     expect(classifyMcpServer("io.example/markets", "Markets", "Live market quotes for public companies")).toBe("finance");
     expect(classifyMcpServer("io.example/images", "Images", "Generate images and videos for social posts")).toBe("creative");
+  });
+});
+
+describe("administrator recommendation metadata", () => {
+  it("defaults unknown modes to config and sanitizes exact OAuth scopes", () => {
+    expect(normalizeMcpConnectMode(undefined)).toBe("config");
+    expect(normalizeMcpConnectMode("unknown")).toBe("config");
+    expect(normalizeMcpConnectMode("quick")).toBe("quick");
+    expect(normalizeMcpOauthScopes([" read ", "read", "", 42, "write"])).toEqual(["read", "write"]);
+    expect(normalizeMcpOauthScopes("read")).toEqual([]);
+  });
+
+  it("rejects direct modes that are not featured or do not match the auth hint", () => {
+    expect(() => validateMcpRecommendation({ connectMode: "quick", authHint: "none", oauthScopes: [], featured: false })).toThrow(/推荐位/);
+    expect(() => validateMcpRecommendation({ connectMode: "quick", authHint: "oauth", oauthScopes: [], featured: true })).toThrow(/无需鉴权/);
+    expect(() => validateMcpRecommendation({ connectMode: "login", authHint: "none", oauthScopes: ["read"], featured: true })).toThrow(/OAuth/);
+    expect(() => validateMcpRecommendation({ connectMode: "login", authHint: "oauth", oauthScopes: [], featured: true })).toThrow(/授权范围/);
+    expect(() => validateMcpRecommendation({ connectMode: "config", authHint: "oauth", oauthScopes: [], featured: false })).not.toThrow();
+  });
+
+  it("creates a stable ASCII source id for a Chinese title", () => {
+    const url = new URL("https://agent.example/mcp/company/stream");
+    expect(marketSourceId("合成测试服务", url)).toBe("agent.example-mcp-company-stream");
+    expect(marketSourceId("Synthetic", url)).toBe("synthetic");
+    expect(marketSourceId("合成测试服务", url)).toBe(marketSourceId("合成测试服务", url));
   });
 });

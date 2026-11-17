@@ -110,14 +110,20 @@ describe("Resource center reference and test requests (M3)", () => {
     request.mockResolvedValueOnce({ items });
     const result = await new WorkflowApiV2().extensionReferences("price_service", "local-env");
     expect(result).toEqual({ items });
-    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&environmentRef=local-env");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&environmentRef=local-env&kind=connection");
     expect(request.mock.calls[0][1]).toBeUndefined();
   });
 
   it("omits the environment when none is supplied", async () => {
     request.mockResolvedValueOnce({ items: [] });
     await new WorkflowApiV2().extensionReferences("price_service");
-    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&kind=connection");
+  });
+
+  it("queries function references with the function kind", async () => {
+    request.mockResolvedValueOnce({ items: [] });
+    await new WorkflowApiV2().extensionReferences("cleanup", "local-env", "function");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=cleanup&environmentRef=local-env&kind=function");
   });
 
   it("queries variable references without a Workflow identity", async () => {

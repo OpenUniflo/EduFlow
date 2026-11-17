@@ -112,6 +112,8 @@ export function pinnedRequest(destination: CheckedDestination, options: {
         ...(body ? { "content-length": String(Buffer.byteLength(body)) } : {}),
         ...options.headers,
       },
+      // Pin the family too so Node requests a single address from the lookup callback.
+      family: destination.family,
       lookup: (_hostname, _options, callback) => callback(null, destination.address, destination.family),
       timeout: options.timeoutMs ?? 15000,
       rejectUnauthorized: true,

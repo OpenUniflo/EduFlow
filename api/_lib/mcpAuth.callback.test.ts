@@ -9,6 +9,7 @@ vi.mock("./workflowV2Protocol.js", () => ({
 }));
 
 import { handleMcpOAuthCallback, startMcpOAuth, discoverMcpOAuth } from "./mcpAuth";
+import { workflowCompiler } from "./workflowV2Protocol";
 
 type Hit = { method: string; path: string; headers: IncomingMessage["headers"]; body: string };
 function server(handler: (hit: Hit, response: ServerResponse) => boolean | void) {
@@ -153,7 +154,7 @@ describe("MCP OAuth callback binds the verified authorization server", () => {
 });
 
 describe("MCP OAuth WWW-Authenticate discovery", () => {
-  it("uses resource_metadata from an unauthenticated 401 and requests only the chosen scope", async () => {
+  it("uses resource_metadata from an unauthenticated 401 and re-registers for a changed callback", async () => {
     let origin = "";
     const as = await server((hit, response) => {
       if (hit.path === "/mcp" && hit.method === "POST") {
@@ -198,9 +199,14 @@ describe("MCP OAuth WWW-Authenticate discovery", () => {
     })).rejects.toMatchObject({ code: "MCP_OAUTH_SCOPE_REQUIRED" });
     expect(as.hits.filter((hit) => hit.path === "/register")).toHaveLength(0);
 
+    vi.mocked(workflowCompiler).mockResolvedValueOnce({ connections: [{
+      ref: "challenge", version: 1,
+      content: { type: "mcp-http", authType: "oauth", url: `${origin}/mcp`,
+        oauth: { clientId: "previous-client", redirectUri: "http://127.0.0.1:5174/api/workflows?resource=mcp-auth&op=callback" } },
+    }] } as never);
     const started = await startMcpOAuth({
       request: { headers: {} } as never, ownerId: "owner", environmentRef: "local", ref: "challenge",
-      version: 1, name: "Challenge", url: `${origin}/mcp`, transport: "streamable-http", scopes: ["mcp.read"],
+      version: 2, name: "Challenge", url: `${origin}/mcp`, transport: "streamable-http", scopes: ["mcp.read"],
       resourceMetadataUrl: discovery.resourceMetadataUrl,
     });
     const authorization = new URL(started.authorizationUrl);
@@ -251,13 +257,15 @@ describe("MCP OAuth callback concurrency, denial and discovery errors", () => {
       flow_id: "9a4800d2-74f0-4f40-a4fe-74f4e3d9a5c4", state_hash: "hash", owner_user_id: "owner", environment_ref: "local",
       connection_ref: "mock", connection_version: 2, payload: snapshot(as.origin), code_verifier: "v".repeat(64), client_id: "client",
       client_secret: "super-secret", token_endpoint: `${as.origin}/token`, authorization_endpoint: `${as.origin}/authorize`, resource: `${as.origin}/mcp`,
-      redirect_uri: "https://eduflow.example.com/api/workflows?resource=mcp-auth&op=callback", return_to: "/works",
+      redirect_uri: "https://eduflow.example.com/api/workflows?resource=mcp-auth&op=callback", return_to: "/works?oauthFlow=flow_0123456789abcdef&mcpOAuthPopup=1",
       expires_at: new Date(Date.now() + 60_000).toISOString(), consumed_at: null,
     };
     testState.supabase = fakeSupabase(flow);
     const response = { statusCode: 0, headers: {} as Record<string, string>, setHeader(name: string, value: string) { this.headers[name] = value; }, end() {} };
     await handleMcpOAuthCallback({ query: { state: "state", error: "access_denied" } } as never, response as never);
     expect(response.headers.location).toContain("mcpOAuth=error");
+    expect(response.headers.location).toContain("oauthFlow=flow_0123456789abcdef");
+    expect(response.headers.location).toContain("mcpOAuthPopup=1");
     expect(tokenHits).toBe(0);
     await as.close();
   });
@@ -282,6 +290,95 @@ describe("MCP OAuth callback concurrency, denial and discovery errors", () => {
       response.writeHead(404); response.end("{}"); return true;
     });
     await expect(discoverMcpOAuth({ url: `${as.origin}/mcp` })).rejects.toMatchObject({ code: expect.stringMatching(/MCP_OAUTH_(DISCOVERY_FAILED|UNSUPPORTED)/) });
+    await as.close();
+  });
+});
+
+describe("MCP OAuth reauthorization reuses the verified saved configuration", () => {
+  function savedRow(origin: string, overrides: { tokenEndpoint?: string; resource?: string; redirectUri?: string } = {}) {
+    return {
+      ref: "saved", version: 2,
+      content: {
+        type: "mcp-http", name: "Saved MCP", url: `${origin}/mcp`, transport: "streamable-http",
+        authType: "oauth", allowedToolNames: [],
+        oauth: {
+          issuer: origin,
+          authorizationEndpoint: `${origin}/authorize`,
+          tokenEndpoint: overrides.tokenEndpoint ?? `${origin}/token`,
+          clientId: "saved-client",
+          redirectUri: overrides.redirectUri ?? "https://eduflow.example.com/api/workflows?resource=mcp-auth&op=callback",
+          resource: overrides.resource ?? `${origin}/mcp`,
+          scope: "mcp.read",
+          tokenEndpointAuthMethod: "none",
+        },
+      },
+    };
+  }
+
+  it("starts from the saved client and endpoints without discovery or registration", async () => {
+    const as = await server((_hit, response) => { response.writeHead(404); response.end("{}"); });
+    vi.mocked(workflowCompiler).mockResolvedValueOnce({ connections: [savedRow(as.origin)] } as never);
+    const inserted: Record<string, unknown>[] = [];
+    testState.supabase = fakeSupabase(null, inserted);
+    const started = await startMcpOAuth({
+      request: { headers: {} } as never, ownerId: "owner", environmentRef: "local", ref: "saved",
+      version: 2, name: "Saved MCP", url: `${as.origin}/mcp`, transport: "streamable-http", scopes: ["mcp.read"],
+    });
+    expect(as.hits).toHaveLength(0);
+    const authorization = new URL(started.authorizationUrl);
+    expect(authorization.origin).toBe(as.origin);
+    expect(authorization.pathname).toBe("/authorize");
+    expect(authorization.searchParams.get("client_id")).toBe("saved-client");
+    expect(authorization.searchParams.get("scope")).toBe("mcp.read");
+    expect(authorization.searchParams.get("resource")).toBe(`${as.origin}/mcp`);
+    expect(authorization.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(inserted[0]).toMatchObject({
+      client_id: "saved-client", client_secret: null,
+      token_endpoint: `${as.origin}/token`, authorization_endpoint: `${as.origin}/authorize`,
+      payload: { v: 1, content: { oauth: { clientId: "saved-client", authorizationEndpoint: `${as.origin}/authorize` } }, discovery: { authorizationServerUrl: as.origin } },
+    });
+    await as.close();
+  });
+
+  it("exchanges the saved public client's code without sending a secret", async () => {
+    const as = await server((hit, response) => {
+      if (hit.path === "/token" && hit.method === "POST") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ access_token: "saved-access", token_type: "Bearer", expires_in: 3600 }));
+        return true;
+      }
+      return false;
+    });
+    vi.mocked(workflowCompiler).mockResolvedValueOnce({ connections: [savedRow(as.origin)] } as never);
+    const inserted: Record<string, unknown>[] = [];
+    testState.supabase = fakeSupabase(null, inserted);
+    await startMcpOAuth({
+      request: { headers: {} } as never, ownerId: "owner", environmentRef: "local", ref: "saved",
+      version: 2, name: "Saved MCP", url: `${as.origin}/mcp`, transport: "streamable-http", scopes: ["mcp.read"],
+    });
+    testState.supabase = fakeSupabase({ ...inserted[0], consumed_at: null });
+    const response = { statusCode: 0, headers: {} as Record<string, string>, setHeader(name: string, value: string) { this.headers[name] = value; }, end() {} };
+    await handleMcpOAuthCallback({ query: { state: "state", code: "code" } } as never, response as never);
+    expect(response.headers.location).toContain("mcpOAuth=pending");
+    const tokenHits = as.hits.filter((hit) => hit.path === "/token");
+    expect(tokenHits).toHaveLength(1);
+    expect(tokenHits[0]?.body).toContain("client_id=saved-client");
+    expect(tokenHits[0]?.body).not.toContain("client_secret");
+    expect(tokenHits[0]?.body).toContain("code_verifier=");
+    await as.close();
+  });
+
+  it("rejects a saved endpoint that fails the outbound policy before any request", async () => {
+    const as = await server((_hit, response) => { response.writeHead(404); response.end("{}"); });
+    vi.mocked(workflowCompiler).mockResolvedValueOnce({ connections: [savedRow(as.origin, { tokenEndpoint: "http://169.254.169.254/token" })] } as never);
+    const inserted: Record<string, unknown>[] = [];
+    testState.supabase = fakeSupabase(null, inserted);
+    await expect(startMcpOAuth({
+      request: { headers: {} } as never, ownerId: "owner", environmentRef: "local", ref: "saved",
+      version: 2, name: "Saved MCP", url: `${as.origin}/mcp`, transport: "streamable-http", scopes: ["mcp.read"],
+    })).rejects.toMatchObject({ code: "MCP_OAUTH_UNSUPPORTED" });
+    expect(as.hits).toHaveLength(0);
+    expect(inserted).toHaveLength(0);
     await as.close();
   });
 });

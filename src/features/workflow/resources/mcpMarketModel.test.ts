@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { McpMarketItem } from "../domain/v2/types";
 import type { CatalogConnection } from "./resourceModel";
-import { latestMcpConnections, mcpAuthLabel, mcpAuthTypeOf, mcpCategoryGroups, mcpConnectionErrorMessage, mcpConnectionFor, mcpConnectionStatus, mcpSyncLabel, mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState, uniqueMcpRef } from "./mcpMarketModel";
+import {
+  dedupeMcpMarketItems, latestMcpConnections, mcpAuthLabel, mcpAuthTypeOf, mcpCategoryGroups, mcpConnectionErrorMessage, mcpConnectionFor,
+  mcpConnectionStatus, mcpQuickConnectDraft, mcpRecommendationAction, mcpSyncLabel, mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState,
+  resolveRecommendedMcpServers, uniqueMcpRef,
+} from "./mcpMarketModel";
 
 const entry = (ref: string, version: number, content: Record<string, unknown>): CatalogConnection => ({ connectionKey: `p4:o:${ref}:${version}`, ref, version, disabled: false, hasCredential: false, content: content as CatalogConnection["content"] });
 
@@ -68,5 +73,83 @@ describe("MCP market model", () => {
   it("reports cache and error state without inventing a successful sync", () => {
     expect(mcpSyncLabel({ status: "error", lastSuccessAt: null, error: "registry down", serverCount: 12, hasMore: false })).toContain("显示上次缓存");
     expect(mcpSyncLabel({ status: "ok", lastSuccessAt: "2026-01-01T00:00:00Z", error: null, serverCount: 12, hasMore: true })).toContain("可继续同步");
+  });
+});
+
+const marketItem = (overrides: Partial<McpMarketItem>): McpMarketItem => ({
+  id: "fixture-admin",
+  source: "admin",
+  sourceId: "fixture",
+  name: "fixture.example",
+  title: "Synthetic Fixture",
+  description: "Obviously synthetic test fixture.",
+  version: "1",
+  url: "https://fixture.example/mcp",
+  transport: "streamable-http",
+  authHint: "none",
+  headerHints: [],
+  category: "data",
+  categoryLabel: "数据服务",
+  featured: true,
+  suggestedRef: "synthetic_fixture",
+  recommended: true,
+  connectMode: "config",
+  oauthScopes: [],
+  ...overrides,
+});
+
+describe("API-driven MCP recommendations", () => {
+  it("only treats an explicit compatible mode as a direct action", () => {
+    expect(mcpRecommendationAction(marketItem({ connectMode: "quick", authHint: "none" }))).toBe("quick");
+    expect(mcpRecommendationAction(marketItem({ connectMode: "login", authHint: "oauth", oauthScopes: ["fixture:read"] }))).toBe("login");
+    expect(mcpRecommendationAction(marketItem({ connectMode: "config" }))).toBe("config");
+    expect(mcpRecommendationAction(marketItem({ connectMode: "quick", authHint: "oauth" }))).toBe("config");
+    expect(mcpRecommendationAction(marketItem({ connectMode: "login", authHint: "oauth", oauthScopes: [] }))).toBe("config");
+  });
+
+  it("dedupes by URL, keeps API order, and prefers a featured administrator row", () => {
+    const registry = marketItem({
+      id: "registry-1", source: "registry", sourceId: "io.example/fixture", title: "Registry Fixture",
+      url: "https://fixture.example/mcp/", featured: false, recommended: false,
+    });
+    const admin = marketItem({ id: "admin-1", title: "Admin Fixture", featured: false, recommended: false });
+    expect(dedupeMcpMarketItems([registry, admin]).map(item => item.id)).toEqual(["admin-1"]);
+
+    const registryFeatured = marketItem({ id: "registry-2", source: "registry", sourceId: "io.example/two", featured: true, recommended: true });
+    const adminFeatured = marketItem({ id: "admin-2", featured: true, recommended: true });
+    expect(dedupeMcpMarketItems([registryFeatured, adminFeatured]).map(item => item.id)).toEqual(["admin-2"]);
+    expect(resolveRecommendedMcpServers([registry, adminFeatured], ["admin-2"]).map(item => item.id)).toEqual(["admin-2"]);
+  });
+
+  it("falls back to the row's recommended flag when the page omits recommendedIds", () => {
+    const first = marketItem({ id: "first" });
+    const second = marketItem({ id: "second", url: "https://second.example/mcp" });
+    expect(resolveRecommendedMcpServers([first, second]).map(item => item.id)).toEqual(["first", "second"]);
+  });
+
+  it("drafts a guest connection with no implicit tool permission and a collision-safe ref", () => {
+    const quick = marketItem({ id: "quick-1", suggestedRef: "synthetic_quick", connectMode: "quick" });
+    const draft = mcpQuickConnectDraft(quick, []);
+    expect(draft.ref).toBe("synthetic_quick");
+    expect(draft.version).toBe(1);
+    expect(draft.content).toMatchObject({
+      type: "mcp-http", name: "Synthetic Fixture", url: "https://fixture.example/mcp",
+      transport: "streamable-http", authType: "none", allowedToolNames: [],
+    });
+    expect(draft.content).not.toHaveProperty("registryServerId");
+
+    const unrelated = entry("another_ref", 3, { type: "mcp-http", url: "https://another.example/mcp" });
+    expect(mcpQuickConnectDraft(quick, [unrelated])).toMatchObject({ ref: "synthetic_quick", version: 1 });
+    const sameRef = entry("synthetic_quick", 3, { type: "mcp-http", url: "https://fixture.example/mcp/" });
+    expect(mcpQuickConnectDraft(quick, [sameRef])).toMatchObject({ ref: "synthetic_quick_2", version: 1 });
+    expect(() => mcpQuickConnectDraft(marketItem({ connectMode: "login", authHint: "oauth", oauthScopes: ["read"] }), [])).toThrow(/登录授权或连接配置/);
+    expect(() => mcpQuickConnectDraft(marketItem({ connectMode: "config" }), [])).toThrow(/登录授权或连接配置/);
+  });
+
+  it("keeps a registry id only for registry rows, never for an administrator supplement", () => {
+    const registry = marketItem({ id: "registry-1", source: "registry", sourceId: "io.example/fixture", connectMode: "quick" });
+    expect(mcpQuickConnectDraft(registry, []).content).toMatchObject({ registryServerId: "io.example/fixture" });
+    const admin = marketItem({ id: "admin-1", source: "admin", sourceId: "fixture", connectMode: "quick" });
+    expect(mcpQuickConnectDraft(admin, []).content).not.toHaveProperty("registryServerId");
   });
 });

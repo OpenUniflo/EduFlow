@@ -154,6 +154,102 @@ function flowSnapshot(flow: FlowRow): FlowSnapshot | null {
   return value as unknown as FlowSnapshot;
 }
 
+type SavedOAuth = { discovery: Discovery; clientId: string; tokenEndpointAuthMethod: "none" };
+type CatalogRow = { ref?: unknown; version?: unknown; content?: Record<string, unknown> };
+
+function comparableUrl(value: unknown) {
+  if (typeof value !== "string") return "";
+  try { return new URL(value).toString().replace(/\/+$/, ""); } catch { return ""; }
+}
+
+/**
+ * A re-authorization can use the authorization server and client registration
+ * that were already verified and saved with the connection. This deliberately
+ * avoids repeating discovery and dynamic registration: providers that expose
+ * their protected-resource metadata only from a 401 challenge do not need
+ * another probe, and an existing, still-valid client is not replaced. Every saved URL is rechecked against the outbound policy and the
+ * saved resource must still cover the MCP endpoint.
+ *
+ * Only public clients (`token_endpoint_auth_method: none`) are reusable here;
+ * a confidential client's secret was never stored in connection content, so
+ * that case falls back to normal discovery/registration.
+ */
+async function savedOAuthFor(input: { ownerId: string; environmentRef: string; ref: string; version: number; url: string; callback: string }): Promise<SavedOAuth | null> {
+  if (input.version <= 1) return null;
+  const catalog = await workflowCompiler<{ connections?: CatalogRow[] }>("/v1/extensions", {
+    ownerId: input.ownerId, environmentRef: input.environmentRef, action: "list",
+  });
+  const rows = Array.isArray(catalog.connections) ? catalog.connections : [];
+  const requestedUrl = comparableUrl(input.url);
+  const latest = rows
+    .filter((row) => row.ref === input.ref)
+    .sort((left, right) => Number(right.version) - Number(left.version))[0];
+  if (!latest?.content
+    || latest.content.type !== "mcp-http"
+    || latest.content.authType !== "oauth"
+    || comparableUrl(latest.content.url) !== requestedUrl) return null;
+  const oauth = latest.content.oauth;
+  if (!oauth || typeof oauth !== "object" || Array.isArray(oauth)) return null;
+  const saved = oauth as Record<string, unknown>;
+  // OAuth registrations bind the exact redirect URI. Re-register legacy clients
+  // with no recorded redirect URI or clients registered on another origin.
+  if (saved.redirectUri !== input.callback) return null;
+  if (saved.tokenEndpointAuthMethod !== undefined && saved.tokenEndpointAuthMethod !== "none") return null;
+  const issuer = typeof saved.issuer === "string" ? normalizeIssuer(saved.issuer) : "";
+  const authorizationEndpoint = typeof saved.authorizationEndpoint === "string" ? saved.authorizationEndpoint : "";
+  const tokenEndpoint = typeof saved.tokenEndpoint === "string" ? saved.tokenEndpoint : "";
+  const clientId = typeof saved.clientId === "string" ? saved.clientId : "";
+  const resource = typeof saved.resource === "string" && saved.resource ? saved.resource : input.url;
+  if (!issuer || !authorizationEndpoint || !tokenEndpoint || !clientId) return null;
+  if (clientId.length > 500 || /[\u0000-\u001f\u007f]/.test(clientId)) {
+    throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", "已保存的 OAuth 客户端标识无效");
+  }
+  const scopes = typeof saved.scope === "string" ? [...new Set(saved.scope.split(/\s+/).filter(Boolean))] : [];
+  if (scopes.some((scope) => !SCOPE_PATTERN.test(scope))) {
+    throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", "已保存的 OAuth 授权范围无效");
+  }
+  await assertEndpoint(issuer, "授权服务器地址");
+  await assertEndpoint(authorizationEndpoint, "授权地址");
+  await assertEndpoint(tokenEndpoint, "令牌地址");
+  try {
+    const resourceUrl = new URL(resource);
+    if (resourceUrl.username || resourceUrl.password || resourceUrl.hash) throw new Error("resource");
+    await assertPublicDestination(resourceUrl.toString(), "OAuth 资源标识");
+  } catch (reason) {
+    throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", safeMessage(reason, "已保存的 OAuth 资源标识无效"));
+  }
+  if (!checkResourceAllowed({ requestedResource: input.url, configuredResource: resource })) {
+    throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", "已保存的 OAuth 资源标识与服务地址不一致");
+  }
+  const metadata: AuthorizationServerMetadata = {
+    issuer,
+    authorization_endpoint: authorizationEndpoint,
+    token_endpoint: tokenEndpoint,
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code", "refresh_token"],
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: ["none"],
+    ...(scopes.length ? { scopes_supported: scopes } : {}),
+  };
+  const resourceMetadata: OAuthProtectedResourceMetadata = {
+    resource,
+    authorization_servers: [issuer],
+    ...(scopes.length ? { scopes_supported: scopes } : {}),
+  };
+  const info: OAuthDiscoveryState = {
+    authorizationServerUrl: issuer,
+    authorizationServerMetadata: metadata,
+    resourceMetadata,
+  };
+  return {
+    discovery: {
+      issuer, authorizationEndpoint, tokenEndpoint, resource, info, metadata, resourceMetadata, scopes,
+    },
+    clientId,
+    tokenEndpointAuthMethod: "none",
+  };
+}
+
 /**
  * A no-credential MCP initialize request exposes the server's RFC 9728
  * challenge. SDK's `discoverOAuthServerInfo` only uses a PRM URL supplied by
@@ -334,7 +430,11 @@ export async function startMcpOAuth(input: {
   let callback: string;
   try { callback = oauthCallbackUrl(input.request); }
   catch (reason) { throw new ApiError(503, "MCP_OAUTH_UNAVAILABLE", safeMessage(reason, "OAuth 回调来源未配置")); }
-  const discovery = await discoverMcpOAuth({ url: destination.url.toString(), ...(input.resourceMetadataUrl ? { resourceMetadataUrl: input.resourceMetadataUrl } : {}) });
+  const saved = await savedOAuthFor({
+    ownerId: input.ownerId, environmentRef: input.environmentRef, ref: input.ref,
+    version: input.version, url: destination.url.toString(), callback,
+  });
+  const discovery = saved?.discovery ?? await discoverMcpOAuth({ url: destination.url.toString(), ...(input.resourceMetadataUrl ? { resourceMetadataUrl: input.resourceMetadataUrl } : {}) });
   const scope = selectedScopes(discovery, input.scopes);
   const flowId = randomUUID();
   const state = base64url(randomBytes(32));
@@ -346,16 +446,26 @@ export async function startMcpOAuth(input: {
     authorizationServerMetadata: discovery.metadata,
     resourceMetadata: discovery.resourceMetadata,
   };
+  if (saved) {
+    // The SDK skips discovery and dynamic registration when both cached
+    // discovery state and client information are present. The client is bound
+    // to the same authorization server that was verified with the connection.
+    provider.clientInfo = {
+      client_id: saved.clientId,
+      token_endpoint_auth_method: saved.tokenEndpointAuthMethod,
+      issuer: saved.discovery.issuer,
+    };
+  }
   let result: Awaited<ReturnType<typeof auth>>;
   try {
     result = await auth(provider, {
       serverUrl: destination.url.toString(),
       scope: scope || undefined,
-      ...(input.resourceMetadataUrl ? { resourceMetadataUrl: new URL(input.resourceMetadataUrl) } : {}),
+      ...(!saved && input.resourceMetadataUrl ? { resourceMetadataUrl: new URL(input.resourceMetadataUrl) } : {}),
       fetchFn: safeOAuthFetch,
     });
   } catch (reason) {
-    throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", safeMessage(reason, "OAuth 客户端注册失败"));
+    throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", safeMessage(reason, saved ? "使用已保存的 OAuth 授权配置失败" : "OAuth 客户端注册失败"));
   }
   if (result !== "REDIRECT" || !provider.authorizationUrlValue || !provider.clientInfo) {
     throw new ApiError(400, "MCP_OAUTH_UNSUPPORTED", "该服务未完成 OAuth 客户端注册");
@@ -366,6 +476,7 @@ export async function startMcpOAuth(input: {
     authorizationEndpoint: discovery.metadata.authorization_endpoint,
     tokenEndpoint: discovery.metadata.token_endpoint,
     clientId: client.client_id,
+    redirectUri: callback,
     resource: discovery.resourceMetadata?.resource ?? destination.url.toString(),
     ...(scope ? { scope } : {}),
     tokenEndpointAuthMethod: client.token_endpoint_auth_method ?? "none",

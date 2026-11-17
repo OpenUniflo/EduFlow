@@ -174,12 +174,12 @@ def mcp_tool_names(value,required=False):
 
 def mcp_oauth_metadata(value):
     if not isinstance(value,dict): raise ExecutionError('INVALID_CONNECTION','Provide OAuth authorization metadata')
-    allowed={'issuer','authorizationEndpoint','tokenEndpoint','clientId','resource','scope','tokenEndpointAuthMethod'}
+    allowed={'issuer','authorizationEndpoint','tokenEndpoint','clientId','resource','scope','tokenEndpointAuthMethod','redirectUri'}
     if set(value)-allowed: raise ExecutionError('INVALID_CONNECTION','Unsupported OAuth metadata field')
     for key in ('tokenEndpoint','clientId'):
         item=value.get(key)
         if not isinstance(item,str) or not 1<=len(item)<=2048: raise ExecutionError('INVALID_CONNECTION','OAuth metadata is invalid')
-    for key in ('issuer','authorizationEndpoint','resource'):
+    for key in ('issuer','authorizationEndpoint','resource','redirectUri'):
         item=value.get(key)
         if item is not None and (not isinstance(item,str) or not 1<=len(item)<=2048): raise ExecutionError('INVALID_CONNECTION','OAuth metadata is invalid')
     for key in ('scope','tokenEndpointAuthMethod'):
@@ -418,8 +418,15 @@ async def catalog_operation(body,registry):
         # Display identity lives in the mutable content; the stable ref never changes.
         # These operations only target the newest immutable version so a stale browser
         # cannot revive or delete a newer owner-visible state.
-        if kind!='connection': raise ExecutionError('INVALID_EXTENSION','Only managed connections support this operation')
         rows=await store.call('p4_catalog_read',owner,ref)
+        if kind=='function':
+            if action!='delete': raise ExecutionError('INVALID_EXTENSION','Only managed connections support this operation')
+            versions=[row for row in rows if row.get('kind')=='function' and row.get('ref')==name]
+            if not versions: raise ExecutionError('FUNCTION_UNAVAILABLE','Function unavailable','auth')
+            latest_version=max(int(row.get('version') or 0) for row in versions)
+            if version!=latest_version: raise ExecutionError('FUNCTION_VERSION_CONFLICT','Function changed; refresh before deleting','validation')
+            return await store.call('p4_function_delete',owner,ref,name,version)
+        if kind!='connection': raise ExecutionError('INVALID_EXTENSION','Only managed connections support this operation')
         versions=[row for row in rows if row.get('kind')=='connection' and row.get('ref')==name]
         if not versions: raise ExecutionError('CONNECTION_UNAVAILABLE','Connection unavailable','auth')
         latest=max(versions,key=lambda row:int(row.get('version') or 0))

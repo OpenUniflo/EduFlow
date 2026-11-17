@@ -122,15 +122,20 @@ export type StructuredOutputFieldType = "string" | "number" | "boolean" | "array
 /** One model structured-output field; the runtime returns it as a top-level output item. */
 export type StructuredOutputField = { name: string; type: StructuredOutputFieldType; description?: string };
 export type LlmConfigV2 = { providerRef: string; modelRef: string; modelParameters: Record<string, JsonValue>; allowedToolRefs: string[]; prompt: { system: PromptSegment[]; messages: PromptMessageV2[] }; structuredOutput?: { fields: StructuredOutputField[] } };
-/** P1 MCP market DTOs. Catalog rows come from the official Registry or an administrator supplement. */
+/** MCP market DTOs. Catalog rows come from the official Registry or an administrator supplement. */
 export type McpMarketCategory = { key: string; label: string; count: number };
 export type McpMarketHeaderHint = { name: string; description?: string; isSecret?: boolean; isRequired?: boolean };
+export type McpConnectMode = "config" | "quick" | "login";
 export type McpMarketItem = {
   id: string; source: "registry" | "admin"; sourceId: string; name: string; title: string; description: string;
   version: string; url: string; transport: "streamable-http" | "sse"; authHint: "none" | "oauth" | "api-key" | "bearer" | "unknown";
   headerHints: McpMarketHeaderHint[]; category: string; categoryLabel: string; iconUrl?: string; websiteUrl?: string;
   repositoryUrl?: string; featured: boolean; registryStatus?: string; publishedAt?: string; updatedAt?: string;
   suggestedRef: string; recommended: boolean;
+  /** Administrator-configured recommendation action; `config` keeps the ordinary form. */
+  connectMode: McpConnectMode;
+  /** Exact scopes verified for a login recommendation; empty for other modes. */
+  oauthScopes: string[];
 };
 export type McpMarketSync = { status: "idle" | "running" | "ok" | "error"; cursor: string | null; hasMore: boolean; pageCount: number; serverCount: number; fullSyncCompleted: boolean; lastSuccessAt: string | null; lastAttemptAt: string | null; error: string | null };
 export type McpMarketPage = { items: McpMarketItem[]; page: number; limit: number; total: number; hasMore: boolean; categories: McpMarketCategory[]; recommendedIds: string[]; sync: McpMarketSync; canAdmin: boolean };

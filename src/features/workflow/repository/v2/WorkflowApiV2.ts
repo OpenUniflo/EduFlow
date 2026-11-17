@@ -150,12 +150,12 @@ export class WorkflowApiV2 {
   inspectMcp(environmentRef:string,body:{content:Record<string,JsonValue>;credential?:string}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{environmentRef,action:"inspect",kind:"connection",...body}); }
   extensions<T>(environmentRef:string) { return apiRequest<T>(endpoint("extensions",{environmentRef})); }
   extension<T>(environmentRef:string,body:Record<string,unknown>) { return jsonRequest<T>("extensions","POST",{...body,environmentRef}); }
-  /** Read-only "who uses this connection" scan across the current user's current definitions. */
-  extensionReferences(ref:string,environmentRef?:string) { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("extensions",{view:"references",ref,environmentRef})); }
+  /** Read-only "who uses this connection or function" scan across the current user's current definitions. */
+  extensionReferences(ref:string,environmentRef?:string,kind:"connection"|"function"="connection") { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("extensions",{view:"references",ref,environmentRef,kind})); }
   /** Read-only "who reads this variable" scan across the current user's current definitions. */
   variableReferences() { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("configuration",{view:"references"})); }
   /** Connection test; the Worker returns the shared ConnectionTestResult contract. */
-  testExtension(environmentRef:string,body:{ref:string;version:number;kind?:"connection"|"function";arguments?:Record<string,JsonValue>;confirmExternalEffect?:boolean;testModel?:string;testMessage?:string;content?:JsonValue}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{action:"test",kind:"connection",...body,environmentRef}); }
+  testExtension(environmentRef:string,body:{ref:string;version:number;kind?:"connection"|"function";arguments?:Record<string,JsonValue>;confirmExternalEffect?:boolean;testModel?:string;testMessage?:string;testMode?:"text"|"stream-json";credential?:string;content?:JsonValue}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{action:"test",kind:"connection",...body,environmentRef}); }
   async configuration() { return normalizeConfiguration(await apiRequest<WorkflowConfiguration>(endpoint("configuration"))); }
   async saveConfiguration(config: WorkflowConfiguration) {
     const normalized = normalizeConfiguration(config);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronRight, CircleAlert, ExternalLink, LoaderCircle, Plus, RefreshCw, Search, Server, ShieldCheck, Wrench, X } from "lucide-react";
 import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
 import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
@@ -6,11 +6,13 @@ import type { ConnectionTestResult, JsonValue, McpMarketItem, McpMarketPage, Res
 import type { Extensions } from "../editor/v2/FunctionExecutionFields";
 import { latestVersion, type CatalogConnection } from "./resourceModel";
 import { ResourceReferences } from "./ResourceReferences";
+import { ResourceDeleteDialog } from "./ResourceDeleteDialog";
 import { ResourceTestPanel } from "./ResourceTestPanel";
 import type { ResourceSectionProps } from "./resourceTypes";
 import {
-  latestMcpConnections, mcpAuthHintLabel, mcpAuthTypeOf, mcpCategoryGroups, mcpConnectionAuth, mcpConnectionErrorMessage, mcpConnectionFor,
-  mcpAllowedToolNames, mcpConnectionStatus, mcpConnectionTitle, mcpSyncLabel, mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState, mcpTransportLabel,
+  dedupeMcpMarketItems, latestMcpConnections, mcpAuthHintLabel, mcpAuthTypeOf, mcpCategoryGroups, mcpConnectionAuth, mcpConnectionErrorMessage,
+  mcpConnectionFor, mcpAllowedToolNames, mcpConnectionStatus, mcpConnectionTitle, mcpQuickConnectDraft, mcpRecommendationAction, mcpSyncLabel,
+  mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState, mcpTransportLabel, normalizeMcpUrl, resolveRecommendedMcpServers,
   type McpTab, type McpToolState,
 } from "./mcpMarketModel";
 import { McpConnectDialog } from "./McpConnectDialog";
@@ -20,10 +22,11 @@ type Feedback = { ok: boolean; text: string } | null;
 type TestView = { key: string; result: ConnectionTestResult };
 type ReferenceView = { key: string; loading: boolean; error: string; rows: ResourceReferenceRow[] };
 type DialogState =
-  | { kind: "connect"; server?: McpMarketItem; entry?: CatalogConnection }
+  | { kind: "connect"; server?: McpMarketItem; entry?: CatalogConnection; loginOnly?: boolean }
   | { kind: "details"; server: McpMarketItem }
   | { kind: "admin" }
   | { kind: "disable"; entry: CatalogConnection }
+  | { kind: "delete"; entry: CatalogConnection }
   | { kind: "tools"; entry: CatalogConnection };
 
 export type McpResourceProps = Pick<ResourceSectionProps, "environmentRef" | "create" | "onCreated" | "onResourcesChanged" | "onOpenReference"> & {
@@ -35,10 +38,11 @@ export type McpResourceProps = Pick<ResourceSectionProps, "environmentRef" | "cr
   discovery?: Record<string, readonly string[]>;
 };
 
-function MarketCard({ item, connection, state, onDetails, onConnect }: {
-  item: McpMarketItem; connection?: CatalogConnection; state?: McpToolState; onDetails: () => void; onConnect: () => void;
+function MarketCard({ item, connection, state, recommended = false, actionLabel, busy = false, onDetails, onConnect }: {
+  item: McpMarketItem; connection?: CatalogConnection; state?: McpToolState; recommended?: boolean; actionLabel?: string; busy?: boolean;
+  onDetails: () => void; onConnect: () => void;
 }) {
-  return <article className="wf-mcp-card" data-mcp-server={item.id}>
+  return <article className="wf-mcp-card" data-mcp-server={item.id} data-mcp-url={item.url}>
     <div className="wf-mcp-card-head">
       <span className="wf-mcp-icon" aria-hidden="true">{(item.title || item.name).slice(0, 2).toUpperCase()}</span>
       <div className="wf-mcp-card-title"><strong>{item.title}</strong><small>{item.name}</small></div>
@@ -46,6 +50,7 @@ function MarketCard({ item, connection, state, onDetails, onConnect }: {
     </div>
     <p className="wf-mcp-card-description">{item.description || "此服务暂未提供说明。"}</p>
     <div className="wf-mcp-card-meta">
+      {recommended ? <span className="wf-mcp-badge is-ok">推荐</span> : null}
       <span className="wf-mcp-badge">{item.source === "registry" ? "官方 Registry" : "管理员补充"}</span>
       <span className="wf-mcp-badge">{item.categoryLabel}</span>
       <span className="wf-mcp-badge">{mcpAuthHintLabel(item.authHint)}</span>
@@ -53,7 +58,7 @@ function MarketCard({ item, connection, state, onDetails, onConnect }: {
     </div>
     <div className="wf-mcp-card-actions">
       <button type="button" onClick={onDetails}>详情</button>
-      <button type="button" className="primary" onClick={onConnect}>{connection ? "配置" : "连接"}</button>
+      <button type="button" className="primary" disabled={busy} onClick={onConnect}>{busy ? "连接中…" : actionLabel ?? (connection ? "配置" : "连接")}</button>
     </div>
     {connection ? <p className={`wf-mcp-card-connected${connection.disabled ? " is-disabled" : ""}`}>{mcpConnectionAuth(connection)} · {connection.disabled ? (() => { const labels = mcpToolCountLabels(state ?? { allowed: 0, discovered: null, usable: 0, known: false }, { disabled: true }); return `已断开 · ${labels.allowed} · ${labels.discovered} · ${labels.usable}`; })() : state ? `${mcpToolCountLabels(state).allowed} · ${mcpToolCountLabels(state).discovered} · ${mcpToolCountLabels(state).usable}` : "工具状态待读取"}</p> : null}
   </article>;
@@ -77,6 +82,12 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
   const [localTools, setLocalTools] = useState<WorkflowTool[]>([]);
   const [references, setReferences] = useState<ReferenceView | null>(null);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
+  const [focusedRef, setFocusedRef] = useState(focusRef);
+  const quickConnectRef = useRef(false);
+
+  useEffect(() => {
+    if (focusRef) setFocusedRef(focusRef);
+  }, [focusRef]);
 
   useEffect(() => {
     let active = true;
@@ -114,9 +125,17 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
     const query = connectedSearch.trim().toLocaleLowerCase();
     return connected.filter(entry => !query || `${mcpConnectionTitle(entry)} ${entry.ref} ${String(entry.content.url ?? "")}`.toLocaleLowerCase().includes(query));
   }, [connected, connectedSearch]);
-  const items = market?.items ?? [];
-  const recommended = useMemo(() => !search.trim() && !category ? items.filter(item => market?.recommendedIds.includes(item.id)) : [], [items, market?.recommendedIds, search, category]);
-  const groups = useMemo(() => mcpCategoryGroups(items), [items]);
+  const items = useMemo(() => dedupeMcpMarketItems(market?.items ?? []), [market?.items]);
+  const recommendedItems = useMemo(() => resolveRecommendedMcpServers(items, market?.recommendedIds ?? []), [items, market?.recommendedIds]);
+  const recommendedIdentity = useMemo(() => ({
+    ids: new Set(recommendedItems.map(item => item.id)),
+    urls: new Set(recommendedItems.map(item => normalizeMcpUrl(item.url))),
+  }), [recommendedItems]);
+  const groups = useMemo(() => {
+    const recommended = items.filter(item => recommendedIdentity.ids.has(item.id) || recommendedIdentity.urls.has(normalizeMcpUrl(item.url)));
+    const ordinary = items.filter(item => !recommendedIdentity.ids.has(item.id) && !recommendedIdentity.urls.has(normalizeMcpUrl(item.url)));
+    return mcpCategoryGroups([...recommended, ...ordinary]);
+  }, [items, recommendedIdentity]);
   const toolGroups = useMemo(() => {
     const latest = new Map(connected.map(entry => [entry.ref, entry]));
     const groups = new Map<string, { entry: CatalogConnection; tools: WorkflowTool[] }>();
@@ -129,9 +148,70 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
     return [...groups.values()].filter(group => !connectedSearch.trim() || mcpConnectionTitle(group.entry).toLocaleLowerCase().includes(connectedSearch.trim().toLocaleLowerCase()) || group.tools.some(tool => mcpToolMatchesQuery(tool, connectedSearch)));
   }, [connected, mcpTools, connectedSearch]);
 
+  useEffect(() => {
+    if (tab !== "connected" || !focusedRef) return;
+    const card = [...document.querySelectorAll<HTMLElement>("[data-mcp-connection]")]
+      .find(node => node.dataset.mcpConnection === focusedRef);
+    card?.scrollIntoView({ block: "nearest" });
+  }, [tab, focusedRef, connected.length]);
+
   function refreshAll() {
     setMarketGeneration(value => value + 1);
     onResourcesChanged?.();
+  }
+  function isRecommendedItem(item: McpMarketItem): boolean {
+    return recommendedIdentity.ids.has(item.id) || recommendedIdentity.urls.has(normalizeMcpUrl(item.url));
+  }
+  function recommendationLabel(item: McpMarketItem, entry?: CatalogConnection): string {
+    if (entry) return "配置";
+    const action = mcpRecommendationAction(item);
+    return action === "login" ? "登录授权" : action === "quick" ? "一键连接" : "连接";
+  }
+  function openConnect(item: McpMarketItem) {
+    const entry = mcpConnectionFor(item, connections);
+    if (entry) { setDialog({ kind: "connect", entry }); return; }
+    const action = mcpRecommendationAction(item);
+    if (action === "login") { setDialog({ kind: "connect", server: item, loginOnly: true }); return; }
+    if (action === "quick") { setDialog(null); void quickConnect(item); return; }
+    setDialog({ kind: "connect", server: item });
+  }
+  async function quickConnect(item: McpMarketItem) {
+    if (busyKey || quickConnectRef.current) return;
+    const entry = mcpConnectionFor(item, connections);
+    if (entry) { setDialog({ kind: "connect", entry }); return; }
+    let draft: ReturnType<typeof mcpQuickConnectDraft>;
+    try {
+      draft = mcpQuickConnectDraft(item, connections);
+    } catch (reason) {
+      setFeedback({ ok: false, text: reason instanceof Error ? reason.message : workflowErrorMessage(reason) });
+      return;
+    }
+    quickConnectRef.current = true;
+    setBusyKey(`quick:${item.id}`);
+    setFeedback(null);
+    try {
+      // Publishing a guest connection is the user's explicit connect action.
+      // It deliberately grants no tools: allowedToolNames stays empty until
+      // the owner reviews and selects them in the existing tool scope editor.
+      await workflowApiV2.extension(environmentRef, {
+        action: "publish", kind: "connection", ref: draft.ref, version: draft.version, content: draft.content,
+      });
+      setTab("connected"); setFocusedRef(draft.ref); setConnectedSearch("");
+      setFeedback({ ok: true, text: `已连接「${item.title}」v${draft.version}，未自动授予任何工具。请在“已连接”中点“配置”明确勾选允许使用的工具。` });
+      refreshAll();
+      void workflowApiV2.testExtension(environmentRef, { ref: draft.ref, version: draft.version }).then(result => {
+        setTests(current => ({ ...current, [`${draft.ref}@${draft.version}`]: result }));
+        if (result.ok) {
+          const names = result.discoveredToolNames ?? result.tools?.map(tool => tool.name) ?? [];
+          setLocalDiscovered(current => ({ ...current, [draft.ref]: names }));
+        }
+      }).catch(() => undefined);
+    } catch (reason) {
+      setFeedback({ ok: false, text: workflowErrorMessage(reason) });
+    } finally {
+      quickConnectRef.current = false;
+      setBusyKey("");
+    }
   }
   function discoveredNamesFor(entry: CatalogConnection): string[] | undefined {
     const persisted = discovery[entry.ref];
@@ -205,6 +285,15 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
     }
   }
 
+  function renderMarketCard(item: McpMarketItem) {
+    const entry = mcpConnectionFor(item, connections);
+    return <MarketCard key={item.id} item={item} connection={entry}
+      state={entry ? toolStateFor(entry) : undefined} recommended={isRecommendedItem(item)}
+      actionLabel={recommendationLabel(item, entry)} busy={busyKey === `quick:${item.id}`}
+      onDetails={() => setDialog({ kind: "details", server: item })}
+      onConnect={() => openConnect(item)} />;
+  }
+
   const visibleNotice = notice && !noticeDismissed ? notice : "";
   const tabs: { id: McpTab; label: string; count?: number }[] = [
     { id: "market", label: "市场" },
@@ -238,14 +327,10 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
       {marketError ? <div className="wf-mcp-error" role="alert"><CircleAlert size={15} aria-hidden /><span>{marketError}</span><button type="button" onClick={() => setMarketGeneration(value => value + 1)}>重试</button></div> : null}
       {marketLoading && !market ? <p className="wf-mcp-loading" role="status"><LoaderCircle size={15} aria-hidden /> 正在读取官方 Registry 目录…</p> : null}
       {!marketLoading && market && !items.length ? <div className="wf-mcp-empty"><Server size={24} aria-hidden /><h4>没有匹配的 MCP 服务</h4><p>{search || category ? "试试清除搜索或分类筛选。" : "官方 Registry 暂时没有可用的远程服务；稍后再更新目录。"}</p></div> : null}
-      {recommended.length && !category && !search ? <section className="wf-mcp-section" aria-label="推荐服务">
-        <header><div><h4>目录置顶</h4><p>管理员置顶与最近收录，展示顺序不代表质量认证</p></div></header>
-        <div className="wf-mcp-grid">{recommended.map(item => { const entry = mcpConnectionFor(item, connections); return <MarketCard key={item.id} item={item} connection={entry} state={entry ? toolStateFor(entry) : undefined} onDetails={() => setDialog({ kind: "details", server: item })} onConnect={() => setDialog({ kind: "connect", server: entry ? undefined : item, ...(entry ? { entry } : {}) })} />; })}</div>
-      </section> : null}
-      {search || category ? <section className="wf-mcp-section" aria-label="搜索结果"><header><div><h4>{category ? market?.categories.find(item => item.key === category)?.label ?? "筛选结果" : "搜索结果"}</h4><p>{items.length} 个服务</p></div></header><div className="wf-mcp-grid">{items.map(item => { const entry = mcpConnectionFor(item, connections); return <MarketCard key={item.id} item={item} connection={entry} state={entry ? toolStateFor(entry) : undefined} onDetails={() => setDialog({ kind: "details", server: item })} onConnect={() => setDialog({ kind: "connect", server: entry ? undefined : item, ...(entry ? { entry } : {}) })} />; })}</div></section> : null}
+      {search || category ? <section className="wf-mcp-section" aria-label="搜索结果"><header><div><h4>{category ? market?.categories.find(item => item.key === category)?.label ?? "筛选结果" : "搜索结果"}</h4><p>{items.length} 个服务</p></div></header><div className="wf-mcp-grid">{items.map(renderMarketCard)}</div></section> : null}
       {!search && !category ? groups.map(group => <section className="wf-mcp-section" key={group.key} aria-label={group.label}>
         <header><div><h4>{group.label}</h4><p>{group.items.length} 个服务</p></div><button type="button" className="wf-mcp-link" onClick={() => setCategory(group.key)}>查看全部 <ChevronRight size={13} aria-hidden /></button></header>
-        <div className="wf-mcp-grid">{group.items.slice(0, 9).map(item => { const entry = mcpConnectionFor(item, connections); return <MarketCard key={item.id} item={item} connection={entry} state={entry ? toolStateFor(entry) : undefined} onDetails={() => setDialog({ kind: "details", server: item })} onConnect={() => setDialog({ kind: "connect", server: entry ? undefined : item, ...(entry ? { entry } : {}) })} />; })}</div>
+        <div className="wf-mcp-grid">{group.items.slice(0, 9).map(renderMarketCard)}</div>
       </section>) : null}
       {market?.hasMore ? <div className="wf-mcp-more"><button type="button" className="primary" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "加载中…" : `加载更多（已加载 ${items.length} / ${market.total}）`}</button></div> : null}
       <div className="wf-mcp-custom"><button type="button" onClick={() => setDialog({ kind: "connect" })}>连接自定义远程 MCP 服务</button><span>只接受 HTTPS 远程地址；不会安装或运行本地服务。</span></div>
@@ -261,7 +346,7 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
         const status = mcpConnectionStatus(entry, state);
         const testResult = tests[key];
         const olderVersions = connections.filter(item => item.ref === entry.ref && item.version < entry.version).length;
-        return <article className="wf-mcp-connection-card" key={key} data-mcp-connection={entry.ref} data-focused={focusRef === entry.ref ? "true" : undefined}>
+        return <article className="wf-mcp-connection-card" key={key} data-mcp-connection={entry.ref} data-focused={focusedRef === entry.ref ? "true" : undefined}>
           <header>
             <span className={`wf-mcp-status is-${status.tone}`}>{status.label}</span>
             <div><strong>{mcpConnectionTitle(entry)}</strong><small>当前 v{entry.version} · {mcpTransportLabel(String(entry.content.transport ?? "streamable-http"))}</small></div>
@@ -278,7 +363,7 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
               <button type="button" onClick={() => setDialog({ kind: "tools", entry })}>工具范围</button>
             </>}
             <button type="button" aria-expanded={references?.key === entry.ref} onClick={() => void toggleReferences(entry)}>引用</button>
-            {entry.disabled ? null : <button type="button" className="danger" disabled={busyKey === `disable:${key}`} onClick={() => setDialog({ kind: "disable", entry })}>断开</button>}
+            {entry.disabled ? <button type="button" className="danger" onClick={() => setDialog({ kind: "delete", entry })}>永久删除</button> : <button type="button" className="danger" disabled={busyKey === `disable:${key}`} onClick={() => setDialog({ kind: "disable", entry })}>断开</button>}
           </div>
           {entry.disabled ? <p className="wf-field-note" role="status">此连接已断开且不可调用；允许配置仍保留 {state.allowed} 项，但实际可用为 0。点“重新连接”新建版本后会重新读取工具范围。</p> : null}
           {testResult && !entry.disabled ? <ResourceTestPanel result={testResult} toolsLabel="当前允许的工具" /> : null}
@@ -294,7 +379,7 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
         const state = toolStateFor(group.entry);
         const labels = mcpToolCountLabels(state, { disabled: group.entry.disabled });
         return <article className="wf-mcp-tool-group" key={group.entry.ref}>
-          <header><div><strong>{mcpConnectionTitle(group.entry)}</strong><small>{mcpConnectionAuth(group.entry)} · {labels.allowed} · {labels.discovered} · {labels.usable} · v{group.entry.version}</small></div><div className="wf-resource-actions">{group.entry.disabled ? <button type="button" className="primary" onClick={() => setDialog({ kind: "connect", entry: group.entry })}>重新连接</button> : <><button type="button" disabled={busyKey === `test:${group.entry.ref}@${group.entry.version}`} onClick={() => void testConnection(group.entry)}>{busyKey === `test:${group.entry.ref}@${group.entry.version}` ? "读取中…" : "刷新工具"}</button><button type="button" className="primary" onClick={() => setDialog({ kind: "tools", entry: group.entry })}>管理范围</button></>}</div></header>
+          <header><div><strong>{mcpConnectionTitle(group.entry)}</strong><small>{mcpConnectionAuth(group.entry)} · {labels.allowed} · {labels.discovered} · {labels.usable} · v{group.entry.version}</small></div><div className="wf-resource-actions">{group.entry.disabled ? <><button type="button" className="danger" onClick={() => setDialog({ kind: "delete", entry: group.entry })}>永久删除</button><button type="button" className="primary" onClick={() => setDialog({ kind: "connect", entry: group.entry })}>重新连接</button></> : <><button type="button" disabled={busyKey === `test:${group.entry.ref}@${group.entry.version}`} onClick={() => void testConnection(group.entry)}>{busyKey === `test:${group.entry.ref}@${group.entry.version}` ? "读取中…" : "刷新工具"}</button><button type="button" className="primary" onClick={() => setDialog({ kind: "tools", entry: group.entry })}>管理范围</button></>}</div></header>
           {!group.entry.disabled && group.tools.length ? <ul>{group.tools.map(tool => <li key={tool.ref}><span><strong>{tool.name}</strong>{tool.description ? <small>{tool.description}</small> : null}</span><span className="wf-mcp-tool-meta">{tool.available === false ? "不可用" : [tool.declaredReadOnly ? "服务声明只读" : tool.declaredDestructive ? "服务声明可能写入" : "", typeof tool.inputSchema === "object" && tool.inputSchema ? `${Object.keys((tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}).length} 个参数` : ""].filter(Boolean).join(" · ")}</span></li>)}</ul> : <p className={`wf-field-note${state.allowed ? " is-warn" : ""}`}>{group.entry.disabled ? "连接已断开，当前没有可调用工具。允许配置仍保留，实际可用为 0；重新连接后刷新工具范围。" : state.discovered === null ? "尚未读取服务端工具；已允许数量不会被当成发现数量。点“刷新工具”读取实际列表。" : "服务端本次没有返回可进入工作流的工具。已允许配置仍保留，可在“管理范围”中核对。"}</p>}
         </article>;
       })}</div>
@@ -302,10 +387,12 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
     </section> : null}
 
     {dialog?.kind === "connect" ? <McpConnectDialog
-      key={`${dialog.server?.id ?? dialog.entry?.ref ?? "custom"}:${dialog.entry?.version ?? "new"}`}
+      key={`${dialog.server?.id ?? dialog.entry?.ref ?? "custom"}:${dialog.entry?.version ?? "new"}:${dialog.loginOnly ? "login" : "config"}`}
       environmentRef={environmentRef}
       server={dialog.server}
       entry={dialog.entry}
+      loginOnly={dialog.loginOnly}
+      loginScopes={dialog.loginOnly ? dialog.server?.oauthScopes : undefined}
       connections={connections}
       returnTo={typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`}
       onClose={() => setDialog(null)}
@@ -316,22 +403,47 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
           setTests(current => ({ ...current, [`${ref}@${version}`]: result }));
         }).catch(() => undefined);
       }}
+      onOAuthConnected={(ref, version, _content, result) => {
+        setDialog(null); setTab("connected"); setFocusedRef(ref); setConnectedSearch("");
+        if (result.ok) {
+          // testExtension returns every tool with an allowed flag; the card's
+          // shared test panel is labelled as the allowed subset, so only keep
+          // the discovery names here and let "刷新工具" load the allowed list.
+          const names = result.discoveredToolNames ?? result.tools?.map(tool => tool.name) ?? [];
+          setLocalDiscovered(current => ({ ...current, [ref]: names }));
+        } else {
+          setTests(current => ({ ...current, [`${ref}@${version}`]: result }));
+        }
+        setFeedback(result.ok
+          ? { ok: true, text: `OAuth 授权已由服务端确认，连接「${ref}」v${version} 已保存，服务端返回 ${result.tools?.length ?? 0} 个工具。已切到“已连接”并定位该连接；请点“配置”明确勾选允许使用的工具。` }
+          : { ok: false, text: `OAuth 授权已保存为「${ref}」v${version}，但连接测试未通过：${result.error?.message || mcpConnectionErrorMessage(result.error?.code)}。可在“已连接”中重试，工具权限尚未授予。` });
+        refreshAll();
+      }}
     /> : null}
-    {dialog?.kind === "details" ? <MarketDetails item={dialog.server} connection={mcpConnectionFor(dialog.server, connections)} state={(() => { const entry = mcpConnectionFor(dialog.server, connections); return entry ? toolStateFor(entry) : undefined; })()} onClose={() => setDialog(null)} onConnect={() => { const entry = mcpConnectionFor(dialog.server, connections); setDialog({ kind: "connect", server: entry ? undefined : dialog.server, ...(entry ? { entry } : {}) }); }} /> : null}
+    {dialog?.kind === "details" ? <MarketDetails item={dialog.server} connection={mcpConnectionFor(dialog.server, connections)} state={(() => { const entry = mcpConnectionFor(dialog.server, connections); return entry ? toolStateFor(entry) : undefined; })()} onClose={() => setDialog(null)} onConnect={() => openConnect(dialog.server)} /> : null}
     {dialog?.kind === "admin" && market ? <McpAdminDialog categories={market.categories} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); setFeedback({ ok: true, text: "补充目录已保存。" }); refreshAll(); }} /> : null}
+    {dialog?.kind === "delete" ? <ResourceDeleteDialog
+      key={`delete:${dialog.entry.ref}:${dialog.entry.version}`}
+      environmentRef={environmentRef}
+      target={{ kind: "connection", ref: dialog.entry.ref, version: dialog.entry.version, name: mcpConnectionTitle(dialog.entry), noun: "MCP 连接", versions: connections.filter(item => item.ref === dialog.entry.ref).length, hasCredential: dialog.entry.hasCredential }}
+      onClose={() => setDialog(null)}
+      onDeleted={message => { setDialog(null); setFeedback({ ok: true, text: message }); refreshAll(); }}
+      onOpenReference={row => { setDialog(null); onOpenReference?.(row); }}
+    /> : null}
     {dialog?.kind === "disable" ? <McpModal title="断开 MCP 连接" subtitle={`${mcpConnectionTitle(dialog.entry)} · v${dialog.entry.version}`} onClose={() => setDialog(null)} footer={<div className="wf-resource-actions"><button type="button" onClick={() => setDialog(null)}>取消</button><button type="button" className="danger" disabled={Boolean(busyKey)} onClick={() => void confirmDisable(dialog.entry)}>{busyKey ? "正在断开…" : "断开连接"}</button></div>}><p>断开后，该连接的所有版本都会停止调用，凭据权限立即失效；已有历史结果不受影响。</p><p className="wf-field-note">需要恢复时请重新连接；旧工作流会明确提示连接已断开。</p></McpModal> : null}
     {dialog?.kind === "tools" ? <McpToolPolicyDialog environmentRef={environmentRef} entry={dialog.entry} connections={connections} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); setFeedback({ ok: true, text: "工具允许范围已更新。" }); refreshAll(); }} /> : null}
   </section>;
 }
 
 function MarketDetails({ item, connection, state, onClose, onConnect }: { item: McpMarketItem; connection?: CatalogConnection; state?: McpToolState; onClose: () => void; onConnect: () => void }) {
-  return <McpModal title={item.title} subtitle={item.name} onClose={onClose} wide footer={<div className="wf-resource-actions"><button type="button" onClick={onClose}>关闭</button><button type="button" className="primary" onClick={onConnect}>{connection ? "配置连接" : "连接此服务"}</button></div>}>
-    <div className="wf-mcp-detail-meta"><span className="wf-mcp-badge">{item.source === "registry" ? "官方 MCP Registry" : "管理员补充"}</span><span className="wf-mcp-badge">{item.categoryLabel}</span><span className="wf-mcp-badge">{mcpTransportLabel(item.transport)}</span><span className="wf-mcp-badge">{mcpAuthHintLabel(item.authHint)}</span>{item.featured ? <span className="wf-mcp-badge is-ok">管理员置顶</span> : null}</div>
+  const action = mcpRecommendationAction(item);
+  return <McpModal title={item.title} subtitle={item.name} onClose={onClose} wide footer={<div className="wf-resource-actions"><button type="button" onClick={onClose}>关闭</button><button type="button" className="primary" onClick={onConnect}>{connection ? "配置连接" : action === "login" ? "登录授权" : action === "quick" ? "一键连接" : "连接此服务"}</button></div>}>
+    <div className="wf-mcp-detail-meta"><span className="wf-mcp-badge">{item.source === "registry" ? "官方 MCP Registry" : "管理员补充"}</span><span className="wf-mcp-badge">{item.categoryLabel}</span><span className="wf-mcp-badge">{mcpTransportLabel(item.transport)}</span><span className="wf-mcp-badge">{mcpAuthHintLabel(item.authHint)}</span>{item.recommended ? <span className="wf-mcp-badge is-ok">推荐</span> : null}{item.featured ? <span className="wf-mcp-badge is-ok">管理员置顶</span> : null}</div>
     <p className="wf-mcp-detail-description">{item.description || "此服务暂未提供说明。"}</p>
     <dl className="wf-mcp-detail-list">
       <dt>远程地址</dt><dd><code>{item.url}</code></dd>
       <dt>版本</dt><dd>{item.version || "未标注"}</dd>
-      <dt>来源标识</dt><dd>{item.sourceId}</dd>
+      {item.sourceId ? <><dt>来源标识</dt><dd>{item.sourceId}</dd></> : null}
       {item.websiteUrl ? <><dt>服务主页</dt><dd><a href={item.websiteUrl} target="_blank" rel="noreferrer">打开 <ExternalLink size={12} aria-hidden /></a></dd></> : null}
       {item.repositoryUrl ? <><dt>代码仓库</dt><dd><a href={item.repositoryUrl} target="_blank" rel="noreferrer">查看 <ExternalLink size={12} aria-hidden /></a></dd></> : null}
       {connection ? <><dt>当前连接</dt><dd>{mcpConnectionTitle(connection)} · {mcpConnectionAuth(connection)} · {state ? `${mcpToolCountLabels(state, { disabled: connection.disabled }).allowed} · ${mcpToolCountLabels(state, { disabled: connection.disabled }).discovered} · ${mcpToolCountLabels(state, { disabled: connection.disabled }).usable}` : "工具状态待读取"}</dd></> : null}
@@ -344,28 +456,54 @@ function MarketDetails({ item, connection, state, onClose, onConnect }: { item: 
 function McpAdminDialog({ categories, onClose, onSaved }: { categories: { key: string; label: string }[]; onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(categories[0]?.key ?? "other");
   const [authHint, setAuthHint] = useState("unknown");
   const [featured, setFeatured] = useState(false);
+  const [connectMode, setConnectMode] = useState<"config" | "quick" | "login">("config");
+  const [oauthScopes, setOauthScopes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  function toggleFeatured(value: boolean) {
+    setFeatured(value);
+    if (!value) setConnectMode("config");
+  }
+  function chooseMode(value: "config" | "quick" | "login") {
+    setConnectMode(value);
+    if (value === "quick") setAuthHint("none");
+    if (value === "login") setAuthHint("oauth");
+  }
   async function save() {
+    const scopes = [...new Set(oauthScopes.split(/[\s,]+/).filter(Boolean))];
+    if (connectMode === "quick" && authHint !== "none") { setError("免配置直连需要选择“无需鉴权”。"); return; }
+    if (connectMode === "login" && authHint !== "oauth") { setError("服务方登录需要选择 OAuth 鉴权。"); return; }
+    if (connectMode === "login" && !scopes.length) { setError("服务方登录需要至少一个已核验的授权范围。"); return; }
     setBusy(true); setError("");
     try {
-      await workflowApiV2.supplementMcpMarket({ title: title.trim(), name: title.trim(), url: url.trim(), description: description.trim(), category, authHint, featured, transport: "streamable-http" });
+      await workflowApiV2.supplementMcpMarket({
+        title: title.trim(), name: title.trim(), url: url.trim(), description: description.trim(), category, authHint,
+        ...(websiteUrl.trim() ? { websiteUrl: websiteUrl.trim() } : {}),
+        featured, connectMode: featured ? connectMode : "config",
+        oauthScopes: featured && connectMode === "login" ? scopes : [], transport: "streamable-http",
+      });
       onSaved();
     } catch (reason) { setError(workflowErrorMessage(reason)); }
     finally { setBusy(false); }
   }
-  return <McpModal title="补充 MCP 目录" subtitle="仅管理员可用；补充项与官方 Registry 一起展示，不写入代码仓库或种子数据" onClose={onClose} footer={<div className="wf-resource-actions"><button type="button" onClick={onClose}>取消</button><button type="button" className="primary" disabled={busy} onClick={() => void save()}>{busy ? "保存中…" : "保存补充项"}</button></div>}>
+  return <McpModal title="补充 MCP 目录" subtitle="仅管理员可用；推荐位与连接方式保存在数据库，不写入代码仓库或种子数据" onClose={onClose} footer={<div className="wf-resource-actions"><button type="button" onClick={onClose}>取消</button><button type="button" className="primary" disabled={busy} onClick={() => void save()}>{busy ? "保存中…" : "保存补充项"}</button></div>}>
     {error ? <p className="wf-resource-feedback is-error" role="alert">{error}</p> : null}
     <label>名称<input value={title} onChange={event => setTitle(event.target.value)} placeholder="例如 内部知识库 MCP" /></label>
     <label>远程地址<input value={url} onChange={event => setUrl(event.target.value)} placeholder="https://example.com/mcp" /></label>
+    <label>服务主页（可选）<input value={websiteUrl} onChange={event => setWebsiteUrl(event.target.value)} placeholder="https://example.com" /></label>
     <label>说明<textarea value={description} onChange={event => setDescription(event.target.value)} rows={3} placeholder="只写真实有文档或 Registry 证据的能力说明" /></label>
-    <div className="wf-mcp-form-grid"><label>分类<select value={category} onChange={event => setCategory(event.target.value)}>{categories.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label>鉴权提示<select value={authHint} onChange={event => setAuthHint(event.target.value)}><option value="unknown">待确认</option><option value="none">无需鉴权</option><option value="oauth">OAuth</option><option value="bearer">Bearer</option><option value="api-key">API Key</option></select></label></div>
-    <label className="wf-resource-checkbox"><input type="checkbox" checked={featured} onChange={event => setFeatured(event.target.checked)} />在目录中置顶展示（不代表官方质量认证）</label>
-    <p className="wf-field-note">保存前会校验 HTTPS 和公网目标；不会接受本地命令、stdio 包或内网地址。</p>
+    <div className="wf-mcp-form-grid"><label>分类<select value={category} onChange={event => setCategory(event.target.value)}>{categories.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label>鉴权提示<select aria-label="鉴权提示" value={authHint} onChange={event => setAuthHint(event.target.value)}><option value="unknown">待确认</option><option value="none">无需鉴权</option><option value="oauth">OAuth</option><option value="bearer">Bearer</option><option value="api-key">API Key</option></select></label></div>
+    <label className="wf-resource-checkbox"><input type="checkbox" checked={featured} onChange={event => toggleFeatured(event.target.checked)} />放入目录推荐/置顶位（不代表官方质量认证）</label>
+    {featured ? <div className="wf-mcp-form-grid">
+      <label>推荐连接方式<select aria-label="推荐连接方式" value={connectMode} onChange={event => chooseMode(event.target.value as "config" | "quick" | "login")}><option value="config">需要用户确认配置（默认）</option><option value="quick">免配置直连（仅无需鉴权）</option><option value="login">服务方登录（仅 OAuth）</option></select></label>
+      {connectMode === "login" ? <label>已核验授权范围<input aria-label="已核验授权范围" value={oauthScopes} onChange={event => setOauthScopes(event.target.value)} placeholder="例如 scope:read scope:write" /></label> : null}
+    </div> : null}
+    <p className="wf-field-note">默认需要用户确认连接配置；只有显式选择免配置直连或服务方登录时，推荐卡才跳过配置表单。任何连接都不会自动授予工具权限。保存前会校验 HTTPS、公网目标和推荐元数据一致性。</p>
   </McpModal>;
 }
 

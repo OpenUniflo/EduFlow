@@ -541,7 +541,8 @@
 .wf-resource-menu-panel button.is-danger:hover {
   background: #fff1f3;
 }
-.wf-resource-modal.wf-provider-delete {
+.wf-resource-modal.wf-provider-delete,
+.wf-resource-modal.wf-resource-delete {
   width: min(640px, calc(100vw - 48px));
   max-height: 88vh;
 }
@@ -593,7 +594,8 @@
 .wf-resource-modal .wf-resource-conflict .wf-resource-reference-list li {
   background: #fff;
 }
-.wf-resource-modal .wf-provider-delete .wf-resource-checkbox {
+.wf-resource-modal .wf-provider-delete .wf-resource-checkbox,
+.wf-resource-modal .wf-resource-delete .wf-resource-checkbox {
   margin: 10px 0 0;
 }
 .wf-resource-modal button.danger {
@@ -605,7 +607,8 @@
   background: #a34252;
 }
 @media (max-width: 600px) {
-  .wf-resource-modal.wf-provider-delete {
+  .wf-resource-modal.wf-provider-delete,
+  .wf-resource-modal.wf-resource-delete {
     width: 100%;
     max-height: none;
   }

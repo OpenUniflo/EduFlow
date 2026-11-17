@@ -1,5 +1,5 @@
-import type { JsonValue, WorkflowTool } from "../domain/v2/types";
-import { latestConnectionsOfType, type CatalogConnection } from "./resourceModel";
+import type { JsonValue, McpMarketItem, WorkflowTool } from "../domain/v2/types";
+import { latestConnectionsOfType, latestVersion, type CatalogConnection } from "./resourceModel";
 
 export type McpTab = "market" | "connected" | "tools";
 export type McpDraftAuth = "none" | "bearer" | "api-key" | "oauth" | "legacy";
@@ -42,14 +42,52 @@ export function mcpAuthTypeOf(content: Record<string, JsonValue>, hasCredential 
 export function latestMcpConnections(connections: readonly CatalogConnection[]): CatalogConnection[] {
   return latestConnectionsOfType(connections, "mcp-http");
 }
+/** URL comparison for catalog/connection association; a trailing slash is not an identity. */
+export function normalizeMcpUrl(value: unknown): string {
+  return String(value ?? "").trim().replace(/\/+$/, "");
+}
+export type McpRecommendationAction = "config" | "quick" | "login";
+/**
+ * A featured catalog row is only a direct action when an administrator chose a
+ * compatible recommendation mode. Existing featured rows stay on the ordinary
+ * configuration path by default, so `featured` alone never grants free connect.
+ */
+export function mcpRecommendationAction(item: Pick<McpMarketItem, "connectMode" | "authHint" | "oauthScopes">): McpRecommendationAction {
+  if (item.connectMode === "quick" && item.authHint === "none") return "quick";
+  if (item.connectMode === "login" && item.authHint === "oauth" && item.oauthScopes.length > 0) return "login";
+  return "config";
+}
+function preferredMarketRow(left: McpMarketItem, right: McpMarketItem): McpMarketItem {
+  if (left.featured !== right.featured) return left.featured ? left : right;
+  if (left.source !== right.source) return left.source === "admin" ? left : right;
+  return left;
+}
+/** Collapse duplicate endpoint rows, preferring a featured administrator row. */
+export function dedupeMcpMarketItems(items: readonly McpMarketItem[]): McpMarketItem[] {
+  const byUrl = new Map<string, McpMarketItem>();
+  for (const item of items) {
+    const key = normalizeMcpUrl(item.url);
+    if (!key) continue;
+    const existing = byUrl.get(key);
+    byUrl.set(key, existing ? preferredMarketRow(existing, item) : item);
+  }
+  return [...byUrl.values()];
+}
+/**
+ * Recommendation cards come from the API's featured rows (`recommendedIds`).
+ * Collapse duplicate URLs and prefer the administrator row so reviewed display
+ * and connect metadata win over a duplicate Registry row.
+ */
+export function resolveRecommendedMcpServers(items: readonly McpMarketItem[], recommendedIds: readonly string[] = []): McpMarketItem[] {
+  const recommended = new Set(recommendedIds);
+  return dedupeMcpMarketItems(items.filter(item => recommended.has(item.id) || item.recommended))
+    .map(item => item.recommended ? item : { ...item, recommended: true });
+}
 export function mcpConnectionFor(server: { sourceId: string; url: string; suggestedRef: string }, connections: readonly CatalogConnection[]): CatalogConnection | undefined {
-  const normalized = server.url.replace(/\/+$/, "");
-  return latestMcpConnections(connections).find(entry => {
-    const content = entry.content;
-    const registry = typeof content.registryServerId === "string" ? content.registryServerId : "";
-    if (registry && registry === server.sourceId) return true;
-    return String(content.url ?? "").replace(/\/+$/, "") === normalized || entry.ref === server.suggestedRef;
-  });
+  const normalized = normalizeMcpUrl(server.url);
+  // The endpoint owns the association. A reused ID must not route a market card
+  // to a different endpoint, for example a local test double.
+  return normalized ? latestMcpConnections(connections).find(entry => normalizeMcpUrl(entry.content.url) === normalized) : undefined;
 }
 export function uniqueMcpRef(base: string, existing: readonly string[]): string {
   const fallback = (base || "mcp_service").toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").replace(/^[^a-z]+|_+$/g, "").slice(0, 70) || "mcp_service";
@@ -124,6 +162,26 @@ export function mcpAllowedToolNames(entry: CatalogConnection): string[] {
 }
 export function mcpConnectionRefFor(server: { suggestedRef: string }, connections: readonly CatalogConnection[]): string {
   return uniqueMcpRef(server.suggestedRef, connections.map(entry => entry.ref));
+}
+/** One-click guest connection content. Tool permission is deliberately empty until the owner allows it. */
+export function mcpQuickConnectDraft(item: Pick<McpMarketItem, "source" | "sourceId" | "title" | "url" | "transport" | "authHint" | "suggestedRef" | "connectMode" | "oauthScopes">, connections: readonly CatalogConnection[]): { ref: string; version: number; content: Record<string, JsonValue> } {
+  if (mcpRecommendationAction(item) !== "quick") throw new Error("此服务需要登录授权或连接配置，不能免配置直接连接。");
+  const ref = mcpConnectionRefFor(item, connections);
+  const version = latestVersion(connections, ref) + 1;
+  return {
+    ref,
+    version,
+    content: {
+      type: "mcp-http",
+      name: item.title,
+      url: item.url,
+      transport: item.transport,
+      authType: "none",
+      allowedToolNames: [],
+      serverTitle: item.title,
+      ...(item.source === "registry" && item.sourceId ? { registryServerId: item.sourceId } : {}),
+    },
+  };
 }
 export function mcpServerInitials(title: string): string {
   const compact = title.trim().replace(/\s+/g, " ");

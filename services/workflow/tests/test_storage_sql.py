@@ -547,6 +547,69 @@ def test_connection_delete_rechecks_all_versions_and_nested_references_in_one_tr
     """)
 
 
+def test_function_delete_rechecks_versions_nested_graphs_and_handlers_in_one_transaction():
+    owner = str(uuid.uuid4())
+    other = str(uuid.uuid4())
+    workflow = "function-delete-" + str(uuid.uuid4())
+    definition = {
+        "name": "Function References", "revision": 1,
+        "nodes": [
+            {"id": "fn", "type": "core.function", "config": {"implementation": "registered", "functionRef": "cleanup", "functionVersion": 1}},
+            {"id": "model", "type": "core.llm", "config": {"providerRef": "platform", "modelRef": "m1", "authoring": {"errorHandler": {"functionRef": "cleanup", "functionVersion": 2}}}},
+            {"id": "sub", "type": "core.subgraph", "config": {"graph": {"nodes": [
+                {"id": "inner", "type": "core.function", "config": {"implementation": "registered", "functionRef": "cleanup", "functionVersion": 1}},
+            ]}}},
+        ],
+        "transitions": [],
+    }
+    editor = {"schemaVersion": 1, "workflowId": workflow, "editorRevision": 1, "definitionRevision": 1, "nodes": {}, "edges": {}}
+    quoted = lambda value: "'" + json.dumps(value).replace("'", "''") + "'::jsonb"
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values
+      ('{owner}','authenticated','authenticated','{owner}@integration.invalid'),
+      ('{other}','authenticated','authenticated','{other}@integration.invalid');
+    select workflow_private.p4_catalog_save('{owner}','local','function','cleanup',1,
+      jsonb_build_object('name','Cleanup v1','language','python','code','def process(input, context): return {{}}'),false);
+    select workflow_private.p4_catalog_save('{owner}','local','function','cleanup',2,
+      jsonb_build_object('name','Cleanup v2','language','javascript','code','function process(input, context) {{ return {{}}; }}'),false);
+    select workflow_private.p4_catalog_save('{other}','local','function','cleanup',1,
+      jsonb_build_object('name','Other Cleanup','language','python','code','def process(input, context): return {{}}'),false);
+    select public.workflow_v2_save('{owner}','{workflow}',null,null,{quoted(definition)},{quoted(editor)},'hash',null,'local');
+    do $$ declare n integer; begin
+      select workflow_private.p4_function_reference_count('{owner}','cleanup') into n;
+      if n<>2 then raise exception 'FAILED function reference usage count %',n; end if;
+      begin perform workflow_private.p4_function_delete('{owner}','local','cleanup',2);
+        raise exception 'FAILED function delete with references';
+      exception when others then
+        if sqlerrm not like '%FUNCTION_IN_USE%' then raise; end if;
+      end;
+      begin perform workflow_private.p4_function_delete('{owner}','local','cleanup',1);
+        raise exception 'FAILED stale function version accepted';
+      exception when others then
+        if sqlerrm not like '%FUNCTION_VERSION_CONFLICT%' then raise; end if;
+      end;
+    end $$;
+    update public.workflow_revisions set definition=jsonb_set(definition,'{{nodes}}','[]'::jsonb)
+      where owner_user_id='{owner}' and workflow_id='{workflow}' and revision=1;
+    do $$ declare result jsonb; begin
+      result:=workflow_private.p4_function_delete('{owner}','local','cleanup',2);
+      if (result->>'deleted')::integer<>2 then raise exception 'FAILED all-version function delete'; end if;
+      if exists(select from workflow_private.p4_catalog where owner_user_id='{owner}' and kind='function' and ref='cleanup') then
+        raise exception 'FAILED function catalog rows remain';
+      end if;
+      if not exists(select from workflow_private.p4_catalog where owner_user_id='{other}' and kind='function' and ref='cleanup') then
+        raise exception 'FAILED cross-owner function deletion';
+      end if;
+      if has_function_privilege('authenticated','workflow_private.p4_function_delete(uuid,text,text,integer)','execute')
+        or has_function_privilege('anon','workflow_private.p4_function_delete(uuid,text,text,integer)','execute') then
+        raise exception 'FAILED function delete privilege exposed';
+      end if;
+    end $$;
+    rollback;
+    """)
+
+
 def test_connection_delete_waits_for_an_inflight_workflow_save_and_then_rechecks():
     import time
     owner = str(uuid.uuid4())

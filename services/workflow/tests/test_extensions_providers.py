@@ -565,6 +565,25 @@ async def test_delete_checks_the_latest_version_then_delegates_physical_cleanup(
     assert stale.value.code == 'CONNECTION_VERSION_CONFLICT'
 
 
+async def test_function_delete_checks_the_latest_version_and_delegates_physical_cleanup(monkeypatch):
+    rows = [
+        {'kind': 'function', 'ref': 'cleanup', 'version': 1, 'disabled': False, 'content': {'name': 'Cleanup v1', 'language': 'python', 'code': 'def process(input, context): return {}'}},
+        {'kind': 'function', 'ref': 'cleanup', 'version': 3, 'disabled': True, 'content': {'name': 'Cleanup v3', 'language': 'javascript', 'code': 'function process(input, context) { return {}; }'}},
+    ]
+    storage = install_lifecycle_storage(monkeypatch, rows)
+    body = {'ownerId': 'a', 'environmentRef': 'local', 'action': 'delete', 'kind': 'function', 'ref': 'cleanup', 'version': 3}
+    assert await extensions.catalog_operation(body, FakeRegistry(local_env())) == {'ok': True}
+    assert storage.calls == [('p4_function_delete', ('a', 'local', 'cleanup', 3))]
+
+    with pytest.raises(ExecutionError) as stale:
+        await extensions.catalog_operation({**body, 'version': 2}, FakeRegistry(local_env()))
+    assert stale.value.code == 'FUNCTION_VERSION_CONFLICT'
+
+    with pytest.raises(ExecutionError) as missing:
+        await extensions.catalog_operation({**body, 'ref': 'absent'}, FakeRegistry(local_env()))
+    assert missing.value.code == 'FUNCTION_UNAVAILABLE'
+
+
 async def test_catalog_test_returns_the_unified_model_result(monkeypatch, local_fixtures):
     with local_http(lambda request, body: (200, json.dumps({'data': [{'id': 'z-model'}, {'id': 'a-model'}]}).encode(), {})) as base:
         rows = [{'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': base, 'modelRefs': ['a-model']}}]

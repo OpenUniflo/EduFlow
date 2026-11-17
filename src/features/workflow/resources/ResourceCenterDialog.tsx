@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { Braces, MoreHorizontal, Pencil, Plus, Search, Server, Sparkles, Trash2, Wrench, X } from "lucide-react";
+import { Braces, MoreHorizontal, Pencil, Plus, Search, Server, Sparkles, Wrench, X } from "lucide-react";
 import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
 import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ConnectionTestResult, JsonValue, ResourceReferenceRow, WorkflowConfiguration, WorkflowTool } from "../domain/v2/types";
@@ -11,6 +11,7 @@ import { McpResource } from "./McpResource";
 import { apiDisplayUrl } from "./apiResourceModel";
 import { providerModelSummary } from "./providerModel";
 import { ResourceEditor, type ResourceEditorTarget } from "./ResourceEditor";
+import { ResourceDeleteDialog, type ResourceDeleteTarget } from "./ResourceDeleteDialog";
 import { VariableTable } from "./VariableTable";
 import { RESOURCE_SECTIONS, resourceSectionMeta, type ResourceCenterProps, type ResourceSection } from "./resourceTypes";
 import "./resourceCenter.css";
@@ -23,6 +24,7 @@ const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disa
 type Feedback = { ok: boolean; text: string } | null;
 type TestView = { key: string; result: ConnectionTestResult };
 type MenuKey = string | null;
+type DeleteView = { target: ResourceDeleteTarget };
 type ProviderDeleteState = {
   entry: CatalogConnection;
   loading: boolean;
@@ -64,6 +66,7 @@ export function ResourceCenterDialog({ open, environmentRef, environmentLoading,
   const [tests, setTests] = useState<Record<string, ConnectionTestResult>>({});
   const [busyKey, setBusyKey] = useState("");
   const [menuOpen, setMenuOpen] = useState<MenuKey>(null);
+  const [deleteView, setDeleteView] = useState<DeleteView | null>(null);
   const [providerDelete, setProviderDelete] = useState<ProviderDeleteState | null>(null);
   const [tools, setTools] = useState<WorkflowTool[]>([]);
   const panel = useRef<HTMLElement>(null);
@@ -288,7 +291,7 @@ export function ResourceCenterDialog({ open, environmentRef, environmentLoading,
             <div className="wf-resource-center-actions">
               <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "api", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
               <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || entry.disabled} onClick={() => openEditor({ kind: "api", mode: "edit", ref: entry.ref })}>测试</button>
-              <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button></div></details>
+              <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button><button type="button" className="is-danger" data-resource-action="delete" disabled={Boolean(busyKey)} onClick={() => { setMenuOpen(null); setFeedback(null); setDeleteView({ target: { kind: "connection", ref: entry.ref, version: entry.version, name, noun: "API 连接", versions: data.connections.filter(item => item.ref === entry.ref).length, hasCredential: entry.hasCredential } }); }}>永久删除…</button></div></details>
             </div>
             {tests[key] ? <ResourceTestPanel result={tests[key]}/> : null}
           </article>;
@@ -321,7 +324,7 @@ export function ResourceCenterDialog({ open, environmentRef, environmentLoading,
           <div className="wf-resource-center-actions">
             <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "function", mode: "edit", ref: entry.ref, version: entry.version })}><Pencil size={15}/></button>
             <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || Boolean(entry.disabled)} onClick={() => openEditor({ kind: "function", mode: "edit", ref: entry.ref, version: entry.version })}>测试</button>
-            <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("function", entry.ref, entry.version, name)}>停用此函数</button></div></details>
+            <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("function", entry.ref, entry.version, name)}>停用此函数</button><button type="button" className="is-danger" data-resource-action="delete" disabled={Boolean(busyKey)} onClick={() => { setMenuOpen(null); setFeedback(null); setDeleteView({ target: { kind: "function", ref: entry.ref, version: entry.version, name, noun: "函数", versions: data.functions.filter(item => item.ref === entry.ref).length } }); }}>永久删除…</button></div></details>
           </div>
         </article>;
       })}
@@ -413,6 +416,14 @@ export function ResourceCenterDialog({ open, environmentRef, environmentLoading,
         </section>
       </>;
     })() : null}
+    {deleteView ? <ResourceDeleteDialog
+      key={`${deleteView.target.kind}:${deleteView.target.ref}`}
+      environmentRef={environmentRef}
+      target={deleteView.target}
+      onClose={() => setDeleteView(null)}
+      onDeleted={message => { setDeleteView(null); setFeedback({ ok: true, text: message }); handleResourcesChanged(); }}
+      onOpenReference={row => { setDeleteView(null); onOpenReference?.(row); }}
+    /> : null}
     {editor ? <ResourceEditor key={`${editorKey}:${editor.kind}:${editor.mode}`} environmentRef={environmentRef} target={editor} onClose={() => setEditor(null)} onSaved={(ref, version, content) => { refreshExtensions(); reloadConfiguration(); onResourcesChanged?.(); setFeedback({ ok: true, text: `已保存「${String(content?.name ?? ref)}」v${version}。` }); if (intent?.section === section) intent.onCreated(ref, version, content); }} /> : null}
   </>;
 }

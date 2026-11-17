@@ -28,13 +28,16 @@ export type McpMarketCategory = typeof MCP_MARKET_CATEGORIES[number]["key"];
 const CATEGORY_KEYS = new Set(MCP_MARKET_CATEGORIES.map((item) => item.key));
 const CATEGORY_LABELS = new Map(MCP_MARKET_CATEGORIES.map((item) => [item.key, item.label]));
 
+export type McpConnectMode = "config" | "quick" | "login";
+
 export type McpMarketServerRow = {
   id: string; source: "registry" | "admin"; source_id: string; name: string; title: string;
   description: string; version: string; url: string; transport: "streamable-http" | "sse";
   auth_hint: "none" | "oauth" | "api-key" | "bearer" | "unknown";
   header_hints: unknown; category: string; icon_url: string | null; website_url: string | null;
-  repository_url: string | null; featured: boolean; registry_status: string | null;
-  published_at: string | null; updated_at: string | null; last_seen_at: string; created_at: string;
+  repository_url: string | null; featured: boolean; connect_mode: McpConnectMode; oauth_scopes: unknown;
+  registry_status: string | null; published_at: string | null; updated_at: string | null;
+  last_seen_at: string; created_at: string;
 };
 
 export type McpMarketItem = {
@@ -43,7 +46,7 @@ export type McpMarketItem = {
   authHint: string; headerHints: { name: string; description?: string; isSecret?: boolean; isRequired?: boolean }[];
   category: McpMarketCategory; categoryLabel: string; iconUrl?: string; websiteUrl?: string;
   repositoryUrl?: string; featured: boolean; registryStatus?: string; publishedAt?: string; updatedAt?: string;
-  suggestedRef: string; recommended: boolean;
+  suggestedRef: string; recommended: boolean; connectMode: McpConnectMode; oauthScopes: string[];
 };
 
 type SyncRow = { id: number; status: "idle" | "running" | "ok" | "error"; cursor: string | null; full_sync_completed: boolean; page_count: number; server_count: number; last_attempt_at: string | null; last_success_at: string | null; last_error: string | null; classifier_version: number; updated_at: string };
@@ -57,6 +60,38 @@ function httpsUrl(value: unknown, max = 2048) {
   const url = publicHttpUrl(value);
   if (!url || url.protocol !== "https:") return undefined;
   return url.toString();
+}
+export function normalizeMcpConnectMode(value: unknown): McpConnectMode {
+  return value === "quick" || value === "login" ? value : "config";
+}
+export function normalizeMcpOauthScopes(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const scopes: string[] = [];
+  for (const item of value) {
+    const scope = text(item, 200);
+    if (scope && !scopes.includes(scope)) scopes.push(scope);
+    if (scopes.length >= 20) break;
+  }
+  return scopes;
+}
+/**
+ * Direct recommendation actions are opt-in and must agree with the row's auth
+ * hint. Existing featured rows therefore stay on the configuration path.
+ */
+export function validateMcpRecommendation(input: {
+  connectMode: McpConnectMode; authHint: string; oauthScopes: readonly string[]; featured: boolean;
+}) {
+  if (input.connectMode === "config") return;
+  if (!input.featured) throw new ApiError(400, "INVALID_MARKET_SERVER", "推荐连接方式需要同时开启推荐位");
+  if (input.connectMode === "quick" && input.authHint !== "none") {
+    throw new ApiError(400, "INVALID_MARKET_SERVER", "免配置直连仅适用于无需鉴权的服务");
+  }
+  if (input.connectMode === "login" && input.authHint !== "oauth") {
+    throw new ApiError(400, "INVALID_MARKET_SERVER", "登录入口仅适用于 OAuth 服务");
+  }
+  if (input.connectMode === "login" && !input.oauthScopes.length) {
+    throw new ApiError(400, "INVALID_MARKET_SERVER", "登录入口需要至少一个已核验的授权范围");
+  }
 }
 function officialMeta(entry: Record<string, unknown>) {
   const meta = entry._meta;
@@ -163,7 +198,8 @@ export function normalizeRegistryServer(entry: unknown): Omit<McpMarketServerRow
     transport: remote.transport, auth_hint: authHint(description, headers), header_hints: headers,
     category: classifyMcpServer(name, title, description), icon_url: iconUrl ?? null,
     website_url: httpsUrl(value.websiteUrl) ?? null, repository_url: repository ? httpsUrl(repository.url) ?? null : null,
-    featured: false, registry_status: meta ? text(meta.status, 40) || null : null, published_at: publishedAt, updated_at: updatedAt,
+    featured: false, connect_mode: "config", oauth_scopes: [],
+    registry_status: meta ? text(meta.status, 40) || null : null, published_at: publishedAt, updated_at: updatedAt,
   };
 }
 
@@ -334,7 +370,8 @@ function marketDto(row: McpMarketServerRow, recommended: Set<string>): McpMarket
     websiteUrl: row.website_url ?? undefined, repositoryUrl: row.repository_url ?? undefined,
     featured: row.featured, registryStatus: row.registry_status ?? undefined, publishedAt: row.published_at ?? undefined,
     updatedAt: row.updated_at ?? undefined, suggestedRef: suggestedConnectionRef(row.source_id),
-    recommended: row.featured,
+    recommended: row.featured, connectMode: normalizeMcpConnectMode(row.connect_mode),
+    oauthScopes: normalizeMcpOauthScopes(row.oauth_scopes),
   };
 }
 
@@ -387,6 +424,14 @@ export async function readMcpMarket(input: { query?: string; category?: string; 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^[^a-z0-9]+|[-_.]+$/g, "").slice(0, 120);
 }
+/**
+ * Chinese titles slug to nothing. Fall back to the stable endpoint so an
+ * administrator can still create a supplement without inventing an ASCII name.
+ */
+export function marketSourceId(title: string, url: URL) {
+  return slug(title) || slug(`${url.hostname}${url.pathname}`)
+    || `mcp-${createHash("sha1").update(url.toString()).digest("hex").slice(0, 12)}`;
+}
 export async function supplementMcpMarketServer(input: Record<string, unknown>) {
   const title = text(input.title, 160);
   const name = text(input.name, 220) || title;
@@ -400,14 +445,18 @@ export async function supplementMcpMarketServer(input: Record<string, unknown>) 
   if (!CATEGORY_KEYS.has(category as McpMarketCategory)) throw new ApiError(400, "INVALID_MARKET_SERVER", "分类无效");
   const transport = input.transport === "sse" ? "sse" : "streamable-http";
   const authHint = ["none", "oauth", "api-key", "bearer", "unknown"].includes(String(input.authHint)) ? String(input.authHint) : "unknown";
-  const sourceId = slug(text(input.sourceId, 120) || title);
+  const sourceId = slug(text(input.sourceId, 120)) || marketSourceId(title, url);
   if (!sourceId) throw new ApiError(400, "INVALID_MARKET_SERVER", "目录标识无效");
+  const featured = input.featured === true;
+  const connectMode = normalizeMcpConnectMode(input.connectMode);
+  const oauthScopes = normalizeMcpOauthScopes(input.oauthScopes);
+  validateMcpRecommendation({ connectMode, authHint, oauthScopes, featured });
   const client = syncClient();
   const { data, error } = await client.from("mcp_market_servers").upsert({
     source: "admin", source_id: sourceId, name, title, description, version: text(input.version, 255),
     url: url.toString(), transport, auth_hint: authHint, header_hints: [],
     category, icon_url: httpsUrl(input.iconUrl) ?? null, website_url: httpsUrl(input.websiteUrl) ?? null,
-    repository_url: httpsUrl(input.repositoryUrl) ?? null, featured: input.featured === true,
+    repository_url: httpsUrl(input.repositoryUrl) ?? null, featured, connect_mode: connectMode, oauth_scopes: oauthScopes,
     registry_status: "admin", published_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     last_seen_at: new Date().toISOString(),
   }, { onConflict: "source,source_id" }).select("*").single();

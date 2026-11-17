@@ -38,6 +38,7 @@ vi.mock("../application/v2/useWorkflowV2Controller", () => ({ workflowApiV2: api
 vi.mock("../editor/v2/FunctionExecutionFields", () => ({ useExtensions: () => catalog }));
 
 import { ResourceCenterDialog } from "./ResourceCenterDialog";
+import { ResourceDeleteDialog } from "./ResourceDeleteDialog";
 import { VariableTable } from "./VariableTable";
 
 type Element = { type: unknown; props: Record<string, any> };
@@ -167,6 +168,33 @@ describe("ResourceCenterDialog interactions", () => {
     (confirm.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
     tree = render(base);
     expect(find(tree, element => element.props["data-provider-action"] === "confirm-delete")!.props.disabled).toBe(false);
+  });
+
+  it("opens the shared safe-delete target for a self-built API", () => {
+    catalog.data = {
+      connections: [{ connectionKey: "p4:o:price:1", ref: "price", version: 1, disabled: false, hasCredential: true, content: { type: "http", name: "价格服务", baseUrl: "https://api.example.com", path: "/price", method: "GET", sideEffect: "read" } }],
+      functions: [], reducers: [], runtime: { available: {}, limits: {} },
+    };
+    let tree = render({ ...base, initialSection: "apis" });
+    const apiDelete = find(tree, element => element.props["data-resource-action"] === "delete")!;
+    (apiDelete.props.onClick as () => void)();
+    tree = render({ ...base, initialSection: "apis" });
+    const dialog = find(tree, element => element.type === ResourceDeleteDialog)!;
+    expect(dialog.props.target).toMatchObject({ kind: "connection", ref: "price", version: 1, noun: "API 连接", versions: 1 });
+  });
+
+  it("opens the shared safe-delete target for a function", () => {
+    catalog.data = {
+      connections: [],
+      functions: [{ ref: "cleanup", version: 3, name: "清理函数", language: "python", disabled: false, purpose: "node" }],
+      reducers: [], runtime: { available: {}, limits: {} },
+    };
+    let tree = render({ ...base, initialSection: "functions" });
+    const functionDelete = find(tree, element => element.props["data-resource-action"] === "delete")!;
+    (functionDelete.props.onClick as () => void)();
+    tree = render({ ...base, initialSection: "functions" });
+    const dialog = find(tree, element => element.type === ResourceDeleteDialog)!;
+    expect(dialog.props.target).toMatchObject({ kind: "function", ref: "cleanup", version: 3, noun: "函数", versions: 1 });
   });
 
   it("shows the variable count after the workspace configuration loads", async () => {
