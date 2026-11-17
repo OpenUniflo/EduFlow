@@ -61,7 +61,7 @@ def llm_definition(config, inputs=None, type_version=2):
 
 def llm_run(monkeypatch, text='assistant-answer'):
     fake = FakeStreamModel(text)
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatDeepSeek', lambda **kwargs: fake)
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatDeepSeek', lambda **kwargs: fake)
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'secretRef': 'MODEL_KEY'}]
     monkeypatch.setenv('MODEL_KEY', 'synthetic-offline-model-key')
@@ -300,6 +300,31 @@ def test_retired_v1_model_node_inside_a_subgraph_keeps_the_graph_path():
 
 def test_structure_validation_accepts_the_new_model_shape_without_a_connection_catalog():
     assert validate_structure(llm_definition(llm_config(), {'topic': {'source': 'literal', 'value': 'math'}}), NODE_DESCRIPTORS, OPERATIONS)['valid']
+
+def test_model_output_limit_comes_only_from_the_node(monkeypatch):
+    run, fake = llm_run(monkeypatch)
+    run.policy["maxOutputTokens"] = 1600  # Historical workflow policy.
+    requests = []
+    def capture(**kwargs):
+        requests.append(kwargs)
+        return fake
+    monkeypatch.setattr("eduflow_workflow.model_transport.ChatDeepSeek", capture)
+    config = llm_config()
+    run.model_adapter(config)
+    config["modelParameters"]["maxOutputTokens"] = 3000
+    run.model_adapter(config)
+    assert "max_tokens" not in requests[0]
+    assert requests[1]["max_tokens"] == 3000
+
+
+@pytest.mark.parametrize("limit", [None, 0, -1, 1.5, True, "3000"])
+def test_invalid_node_output_limit_is_rejected_during_validation(limit):
+    config = llm_config()
+    config["modelParameters"]["maxOutputTokens"] = limit
+    result = validate_structure(llm_definition(config), NODE_DESCRIPTORS, OPERATIONS)
+    assert not result["valid"]
+    assert any(item.get("pointer") == "/nodes/a/config/modelParameters/maxOutputTokens"
+               for item in result["diagnostics"])
 
 
 def test_estimated_rendered_prompt_length_is_counted_against_max_input_bytes():

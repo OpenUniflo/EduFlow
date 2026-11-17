@@ -108,8 +108,25 @@ export function LlmAdvancedSettings({ node, stateSchema, onChange }: { node: Wor
   const stateFields = stateSchema.properties && typeof stateSchema.properties === "object" && !Array.isArray(stateSchema.properties) ? Object.entries(stateSchema.properties).map(([name, schema]) => ({ name, type: String((schema && typeof schema === "object" && !Array.isArray(schema) ? schema.type : "") ?? "") })) : [];
   const historyBinding = node.inputs.history;
   const modelParameters = config.modelParameters as Record<string, JsonValue> | undefined;
+  function changeOutputLimit(value: string) {
+    const next = { ...modelParameters };
+    if (value === "") delete next.maxOutputTokens;
+    else {
+      const limit = Number(value);
+      if (!Number.isSafeInteger(limit) || limit < 1) return;
+      next.maxOutputTokens = limit;
+    }
+    update({ modelParameters: next });
+  }
   return <fieldset className="wf-node-form" disabled={false}>
     <label data-config-field="inputs/history">对话历史<select aria-label="对话历史" value={historyBinding && historyBinding.source === "state" ? historyBinding.pointer : ""} onChange={event => { const next = { ...node.inputs }; if (event.target.value) next.history = { source: "state", pointer: event.target.value, onMissing: { mode: "error" } }; else delete next.history; onChange({ inputs: next }); }}><option value="">不传入</option>{stateFields.filter(field => field.type === "array" || field.type === "object" || field.type === "").map(field => <option key={field.name} value={`/${field.name}`}>流程数据 · {field.name}</option>)}</select></label>
     <div className="wf-model-parameters"><label>温度<input aria-label="模型温度" type="number" min="0" max="2" step="0.1" value={String(modelParameters?.temperature ?? "")} placeholder="模型默认" onChange={e => { const params = { ...(modelParameters ?? {}) }; if (e.target.value === "") delete params.temperature; else params.temperature = Number(e.target.value); update({ modelParameters: params }); }}/></label><label>top_p<input aria-label="模型 top_p" type="number" min="0" max="1" step="0.05" value={String(modelParameters?.top_p ?? "")} placeholder="模型默认" onChange={e => { const params = { ...(modelParameters ?? {}) }; if (e.target.value === "") delete params.top_p; else params.top_p = Number(e.target.value); update({ modelParameters: params }); }}/></label><label>思考模式<select aria-label="模型思考模式" value={String((modelParameters?.thinking as Record<string, JsonValue> | undefined)?.type ?? "")} onChange={e => { const params = { ...(modelParameters ?? {}) }; if (!e.target.value) delete params.thinking; else params.thinking = { type: e.target.value }; update({ modelParameters: params }); }}><option value="">模型默认</option><option value="enabled">开启</option><option value="disabled">关闭</option></select></label></div>
+    <label data-config-field="config/modelParameters/maxOutputTokens">
+      最大输出 token（可选）
+      <input aria-label="最大输出 token" type="number" min="1" step="1"
+        value={String(modelParameters?.maxOutputTokens ?? "")} placeholder="模型服务默认"
+        onChange={event => changeOutputLimit(event.target.value)} />
+      <small>留空时使用模型服务的默认上限。填写后，仅限制此节点的单次模型调用。</small>
+    </label>
   </fieldset>;
 }

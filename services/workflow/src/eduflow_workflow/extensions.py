@@ -1,29 +1,31 @@
 """Authenticated owner catalogs and managed connection configuration, backed by SQL/Vault."""
+import asyncio
 import json
 import os
 import re
 import time
+import uuid
 from urllib.parse import urlparse
 import httpx
 from .contracts import ExecutionError,validate_value,schema_check,digest
 from .storage import Storage
 from .execution_policies import catalog,REDUCERS
 from .sandbox import IMAGES,LIMITS,available
+from .model_transport import DEEPSEEK_BASE_URL, JSON_RESPONSE_FORMAT, create_model_client, model_request_headers, normalize_model_headers, parse_structured_output, structured_instruction
 
 CONNECTION_TYPES=('http','deepseek','mcp-http','openai-compatible')
 CONNECTION_FIELDS={'type','name','baseUrl','path','method','sideEffect','inputSchema','outputSchema','modelRefs','url','transport','authType','allowedToolNames','credentialHeader','description','secretRef','oauth','registryServerId','serverTitle',
-                   'params','headers','body','auth','settings','outputMap'}
+                   'params','headers','body','auth','settings','outputMap','sessionAffinityHeader'}
 MCP_CONNECTION_FIELDS={'type','name','url','transport','authType','allowedToolNames','credentialHeader','description','oauth','registryServerId','serverTitle'}
 MCP_AUTH_TYPES=('none','bearer','api-key','oauth','legacy')
 MCP_TOOL_NAME=re.compile(r'^[A-Za-z0-9_.:/-]{1,200}$')
 MAX_MCP_TOOLS=200
-OPENAI_COMPATIBLE_FIELDS={'type','name','baseUrl','modelRefs','credentialHeader','description','secretRef'}
+OPENAI_COMPATIBLE_FIELDS={'type','name','baseUrl','modelRefs','credentialHeader','description','secretRef','headers','sessionAffinityHeader'}
 MODEL_CONNECTION_TYPES=('deepseek','openai-compatible')
 MODEL_REF_PATTERN=re.compile(r'^[\w.:/-]+$',re.ASCII)
 MAX_MODEL_REFS=50
 PREVIEW_BYTES=4096
 LOCAL_LOOPBACK_HOSTS=('localhost','127.0.0.1')
-DEEPSEEK_BASE_URL='https://api.deepseek.com'
 
 def connector_cache_digest(connector):
     # Discovery names are display metadata, not connection identity. Keeping them
@@ -265,13 +267,19 @@ async def validate_connection(content,credential,env,credential_reused=False):
     # The managed secret reference is injected by the database; callers supply only the credential field.
     if 'secretRef' in c: raise ExecutionError('INVALID_CONNECTION','Credentials must be supplied separately; secretRef is managed by the platform')
     ctype=c['type']
+    if ctype in MODEL_CONNECTION_TYPES:
+        c.update(normalize_model_headers(c))
+        if not c.get('headers'): c.pop('headers',None)
+        if not c.get('sessionAffinityHeader'): c.pop('sessionAffinityHeader',None)
     if ctype=='deepseek':
+        if c.get('credentialHeader','Authorization')!='Authorization': raise ExecutionError('INVALID_CONNECTION','Only the Authorization header is supported for model connections')
         if c.get('baseUrl',DEEPSEEK_BASE_URL)!=DEEPSEEK_BASE_URL: raise ExecutionError('INVALID_CONNECTION','Use the official DeepSeek base URL')
         if not credential and not credential_reused: raise ExecutionError('INVALID_CONNECTION','Provide a DeepSeek credential')
         c['modelRefs']=model_refs(c.get('modelRefs'))
         return c
     if ctype=='openai-compatible':
         return await validate_model_connection(c,credential,env,credential_reused)
+    if 'sessionAffinityHeader' in c: raise ExecutionError('INVALID_CONNECTION','Session Headers are only available for model connections')
     if ctype=='mcp-http':
         return await validate_mcp_connection(c,credential,env,credential_reused)
     raw=c.get('baseUrl' if ctype=='http' else 'url','');parsed=urlparse(raw)
@@ -323,11 +331,12 @@ def parse_model_ids(payload):
     identifiers={item['id'] for item in payload['data'] if isinstance(item,dict) and isinstance(item.get('id'),str) and item['id']}
     return sorted(identifiers)[:200]
 
-async def fetch_model_ids(base_url,secret_ref,env,timeout=10):
+async def fetch_model_ids(base_url,secret_ref,env,timeout=10,*,provider=None):
     """GET {baseUrl}/models through the same pinned outbound policy used for tools."""
     from .tools import PinnedTransport,safe_http_url,secret
     url,ip=await safe_http_url({'baseUrl':base_url.rstrip('/'),'path':'/models'},env,{})
-    headers={'Authorization':'Bearer '+secret(secret_ref)} if secret_ref else {}
+    headers=model_request_headers(provider or {},str(uuid.uuid4()))
+    if secret_ref: headers['Authorization']='Bearer '+secret(secret_ref)
     try:
         async with httpx.AsyncClient(transport=PinnedTransport(urlparse(url).hostname,ip),timeout=timeout,follow_redirects=False,trust_env=False) as client:
             response=await client.get(url,headers=headers)
@@ -339,41 +348,79 @@ async def fetch_model_ids(base_url,secret_ref,env,timeout=10):
     except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned invalid JSON') from None
     return parse_model_ids(payload)
 
-async def fetch_model_reply(base_url,secret_ref,model,message,env,timeout=30):
-    """Send one short chat message through the same pinned destination policy.
+async def fetch_model_reply(provider,model,message,env,*,credential=None,structured=False,timeout=30):
+    """Exercise the same SDK, request profile and JSON mode as a Workflow node."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+    from .tools import model_http_client, secret
 
-    This is an explicit connection test: it returns only the first reply text and
-    never persists a run, message, State value or provider payload.
-    """
-    from .tools import model_http_client,secret
-    if not isinstance(message,str) or not 1<=len(message)<=2000: raise ExecutionError('CONNECTION_TEST_FAILED','Provide a bounded test message')
-    base=base_url.rstrip('/')
-    headers={'Authorization':'Bearer '+secret(secret_ref)} if secret_ref else {}
-    payload={'model':model,'messages':[{'role':'user','content':message}],'max_tokens':64,'stream':False}
+    if not isinstance(message,str) or not 1<=len(message)<=2000:
+        raise ExecutionError('CONNECTION_TEST_FAILED','Provide a bounded test message')
+    fields=[{'name':'summary','type':'string'}]
+    messages=[HumanMessage(content=message)]
+    if structured: messages.insert(0,SystemMessage(content=structured_instruction(fields)))
+    if not credential and provider.get('secretRef'): credential=secret(provider['secretRef'])
     try:
-        async with model_http_client(base,env) as client:
-            response=await client.post(base+'/chat/completions',headers=headers,json=payload)
-    except httpx.TimeoutException: raise ExecutionError('CONNECTION_TEST_TIMEOUT','Model endpoint timed out') from None
+        async with asyncio.timeout(timeout), model_http_client(provider['baseUrl'],env) as client:
+            sdk=create_model_client(provider,model,env,str(uuid.uuid4()),512 if structured else 256,timeout,
+                                    credential=credential,http_client=client)
+            if structured:
+                text=''
+                finish_reason=None
+                async for chunk in sdk.astream(messages,response_format=JSON_RESPONSE_FORMAT,stream_usage=True):
+                    text+=chunk.text
+                    finish_reason=chunk.response_metadata.get('finish_reason') or finish_reason
+                    if len(text)>8192: raise ExecutionError('CONNECTION_TEST_FAILED','Model reply exceeded the test limit')
+                if finish_reason!='stop': raise ExecutionError('CONNECTION_TEST_FAILED','Model did not complete the structured response')
+                summary=parse_structured_output(text,fields)['summary']
+                return json.dumps({'summary':_scrub_ephemeral(summary,credential)[:400]},ensure_ascii=False)
+            else:
+                reply=(await sdk.ainvoke(messages)).text
+        if not reply.strip(): raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint did not return reply text')
     except ExecutionError: raise
-    except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint is unreachable') from None
-    if response.status_code!=200: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned HTTP '+str(response.status_code))
-    try: body=response.json()
-    except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned invalid JSON') from None
-    choices=body.get('choices') if isinstance(body,dict) else None
-    message_body=choices[0].get('message') if isinstance(choices,list) and choices and isinstance(choices[0],dict) else None
-    reply=message_body.get('content') if isinstance(message_body,dict) else None
-    if not isinstance(reply,str): raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint did not return reply text')
-    return reply[:500]
+    except Exception as error:
+        from openai import APITimeoutError
+        if isinstance(error,(TimeoutError,httpx.TimeoutException,APITimeoutError)):
+            raise ExecutionError('CONNECTION_TEST_TIMEOUT','Model endpoint timed out') from None
+        status=getattr(error,'status_code',None)
+        if isinstance(status,int): raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned HTTP '+str(status)) from None
+        raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint did not return a usable reply') from None
+    return _scrub_ephemeral(reply,credential)[:500]
+
+def model_connection_provider(content,key):
+    """Project the same immutable connection fields for testing and execution."""
+    deepseek=content['type']=='deepseek'
+    return {'ref':key,'name':content.get('name',key),'modelRefs':content['modelRefs'],
+            'baseUrl':DEEPSEEK_BASE_URL if deepseek else content['baseUrl'],
+            'adapter':'deepseek' if deepseek else 'openai',
+            **{name:content[name] for name in ('headers','sessionAffinityHeader','secretRef') if name in content}}
+
+async def test_model_connection(content,key,body,env,started,credential=None):
+    provider=model_connection_provider(content,key)
+    message=body.get('testMessage')
+    if not isinstance(message,str):
+        models=await fetch_model_ids(provider['baseUrl'],provider.get('secretRef'),env,provider=provider)
+        return {'ok':True,'elapsedMs':elapsed_ms(started),'models':models}
+    model=body.get('testModel')
+    mode=body.get('testMode','text')
+    if not isinstance(model,str) or not model.strip(): raise ExecutionError('CONNECTION_TEST_FAILED','Choose a model to test')
+    if mode not in ('text','stream-json'): raise ExecutionError('CONNECTION_TEST_FAILED','Unsupported model test mode')
+    reply=await fetch_model_reply(provider,model.strip(),message,env,credential=credential,structured=mode=='stream-json')
+    return {'ok':True,'elapsedMs':elapsed_ms(started),'reply':reply,'models':[model.strip()]}
 
 def preview_text(content):
     return content.encode('utf-8')[:PREVIEW_BYTES].decode('utf-8','ignore')
 
 async def http_test_preview(tool,env,arguments,timeout=10):
-    """Registered HTTP test: raw bounded body, credentials redacted before the preview is returned."""
+    """Registered HTTP test: raw bounded body, credentials redacted before the preview is returned.
+
+    Text mode applies the same strict content-type/UTF-8 checks as execution so a
+    successful test cannot hide a format the actual tool will reject.
+    """
     from .credentials import assert_no_secrets
-    from .tools import PinnedTransport,safe_http_url,_http_auth,_http_body,_http_headers
+    from .tools import PinnedTransport,safe_http_url,_http_auth,_http_body,_http_headers,decode_text_response,response_format
     assert_no_secrets(arguments,env)
     validate_value(tool['inputSchema'],arguments,'INVALID_TOOL_ARGUMENTS')
+    format=response_format(tool)
     url,ip=await safe_http_url(tool,env,arguments)
     headers=_http_headers(tool,env)
     kwargs=_http_body(tool,arguments)
@@ -382,18 +429,24 @@ async def http_test_preview(tool,env,arguments,timeout=10):
         from urllib.parse import urlencode,parse_qsl,urlunparse
         parts=urlparse(url); query=dict(parse_qsl(parts.query)); query.update(secret_query)
         url=urlunparse(parts._replace(query=urlencode(query)))
-    content=bytearray();status=None
+    content=bytearray();status=None;content_type=None
     try:
         async with httpx.AsyncClient(transport=PinnedTransport(urlparse(url).hostname,ip),timeout=timeout,follow_redirects=False,trust_env=False) as client:
             async with client.stream(tool['method'],url,headers=headers,**kwargs) as response:
                 status=response.status_code
+                content_type=response.headers.get('content-type')
                 async for chunk in response.aiter_bytes():
                     content.extend(chunk)
-                    if len(content)>=PREVIEW_BYTES*4: break
+                    if format=='text':
+                        if len(content)>1048576: raise ExecutionError('TOOL_OUTPUT_TOO_LARGE','Tool response exceeds limit','policy',reason='provider_error')
+                    elif len(content)>=PREVIEW_BYTES*4: break
     except httpx.TimeoutException: raise ExecutionError('CONNECTION_TEST_TIMEOUT','HTTP endpoint timed out') from None
     except ExecutionError: raise
     except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','HTTP endpoint is unreachable') from None
-    text=bytes(content).decode('utf-8','replace')
+    if format=='text' and 200<=status<300:
+        text=decode_text_response(bytes(content),content_type)
+    else:
+        text=bytes(content).decode('utf-8','replace')
     assert_no_secrets(text,env)
     return {'ok':200<=status<300,'status':status,'preview':preview_text(text)}
 
@@ -512,15 +565,7 @@ async def catalog_operation(body,registry):
         started=time.monotonic()
         try:
             if c['type'] in MODEL_CONNECTION_TYPES:
-                base_url=c.get('baseUrl',DEEPSEEK_BASE_URL) if c['type']=='openai-compatible' else DEEPSEEK_BASE_URL
-                message=body.get('testMessage')
-                model=body.get('testModel')
-                if isinstance(message,str):
-                    if not isinstance(model,str) or not model.strip(): raise ExecutionError('CONNECTION_TEST_FAILED','Choose a model to test')
-                    reply=await fetch_model_reply(base_url,c.get('secretRef'),model.strip(),message,env)
-                    return {'ok':True,'elapsedMs':elapsed_ms(started),'reply':reply,'models':[model.strip()]}
-                models=await fetch_model_ids(base_url,c.get('secretRef'),env)
-                return {'ok':True,'elapsedMs':elapsed_ms(started),'models':models}
+                return await test_model_connection(c,key,body,env,started)
             if c['type']=='http':
                 result=await http_test_preview(tool,env,body.get('arguments',{}))
                 return {**result,'elapsedMs':elapsed_ms(started)}
@@ -629,9 +674,7 @@ def hydrate_connections(env,owner,rows):
         live=latest.get(r['ref'])
         current_allowed=(live['content'].get('allowedToolNames') or []) if live else []
         if c['type'] in MODEL_CONNECTION_TYPES:
-            provider={'ref':key,'name':c.get('name',r['ref']),'modelRefs':c['modelRefs'],'baseUrl':DEEPSEEK_BASE_URL if c['type']=='deepseek' else c['baseUrl'],'adapter':'deepseek' if c['type']=='deepseek' else 'openai'}
-            if c.get('secretRef'): provider['secretRef']=c['secretRef']
-            env['providers'].append(provider)
+            env['providers'].append(model_connection_provider({'name':r['ref'],**c},key))
         elif c['type']=='http': env['tools'].append(http_connection_tool(c,r,key,headers,env))
         else:
             connector=mcp_connector(c,key,owner,r['version'])

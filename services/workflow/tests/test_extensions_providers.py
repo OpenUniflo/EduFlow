@@ -355,7 +355,7 @@ async def test_model_adapter_routes_openai_compatible_provider(monkeypatch):
         calls.update(kwargs)
         return FakeModel(**kwargs)
 
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', fake_model)
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', fake_model)
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'baseUrl': 'https://models.example/v1', 'adapter': 'openai'}]
     adapter = run.model_adapter(llm_config())
@@ -370,8 +370,8 @@ async def test_model_adapter_routes_openai_compatible_provider(monkeypatch):
 
 
 async def test_model_adapter_routes_deepseek_by_default_and_never_constructs_openai(monkeypatch):
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', lambda **kwargs: pytest.fail('DeepSeek must not use the OpenAI adapter'))
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatDeepSeek', lambda **kwargs: FakeModel(**kwargs))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', lambda **kwargs: pytest.fail('DeepSeek must not use the OpenAI adapter'))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatDeepSeek', lambda **kwargs: FakeModel(**kwargs))
     monkeypatch.setenv('MODEL_CONNECTION_KEY', 'synthetic-model-key')
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['deepseek-flash'], 'secretRef': 'MODEL_CONNECTION_KEY', 'headers': {'x-opencode-session': 'eduflow-test', 'ignored': 3}}]
@@ -382,7 +382,7 @@ async def test_model_adapter_routes_deepseek_by_default_and_never_constructs_ope
 
 
 async def test_openai_compatible_provider_binds_authorized_tools(monkeypatch):
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', lambda **kwargs: FakeModel(**kwargs))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', lambda **kwargs: FakeModel(**kwargs))
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'baseUrl': 'https://models.example/v1', 'adapter': 'openai'}]
     run.env['tools'] = [{'ref': 'f', 'name': 'trusted_identity', 'description': 'Echo', 'version': 1, 'adapter': 'function', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'}, 'available': True, 'sideEffect': 'none'}]
@@ -392,7 +392,7 @@ async def test_openai_compatible_provider_binds_authorized_tools(monkeypatch):
 
 
 async def test_thinking_remains_deepseek_only(monkeypatch):
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', lambda **kwargs: pytest.fail('thinking must be rejected before the SDK is constructed'))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', lambda **kwargs: pytest.fail('thinking must be rejected before the SDK is constructed'))
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'baseUrl': 'https://models.example/v1', 'adapter': 'openai'}]
     with pytest.raises(ExecutionError) as caught:

@@ -205,7 +205,7 @@ async def test_thinking_parameter_uses_official_sdk_extra_body(monkeypatch,think
 def test_invalid_thinking_configuration_is_rejected_before_sdk(monkeypatch,thinking):
     run=execution();run.env['providers']=[{'ref':'provider','secretRef':'unused','modelRefs':['deepseek-flash']}]
     def forbidden(**kwargs):raise AssertionError('Invalid config must not initialize model')
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatDeepSeek',forbidden)
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatDeepSeek',forbidden)
     with pytest.raises(ExecutionError) as error:
         run.model_adapter({'providerRef':'provider','modelRef':'deepseek-flash','modelParameters':{'thinking':thinking},'allowedToolRefs':[]})
     assert error.value.code=='UNSUPPORTED_MODEL_PARAMETER'
@@ -219,7 +219,7 @@ async def test_model_adapter_failures_do_not_expose_provider_or_proxy_credential
     monkeypatch.setenv("WORKFLOW_TEST_MODEL_KEY","synthetic-offline-sdk-key")
     def fail(*args,**kwargs): raise ImportError("synthetic-offline-sdk-key socks5://proxy-user:proxy-password@127.0.0.1:19876")
     factory=fail if failure_stage=="initialization" else lambda **kwargs:SimpleNamespace(bind_tools=fail)
-    monkeypatch.setattr("eduflow_workflow.runtime.ChatDeepSeek",factory)
+    monkeypatch.setattr("eduflow_workflow.model_transport.ChatDeepSeek",factory)
     with pytest.raises(ExecutionError) as error:
         run.model_adapter({"providerRef":"provider","modelRef":"deepseek-flash","modelParameters":{},"allowedToolRefs":["f"]})
     assert error.value.code=="MODEL_ADAPTER_FAILED"

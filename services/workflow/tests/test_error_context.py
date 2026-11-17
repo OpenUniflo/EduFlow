@@ -64,7 +64,7 @@ async def test_stream_stall_is_reported_as_stream_interrupted(monkeypatch):
 
     run, _ = llm_run(monkeypatch)
     run.env["providers"] = [{"ref": "provider", "name": "DeepSeek", "modelRefs": ["model-a"], "secretRef": "MODEL_KEY", "baseUrl": "https://api.deepseek.com"}]
-    monkeypatch.setattr("eduflow_workflow.runtime.ChatDeepSeek", lambda **kwargs: StallingModel())
+    monkeypatch.setattr("eduflow_workflow.model_transport.ChatDeepSeek", lambda **kwargs: StallingModel())
     monkeypatch.setattr(history, "STREAM_IDLE_SECONDS", 0.01)
     with pytest.raises(ExecutionError) as caught:
         await run.llm(llm_node(llm_config(), {}), {})
