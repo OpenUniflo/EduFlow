@@ -3,7 +3,7 @@ import type { McpMarketItem } from "../domain/v2/types";
 import type { CatalogConnection } from "./resourceModel";
 import {
   dedupeMcpMarketItems, latestMcpConnections, mcpAuthLabel, mcpAuthTypeOf, mcpCategoryGroups, mcpConnectionErrorMessage, mcpConnectionFor,
-  mcpConnectionStatus, mcpQuickConnectDraft, mcpRecommendationAction, mcpSyncLabel, mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState,
+  mcpConnectionStatus, mcpQuickConnectDraft, mcpRecommendationAction, mcpSourceLabel, mcpSyncLabel, mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState,
   resolveRecommendedMcpServers, uniqueMcpRef,
 } from "./mcpMarketModel";
 
@@ -107,7 +107,7 @@ describe("API-driven MCP recommendations", () => {
     expect(mcpRecommendationAction(marketItem({ connectMode: "login", authHint: "oauth", oauthScopes: [] }))).toBe("config");
   });
 
-  it("dedupes by URL, keeps API order, and prefers a featured administrator row", () => {
+  it("dedupes by URL, keeps API order, and prefers platform metadata without changing other sources' priority", () => {
     const registry = marketItem({
       id: "registry-1", source: "registry", sourceId: "io.example/fixture", title: "Registry Fixture",
       url: "https://fixture.example/mcp/", featured: false, recommended: false,
@@ -119,6 +119,23 @@ describe("API-driven MCP recommendations", () => {
     const adminFeatured = marketItem({ id: "admin-2", featured: true, recommended: true });
     expect(dedupeMcpMarketItems([registryFeatured, adminFeatured]).map(item => item.id)).toEqual(["admin-2"]);
     expect(resolveRecommendedMcpServers([registry, adminFeatured], ["admin-2"]).map(item => item.id)).toEqual(["admin-2"]);
+
+    const platform = marketItem({ id: "platform-1", source: "platform", title: "Platform Fixture", featured: true, recommended: true });
+    expect(dedupeMcpMarketItems([adminFeatured, platform]).map(item => item.id)).toEqual(["platform-1"]);
+    expect(dedupeMcpMarketItems([platform, adminFeatured]).map(item => item.id)).toEqual(["platform-1"]);
+    expect(mcpSourceLabel("platform")).toBe("平台内置");
+    expect(mcpSourceLabel("admin")).toBe("管理员补充");
+    expect(mcpSourceLabel("registry", true)).toBe("官方 MCP Registry");
+  });
+
+  it("keeps platform priority but restores featured before administrator for other sources", () => {
+    const registryFeatured = marketItem({ id: "registry-featured", source: "registry", sourceId: "io.example/featured", featured: true, recommended: false });
+    const adminPlain = marketItem({ id: "admin-plain", featured: false, recommended: false });
+    expect(dedupeMcpMarketItems([adminPlain, registryFeatured]).map(item => item.id)).toEqual(["registry-featured"]);
+    expect(dedupeMcpMarketItems([registryFeatured, adminPlain]).map(item => item.id)).toEqual(["registry-featured"]);
+
+    const platformPlain = marketItem({ id: "platform-plain", source: "platform", featured: false, recommended: false });
+    expect(dedupeMcpMarketItems([registryFeatured, platformPlain]).map(item => item.id)).toEqual(["platform-plain"]);
   });
 
   it("falls back to the row's recommended flag when the page omits recommendedIds", () => {

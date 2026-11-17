@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabase } from "./supabase.js";
 import { ApiError } from "./http.js";
 import { assertPublicDestination, publicHttpUrl } from "./outbound.js";
+import { PLATFORM_MCP_SERVICES, type PlatformMcpService } from "./platformMcpCatalog.js";
 
 const REGISTRY_URL = "https://registry.modelcontextprotocol.io/v0.1/servers";
 const REGISTRY_PAGE_SIZE = 100;
@@ -41,7 +42,7 @@ export type McpMarketServerRow = {
 };
 
 export type McpMarketItem = {
-  id: string; source: "registry" | "admin"; sourceId: string; name: string; title: string;
+  id: string; source: "registry" | "admin" | "platform"; sourceId: string; name: string; title: string;
   description: string; version: string; url: string; transport: "streamable-http" | "sse";
   authHint: string; headerHints: { name: string; description?: string; isSecret?: boolean; isRequired?: boolean }[];
   category: McpMarketCategory; categoryLabel: string; iconUrl?: string; websiteUrl?: string;
@@ -214,6 +215,11 @@ function searchTerm(value: unknown) {
 }
 function marketQuery(client: SupabaseClient, term: string, category: string, options: { count?: "exact"; head?: boolean } = {}) {
   let query = client.from("mcp_market_servers").select("*", options.count === "exact" ? { count: "exact", head: options.head === true } : undefined);
+  // A database row for a platform-owned endpoint is superseded by the platform
+  // metadata, so it must not also appear in rows, totals, or category counts.
+  for (const service of PLATFORM_MCP_SERVICES) {
+    query = query.neq("url", service.url).neq("url", `${service.url}/`);
+  }
   if (term) {
     const escaped = term.replace(/[%_]/g, "");
     query = query.or(["title", "name", "description", "source_id"].map((column) => `${column}.ilike.%${escaped}%`).join(","));
@@ -360,7 +366,7 @@ async function reclassifyCachedMarket(client: SupabaseClient, state: SyncRow) {
   return { ...state, classifier_version: MCP_CLASSIFIER_VERSION };
 }
 
-function marketDto(row: McpMarketServerRow, recommended: Set<string>): McpMarketItem {
+function marketDto(row: McpMarketServerRow): McpMarketItem {
   const category = CATEGORY_KEYS.has(row.category as McpMarketCategory) ? row.category as McpMarketCategory : "other";
   return {
     id: row.id, source: row.source, sourceId: row.source_id, name: row.name, title: row.title,
@@ -372,6 +378,75 @@ function marketDto(row: McpMarketServerRow, recommended: Set<string>): McpMarket
     updatedAt: row.updated_at ?? undefined, suggestedRef: suggestedConnectionRef(row.source_id),
     recommended: row.featured, connectMode: normalizeMcpConnectMode(row.connect_mode),
     oauthScopes: normalizeMcpOauthScopes(row.oauth_scopes),
+  };
+}
+
+function platformMarketDto(service: PlatformMcpService): McpMarketItem {
+  const category = CATEGORY_KEYS.has(service.category as McpMarketCategory) ? service.category as McpMarketCategory : "other";
+  return {
+    id: service.id, source: "platform", sourceId: service.sourceId, name: service.name, title: service.title,
+    description: service.description, version: service.version, url: service.url, transport: service.transport,
+    authHint: service.authHint, headerHints: [], category, categoryLabel: CATEGORY_LABELS.get(category) ?? "其他",
+    featured: service.featured, suggestedRef: service.suggestedRef, recommended: service.featured,
+    connectMode: service.connectMode, oauthScopes: [...service.oauthScopes],
+  };
+}
+
+/** In-memory platform catalog rows. They are never persisted to Supabase. */
+export function platformMcpMarketItems(): McpMarketItem[] {
+  return PLATFORM_MCP_SERVICES.map(platformMarketDto);
+}
+
+/**
+ * Platform rows participate in the same search and category filters as database
+ * rows, including matching the service host, without querying the database for
+ * them.
+ */
+export function platformMarketItemsForQuery(query: string, category: string): McpMarketItem[] {
+  const term = searchTerm(query);
+  return platformMcpMarketItems().filter((item) => {
+    if (category && item.category !== category) return false;
+    if (!term) return true;
+    return `${item.title} ${item.name} ${item.description} ${item.sourceId} ${item.url}`.toLocaleLowerCase().includes(term);
+  });
+}
+
+/**
+ * Platform recommendations sort first, so page windows reserve their slots
+ * before reading the bounded database range. This keeps page boundaries and
+ * counts correct without loading the catalog into memory.
+ */
+export function platformCatalogPageWindow(platformCount: number, page: number, limit: number) {
+  const start = (page - 1) * limit;
+  const platformOnPage = Math.max(0, Math.min(limit, platformCount - start));
+  return { start, platformOnPage, dbStart: Math.max(0, start - platformCount), dbLimit: Math.max(0, limit - platformOnPage) };
+}
+
+/** Merge a page of database rows with matching platform rows. */
+export function mergePlatformMarketPage(input: {
+  platformItems: readonly McpMarketItem[];
+  dbItems: readonly McpMarketItem[];
+  dbTotal: number;
+  dbCategories: readonly { key: string; label: string; count: number }[];
+  page: number;
+  limit: number;
+}) {
+  const start = (input.page - 1) * input.limit;
+  const platformItems = input.platformItems.slice(start, start + input.limit);
+  const platformByCategory = new Map<string, number>();
+  for (const item of input.platformItems) platformByCategory.set(item.category, (platformByCategory.get(item.category) ?? 0) + 1);
+  const categories = input.dbCategories.map((item) => ({
+    ...item,
+    count: item.count + (platformByCategory.get(item.key) ?? 0),
+  }));
+  const items = [...platformItems, ...input.dbItems];
+  const total = input.dbTotal + input.platformItems.length;
+  return {
+    items,
+    total,
+    categories,
+    recommendedIds: items.filter((item) => item.recommended).map((item) => item.id),
+    hasMore: start + items.length < total,
   };
 }
 
@@ -391,27 +466,37 @@ export async function readMcpMarket(input: { query?: string; category?: string; 
   const categoryFilter = input.category && CATEGORY_KEYS.has(input.category as McpMarketCategory) ? input.category : "";
   const page = Math.max(1, Math.min(input.page ?? 1, 10000));
   const limit = Math.max(1, Math.min(input.limit ?? 120, 200));
-  const start = (page - 1) * limit;
+  const platformItems = platformMarketItemsForQuery(query, categoryFilter);
+  const window = platformCatalogPageWindow(platformItems.length, page, limit);
   const countResult = await marketQuery(client, query, categoryFilter, { count: "exact", head: true });
   if (countResult.error) throw new ApiError(503, "MCP_MARKET_UNAVAILABLE", "MCP 目录暂时不可用");
-  const total = countResult.count ?? 0;
-  const rowsResult = await marketQuery(client, query, categoryFilter)
-    .order("featured", { ascending: false })
-    .order("title", { ascending: true })
-    .order("id", { ascending: true })
-    .range(start, start + limit - 1);
-  if (rowsResult.error) throw new ApiError(503, "MCP_MARKET_UNAVAILABLE", "MCP 目录暂时不可用");
-  const pageRows = (rowsResult.data ?? []) as McpMarketServerRow[];
+  const dbTotal = countResult.count ?? 0;
+  let pageRows: McpMarketServerRow[] = [];
+  if (window.dbLimit > 0) {
+    const rowsResult = await marketQuery(client, query, categoryFilter)
+      .order("featured", { ascending: false })
+      .order("title", { ascending: true })
+      .order("id", { ascending: true })
+      .range(window.dbStart, window.dbStart + window.dbLimit - 1);
+    if (rowsResult.error) throw new ApiError(503, "MCP_MARKET_UNAVAILABLE", "MCP 目录暂时不可用");
+    pageRows = (rowsResult.data ?? []) as McpMarketServerRow[];
+  }
   const categories = await Promise.all(MCP_MARKET_CATEGORIES.map(async (item) => {
     const result = await marketQuery(client, query, item.key, { count: "exact", head: true });
     if (result.error) throw new ApiError(503, "MCP_MARKET_UNAVAILABLE", "MCP 目录暂时不可用");
     return { key: item.key, label: item.label, count: result.count ?? 0 };
   }));
-  const recommended = new Set(pageRows.filter((row) => row.featured).map((row) => row.id));
-  const items = pageRows.map((row) => marketDto(row, recommended));
+  const merged = mergePlatformMarketPage({
+    platformItems,
+    dbItems: pageRows.map((row) => marketDto(row)),
+    dbTotal,
+    dbCategories: categories,
+    page,
+    limit,
+  });
   return {
-    items, page, limit, total, hasMore: start + items.length < total, categories,
-    recommendedIds: items.filter((item) => item.recommended).map((item) => item.id),
+    items: merged.items, page, limit, total: merged.total, hasMore: merged.hasMore, categories: merged.categories,
+    recommendedIds: merged.recommendedIds,
     sync: {
       status: state.status, cursor: state.cursor, hasMore: Boolean(state.cursor) && !state.full_sync_completed,
       pageCount: state.page_count, serverCount: state.server_count, fullSyncCompleted: state.full_sync_completed,
@@ -461,7 +546,7 @@ export async function supplementMcpMarketServer(input: Record<string, unknown>) 
     last_seen_at: new Date().toISOString(),
   }, { onConflict: "source,source_id" }).select("*").single();
   if (error || !data) throw new ApiError(503, "MCP_MARKET_UNAVAILABLE", "补充目录保存失败");
-  return marketDto(data as McpMarketServerRow, new Set());
+  return marketDto(data as McpMarketServerRow);
 }
 export async function removeAdminMarketServer(id: string) {
   const client = syncClient();

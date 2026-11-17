@@ -11,8 +11,8 @@ import { ResourceTestPanel } from "./ResourceTestPanel";
 import type { ResourceSectionProps } from "./resourceTypes";
 import {
   dedupeMcpMarketItems, latestMcpConnections, mcpAuthHintLabel, mcpAuthTypeOf, mcpCategoryGroups, mcpConnectionAuth, mcpConnectionErrorMessage,
-  mcpConnectionFor, mcpAllowedToolNames, mcpConnectionStatus, mcpConnectionTitle, mcpQuickConnectDraft, mcpRecommendationAction, mcpSyncLabel,
-  mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState, mcpTransportLabel, normalizeMcpUrl, resolveRecommendedMcpServers,
+  mcpConnectionFor, mcpAllowedToolNames, mcpConnectionStatus, mcpConnectionTitle, mcpQuickConnectDraft, mcpRecommendationAction, mcpSourceLabel,
+  mcpSyncLabel, mcpToolCountLabels, mcpToolMatchesQuery, mcpToolState, mcpTransportLabel, normalizeMcpUrl, resolveRecommendedMcpServers,
   type McpTab, type McpToolState,
 } from "./mcpMarketModel";
 import { McpConnectDialog } from "./McpConnectDialog";
@@ -51,7 +51,7 @@ function MarketCard({ item, connection, state, recommended = false, actionLabel,
     <p className="wf-mcp-card-description">{item.description || "此服务暂未提供说明。"}</p>
     <div className="wf-mcp-card-meta">
       {recommended ? <span className="wf-mcp-badge is-ok">推荐</span> : null}
-      <span className="wf-mcp-badge">{item.source === "registry" ? "官方 Registry" : "管理员补充"}</span>
+      <span className="wf-mcp-badge">{mcpSourceLabel(item.source)}</span>
       <span className="wf-mcp-badge">{item.categoryLabel}</span>
       <span className="wf-mcp-badge">{mcpAuthHintLabel(item.authHint)}</span>
       <span className="wf-mcp-badge">{mcpTransportLabel(item.transport)}</span>
@@ -438,7 +438,7 @@ export function McpResource({ environmentRef, create = false, onCreated, onResou
 function MarketDetails({ item, connection, state, onClose, onConnect }: { item: McpMarketItem; connection?: CatalogConnection; state?: McpToolState; onClose: () => void; onConnect: () => void }) {
   const action = mcpRecommendationAction(item);
   return <McpModal title={item.title} subtitle={item.name} onClose={onClose} wide footer={<div className="wf-resource-actions"><button type="button" onClick={onClose}>关闭</button><button type="button" className="primary" onClick={onConnect}>{connection ? "配置连接" : action === "login" ? "登录授权" : action === "quick" ? "一键连接" : "连接此服务"}</button></div>}>
-    <div className="wf-mcp-detail-meta"><span className="wf-mcp-badge">{item.source === "registry" ? "官方 MCP Registry" : "管理员补充"}</span><span className="wf-mcp-badge">{item.categoryLabel}</span><span className="wf-mcp-badge">{mcpTransportLabel(item.transport)}</span><span className="wf-mcp-badge">{mcpAuthHintLabel(item.authHint)}</span>{item.recommended ? <span className="wf-mcp-badge is-ok">推荐</span> : null}{item.featured ? <span className="wf-mcp-badge is-ok">管理员置顶</span> : null}</div>
+    <div className="wf-mcp-detail-meta"><span className="wf-mcp-badge">{mcpSourceLabel(item.source, true)}</span><span className="wf-mcp-badge">{item.categoryLabel}</span><span className="wf-mcp-badge">{mcpTransportLabel(item.transport)}</span><span className="wf-mcp-badge">{mcpAuthHintLabel(item.authHint)}</span>{item.recommended ? <span className="wf-mcp-badge is-ok">推荐</span> : null}{item.featured && item.source !== "platform" ? <span className="wf-mcp-badge is-ok">管理员置顶</span> : null}</div>
     <p className="wf-mcp-detail-description">{item.description || "此服务暂未提供说明。"}</p>
     <dl className="wf-mcp-detail-list">
       <dt>远程地址</dt><dd><code>{item.url}</code></dd>

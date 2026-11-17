@@ -35,6 +35,11 @@ export function mcpAuthHintLabel(value: string | undefined): string {
 export function mcpTransportLabel(value: string | undefined): string {
   return value === "sse" ? "SSE" : "Streamable HTTP";
 }
+export function mcpSourceLabel(source: McpMarketItem["source"], detailed = false): string {
+  if (source === "platform") return "平台内置";
+  if (source === "admin") return "管理员补充";
+  return detailed ? "官方 MCP Registry" : "官方 Registry";
+}
 export function mcpAuthTypeOf(content: Record<string, JsonValue>, hasCredential = false): McpDraftAuth {
   const value = typeof content.authType === "string" ? content.authType : content.secretRef || hasCredential ? "legacy" : "none";
   return value === "bearer" || value === "api-key" || value === "oauth" || value === "legacy" ? value : value === "none" ? "none" : "legacy";
@@ -58,11 +63,17 @@ export function mcpRecommendationAction(item: Pick<McpMarketItem, "connectMode" 
   return "config";
 }
 function preferredMarketRow(left: McpMarketItem, right: McpMarketItem): McpMarketItem {
+  // Platform metadata is the product-owned source of truth for its endpoint.
+  // Every other source keeps the original featured-then-administrator priority.
+  if (left.source !== right.source) {
+    if (left.source === "platform") return left;
+    if (right.source === "platform") return right;
+  }
   if (left.featured !== right.featured) return left.featured ? left : right;
   if (left.source !== right.source) return left.source === "admin" ? left : right;
   return left;
 }
-/** Collapse duplicate endpoint rows, preferring a featured administrator row. */
+/** Collapse duplicate endpoint rows, preferring platform metadata; other sources keep the original featured-then-administrator priority. */
 export function dedupeMcpMarketItems(items: readonly McpMarketItem[]): McpMarketItem[] {
   const byUrl = new Map<string, McpMarketItem>();
   for (const item of items) {
@@ -74,9 +85,10 @@ export function dedupeMcpMarketItems(items: readonly McpMarketItem[]): McpMarket
   return [...byUrl.values()];
 }
 /**
- * Recommendation cards come from the API's featured rows (`recommendedIds`).
- * Collapse duplicate URLs and prefer the administrator row so reviewed display
- * and connect metadata win over a duplicate Registry row.
+ * Recommendation cards come from the API's featured/platform rows
+ * (`recommendedIds`). Collapse duplicate URLs, preferring platform metadata;
+ * other sources keep the original featured-then-administrator priority, so
+ * reviewed display and connect metadata win only where that order allows.
  */
 export function resolveRecommendedMcpServers(items: readonly McpMarketItem[], recommendedIds: readonly string[] = []): McpMarketItem[] {
   const recommended = new Set(recommendedIds);

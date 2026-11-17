@@ -227,6 +227,75 @@ describe("McpResource recommendations from the catalog API", () => {
     expect(container.textContent).toContain("已连接");
   });
 
+  it("renders the platform Qichacha login card once in the data grid and cancels without writing", async () => {
+    const platform = item({
+      id: "platform-qichacha-company", source: "platform", sourceId: "qichacha-company",
+      name: "Qichacha 企业工商", title: "企查查企业工商",
+      url: "https://agent.qcc.com/mcp/company/stream", authHint: "oauth",
+      category: "data", categoryLabel: "数据服务", featured: true, recommended: true,
+      connectMode: "login", oauthScopes: ["mcp:tools"], suggestedRef: "qichacha_company",
+    });
+    const duplicate = item({
+      id: "admin-duplicate", title: "管理员重复项", url: "https://agent.qcc.com/mcp/company/stream/",
+      featured: true, recommended: true, connectMode: "config",
+    });
+    api.mcpMarket.mockResolvedValue({ ...emptyMarket, items: [platform, duplicate], total: 2, recommendedIds: [platform.id, duplicate.id] });
+
+    await render();
+
+    expect(container.querySelectorAll('[data-mcp-url="https://agent.qcc.com/mcp/company/stream"]')).toHaveLength(1);
+    const platformCard = card("https://agent.qcc.com/mcp/company/stream");
+    expect(platformCard.closest(".wf-mcp-grid")).not.toBeNull();
+    expect(platformCard.closest("section")?.textContent).toContain("数据服务");
+    expect(platformCard.textContent).toContain("平台内置");
+    expect(platformCard.textContent).toContain("企查查企业工商");
+    expect(container.textContent).not.toContain("管理员重复项");
+
+    const primary = platformCard.querySelector<HTMLButtonElement>(".wf-mcp-card-actions .primary")!;
+    expect(primary.textContent).toBe("登录授权");
+    await act(async () => { primary.click(); });
+
+    expect(container.textContent).toContain("登录企查查企业工商");
+    expect(container.textContent).toContain("授权范围：mcp:tools");
+    expect(container.querySelector('input[aria-label="MCP 连接名称"]')).toBeNull();
+    expect(api.extension).not.toHaveBeenCalled();
+    expect(api.testExtension).not.toHaveBeenCalled();
+
+    const cancel = [...container.querySelectorAll<HTMLButtonElement>("dialog.wf-mcp-modal button")].find(button => button.textContent === "取消")!;
+    await act(async () => { cancel.click(); });
+    expect(container.querySelector("dialog.wf-mcp-modal")).toBeNull();
+    expect(api.extension).not.toHaveBeenCalled();
+    expect(api.testExtension).not.toHaveBeenCalled();
+  });
+
+  it("keeps an existing platform connection matched by URL instead of starting a new login", async () => {
+    const platform = item({
+      id: "platform-qichacha-company", source: "platform", sourceId: "qichacha-company",
+      name: "Qichacha 企业工商", title: "企查查企业工商",
+      url: "https://agent.qcc.com/mcp/company/stream", authHint: "oauth",
+      category: "data", categoryLabel: "数据服务", featured: true, recommended: true,
+      connectMode: "login", oauthScopes: ["mcp:tools"], suggestedRef: "qichacha_company",
+    });
+    api.mcpMarket.mockResolvedValue({ ...emptyMarket, items: [platform], total: 1, recommendedIds: [platform.id] });
+    await act(async () => {
+      root.render(<McpResource environmentRef="local" connections={[{
+        connectionKey: "p4:o:existing_qichacha:2", ref: "existing_qichacha", version: 2, disabled: false, hasCredential: true,
+        content: { type: "mcp-http", url: "https://agent.qcc.com/mcp/company/stream/", authType: "oauth", allowedToolNames: [] },
+      }]} tools={[]} />);
+    });
+    await act(async () => { await new Promise(resolve => window.setTimeout(resolve, 0)); });
+
+    const primary = card("https://agent.qcc.com/mcp/company/stream").querySelector<HTMLButtonElement>(".wf-mcp-card-actions .primary")!;
+    expect(primary.textContent).toBe("配置");
+    expect(container.textContent).toContain("已连接");
+    await act(async () => { primary.click(); });
+    expect(container.textContent).toContain("配置 MCP 连接");
+    expect(container.textContent).not.toContain("登录企查查企业工商");
+    expect(container.querySelector('input[aria-label="MCP 连接名称"]')).not.toBeNull();
+    expect(api.extension).not.toHaveBeenCalled();
+    expect(api.testExtension).toHaveBeenCalledWith("local", { ref: "existing_qichacha", version: 2 });
+  });
+
   it("saves recommendation metadata through the admin supplement API", async () => {
     api.mcpMarket.mockResolvedValue({ ...emptyMarket, canAdmin: true, categories: [{ key: "data", label: "数据服务", count: 0 }] });
     await render();

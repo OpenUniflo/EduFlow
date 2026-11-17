@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  classifyMcpServer, marketSourceId, normalizeMcpConnectMode, normalizeMcpOauthScopes, normalizeRegistryServer,
-  suggestedConnectionRef, validateMcpRecommendation,
+  classifyMcpServer, marketSourceId, mergePlatformMarketPage, normalizeMcpConnectMode, normalizeMcpOauthScopes, normalizeRegistryServer,
+  platformCatalogPageWindow, platformMarketItemsForQuery, platformMcpMarketItems,
+  suggestedConnectionRef, validateMcpRecommendation, type McpMarketItem,
 } from "./mcpRegistry";
+import { PLATFORM_MCP_SERVICES } from "./platformMcpCatalog";
 
 const latest = (server: Record<string, unknown>) => ({ server, _meta: { "io.modelcontextprotocol.registry/official": { status: "active", isLatest: true } } });
 
@@ -84,5 +86,107 @@ describe("administrator recommendation metadata", () => {
     expect(marketSourceId("合成测试服务", url)).toBe("agent.example-mcp-company-stream");
     expect(marketSourceId("Synthetic", url)).toBe("synthetic");
     expect(marketSourceId("合成测试服务", url)).toBe(marketSourceId("合成测试服务", url));
+  });
+});
+
+const dbMarketItem = (overrides: Partial<McpMarketItem>): McpMarketItem => ({
+  id: "db-1",
+  source: "admin",
+  sourceId: "db-fixture",
+  name: "db.example",
+  title: "DB Fixture",
+  description: "Synthetic database row.",
+  version: "1",
+  url: "https://db.example/mcp",
+  transport: "streamable-http",
+  authHint: "oauth",
+  headerHints: [],
+  category: "finance",
+  categoryLabel: "金融投资",
+  featured: false,
+  suggestedRef: "db_fixture",
+  recommended: false,
+  connectMode: "config",
+  oauthScopes: [],
+  ...overrides,
+});
+
+describe("platform-owned MCP catalog", () => {
+  it("defines the single real Qichacha company service with verifiable metadata", () => {
+    expect(PLATFORM_MCP_SERVICES).toHaveLength(1);
+    expect(PLATFORM_MCP_SERVICES[0]).toMatchObject({
+      url: "https://agent.qcc.com/mcp/company/stream",
+      transport: "streamable-http",
+      authHint: "oauth",
+      category: "data",
+      featured: true,
+      connectMode: "login",
+      oauthScopes: ["mcp:tools"],
+    });
+    expect(platformMcpMarketItems()).toHaveLength(1);
+    expect(platformMcpMarketItems()[0]).toMatchObject({
+      id: "platform-qichacha-company",
+      source: "platform",
+      sourceId: "qichacha-company",
+      title: "企查查企业工商",
+      category: "data",
+      categoryLabel: "数据服务",
+      featured: true,
+      recommended: true,
+      connectMode: "login",
+      suggestedRef: "qichacha_company",
+    });
+  });
+
+  it("matches the platform service by Chinese name, English name, host, and category", () => {
+    const ids = (query = "", category = "") => platformMarketItemsForQuery(query, category).map((item) => item.id);
+    expect(ids("企查查")).toEqual(["platform-qichacha-company"]);
+    expect(ids("Qichacha")).toEqual(["platform-qichacha-company"]);
+    expect(ids("agent.qcc.com")).toEqual(["platform-qichacha-company"]);
+    expect(ids("qcc.com")).toEqual(["platform-qichacha-company"]);
+    expect(ids("", "data")).toEqual(["platform-qichacha-company"]);
+    expect(ids("", "finance")).toEqual([]);
+    expect(ids("unrelated")).toEqual([]);
+  });
+
+  it("reserves platform slots before the bounded database page and merges counts once", () => {
+    expect(platformCatalogPageWindow(1, 1, 2)).toEqual({ start: 0, platformOnPage: 1, dbStart: 0, dbLimit: 1 });
+    expect(platformCatalogPageWindow(1, 2, 2)).toEqual({ start: 2, platformOnPage: 0, dbStart: 1, dbLimit: 2 });
+    expect(platformCatalogPageWindow(0, 1, 2)).toEqual({ start: 0, platformOnPage: 0, dbStart: 0, dbLimit: 2 });
+
+    const platform = platformMcpMarketItems()[0];
+    const categories = [
+      { key: "data", label: "数据服务", count: 9 },
+      { key: "finance", label: "金融投资", count: 2 },
+    ];
+    const first = mergePlatformMarketPage({
+      platformItems: [platform],
+      dbItems: [dbMarketItem({ id: "db-1" })],
+      dbTotal: 11,
+      dbCategories: categories,
+      page: 1,
+      limit: 2,
+    });
+    expect(first.items.map((item) => item.id)).toEqual([platform.id, "db-1"]);
+    expect(first.total).toBe(12);
+    expect(first.hasMore).toBe(true);
+    expect(first.recommendedIds).toEqual([platform.id]);
+    expect(first.categories).toEqual([
+      { key: "data", label: "数据服务", count: 10 },
+      { key: "finance", label: "金融投资", count: 2 },
+    ]);
+
+    const second = mergePlatformMarketPage({
+      platformItems: [platform],
+      dbItems: [dbMarketItem({ id: "db-2" }), dbMarketItem({ id: "db-3" })],
+      dbTotal: 11,
+      dbCategories: categories,
+      page: 2,
+      limit: 2,
+    });
+    expect(second.items.map((item) => item.id)).toEqual(["db-2", "db-3"]);
+    expect(second.total).toBe(12);
+    expect(second.hasMore).toBe(true);
+    expect(second.categories[0].count).toBe(10);
   });
 });
