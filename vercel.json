@@ -5,8 +5,7 @@
   ],
   "functions": {
     "api/workflows.ts": {
-      "maxDuration": 120,
-      "regions": ["hkg1"]
+      "maxDuration": 120
     },
     "api/learner.ts": {
       "maxDuration": 300
