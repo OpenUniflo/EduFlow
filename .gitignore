@@ -20,6 +20,8 @@ dist/
 /.acceptance/
 /output/
 /.playwright-cli/
+/.local-handoffs/
+/.tmp-preview/
 
 # Generated reports, raw captures and immutable local evidence archives.
 # Reusable inputs belong in fixtures/acceptance; conclusions in docs/acceptance.

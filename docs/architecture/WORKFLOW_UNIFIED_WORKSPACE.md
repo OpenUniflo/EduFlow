@@ -37,7 +37,7 @@ The root agent implemented changes. A single independent agent began from the pr
 - Round 3 confirmed normal variable selection, saved values taking effect without page reload, no formal history from node tests, history read-only controls/shortcuts, preserved drafts, and corrected banner placement.
 - Download artifacts passed independent verification: both question-workflow exports match revision 5, four nodes, three transitions, environment binding and layout; the template export matches its revision 2 edit state. Browser download-event timeout was an automation observation, not a product failure. All specified third-round items passed.
 
-Evidence: [first use](../../.acceptance/workflow-unified/first-use-round1.md), [round 2](../../.acceptance/workflow-unified/round2-report.md), [round 3](../../.acceptance/workflow-unified/round3-report.md), [desktop screenshot](../../.acceptance/workflow-unified/round3-final-desktop-canvas-bubbles-detail.jpg), [768px layout](../../.acceptance/workflow-unified/round2-04-width768-fixed.jpg).
+Evidence (本机证据路径，私有且不进入版本库): first use `.acceptance/workflow-unified/first-use-round1.md`, round 2 `.acceptance/workflow-unified/round2-report.md`, round 3 `.acceptance/workflow-unified/round3-report.md`, desktop screenshot `.acceptance/workflow-unified/round3-final-desktop-canvas-bubbles-detail.jpg`, 768px layout `.acceptance/workflow-unified/round2-04-width768-fixed.jpg`.
 
 ## Verification
 

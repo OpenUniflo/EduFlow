@@ -48,6 +48,7 @@ export const PRESERVED_USER_TABLES = [
   "workflow_execution_threads",
   "workflow_idempotency",
   "workflow_live_runs",
+  "workflow_reference_index",
   "workflow_revisions",
   "workflow_run_evidence_receipts",
   "workflow_run_tombstones",

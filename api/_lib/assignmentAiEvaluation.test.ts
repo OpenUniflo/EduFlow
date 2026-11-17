@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./http.js";
 import {
   assignmentAiJudgmentSchema,
@@ -232,6 +232,21 @@ describe("Knowledge mastery criterion expansion", () => {
 });
 
 describe("AI evaluation attempt orchestration", () => {
+  beforeEach(() => {
+    // These orchestration tests inject the generator. Provide a complete fake
+    // LLM configuration so a clean checkout without .env.local still reaches
+    // the injected generator instead of stopping at the environment guard.
+    // Never inherit a real provider key from the developer environment.
+    vi.stubEnv("LLM_PROVIDER", "test-provider");
+    vi.stubEnv("LLM_BASE_URL", "https://example.invalid/v1");
+    vi.stubEnv("LLM_API_KEY", "test-only-not-a-secret");
+    vi.stubEnv("LLM_MODEL", "test-model");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("never claims or finalizes a withdrawn Attempt, so a late model result cannot count back", async () => {
     const rpc = vi.fn();
     const withdrawn = { ...attempt, withdrawn_at: "2026-11-07T00:00:00Z" };
