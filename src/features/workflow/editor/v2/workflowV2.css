@@ -1410,9 +1410,9 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-response-choice-error{color:var(--danger)}
 .wf-response-option,.wf-response-summary{border:1px solid var(--line);border-radius:var(--r-12);padding:var(--sp-8) var(--sp-12);background:var(--page);overflow-wrap:anywhere}
 .wf-response-option:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
-.wf-response-option>label{display:flex;align-items:flex-start;gap:var(--sp-8);cursor:pointer}
+.wf-response-option>label{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:var(--sp-8);margin:0;cursor:pointer}
 .wf-response-option>label small{display:block;margin-top:var(--sp-4)}
-.wf-node-response .wf-response-option input[type=radio]{min-height:auto;margin:var(--sp-4) 0 0}
+.wf-node-response .wf-response-option input[type=radio]{width:1em;height:1em;min-height:0;margin:var(--sp-4) 0 0;padding:0;accent-color:var(--brand)}
 .wf-response-facts{margin:var(--sp-4) 0;display:grid;gap:var(--sp-4);font-size:var(--fs-12)}
 .wf-response-facts>div{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:var(--sp-8)}
 .wf-response-facts dd{margin:0}
