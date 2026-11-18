@@ -13,13 +13,16 @@ def interaction_check(definition,node):
     if 'interrupt' not in settings: return
     spec=settings['interrupt']
     required={'title','schema','resumeWrites'}
-    if not isinstance(spec,dict) or not required<=set(spec)<=required|{'presentation'} or not isinstance(spec['title'],str) or not spec['title'].strip() or len(spec['title'])>300:
+    if not isinstance(spec,dict) or not required<=set(spec)<=required|{'presentation','writeIfMissing'} or not isinstance(spec['title'],str) or not spec['title'].strip() or len(spec['title'])>300:
         raise ExecutionError('INVALID_INTERRUPT','Interrupt requires a title, response schema and State mapping')
     if 'presentation' in spec and not isinstance(spec['presentation'],dict):
         raise ExecutionError('INVALID_INTERRUPT','Interrupt presentation must be an object')
     schema_check(spec['schema'])
     if spec['schema'].get('type')!='object': raise ExecutionError('INVALID_INTERRUPT','Response must be an object')
     if not isinstance(spec['resumeWrites'],dict): raise ExecutionError('INVALID_INTERRUPT','State mapping must be an object')
+    guarded=spec.get('writeIfMissing',[])
+    if not isinstance(guarded,list) or any(not isinstance(key,str) or key not in spec['resumeWrites'] for key in guarded):
+        raise ExecutionError('INVALID_INTERRUPT','Missing-only fields must use declared response mappings')
     targets=list(spec['resumeWrites'].values())
     if len(set(targets))!=len(targets): raise ExecutionError('INVALID_INTERRUPT','Response fields cannot target the same State field')
     for source,target in spec['resumeWrites'].items():
@@ -68,6 +71,13 @@ def validate_resume(definition,thread,responses,env,references=None):
         node=next((n for n in scoped['nodes'] if n['id']==item['nodeId']),None)
         if not node or not node['config'].get('authoring',{}).get('interrupt'): raise ExecutionError('INTERRUPT_ID_CONFLICT','Interrupt no longer matches its frozen node')
         patch=response_patch_for(scoped,node,responses[item['id']])
+        if not item.get('graphPath'):
+            spec=node['config']['authoring']['interrupt']
+            for key in spec.get('writeIfMissing',[]):
+                field=spec['resumeWrites'][key]
+                value=state.get(field)
+                if field in patch and value is not None and (not isinstance(value,str) or value.strip()):
+                    raise ExecutionError('RESPONSE_FIELD_NOT_MISSING','Only unresolved fields can be supplied at this step')
         for field,value in patch.items(): validate_value(scoped['state']['schema']['properties'][field],value,'INVALID_INTERRUPT_RESPONSE')
         if not item.get('graphPath'): state=apply_patch(state,patch,definition)
         if len(canonical(patch))>definition['policy']['maxStateBytes']: raise ExecutionError('STATE_TOO_LARGE','Response patch exceeds State budget','policy')

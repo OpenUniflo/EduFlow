@@ -75,7 +75,13 @@ BUILTIN_TOOLS = [
         "outputSchema": {"type": "object", "properties": {"hits": {"type": "array", "items": {"type": "object"}}}, "required": ["hits"]},
     },
 ]
+LOT_LIST = {"type":"array","items":ANY_OBJ}
 OPERATIONS = {
+    "ted.lotQuery": {"inputSchema":obj({"publicationNumber":STRING}),"outputSchema":obj({"query":STRING})},
+    "ted.normalizeLots": {"inputSchema":obj({"rows":LOT_LIST}),"outputSchema":obj({"lots":LOT_LIST})},
+    "ted.evaluateLot": {"inputSchema":obj({"lots":LOT_LIST,"lotId":STRING}),"outputSchema":obj({"lot":ANY_OBJ,"status":STRING})},
+    "core.reopenTextFields": {"inputSchema":obj({"values":ANY_OBJ,"fields":{"type":"array","items":STRING},"fieldMap":ANY_OBJ}),"outputSchema":obj({"values":ANY_OBJ})},
+
     "core.identity": {"inputSchema":obj({"value":{}}),"outputSchema":obj({"value":{}})},
     "core.add": {"inputSchema":obj({"left":{"type":"number"},"right":{"type":"number"}}),"outputSchema":obj({"value":{"type":"number"}})},
     "core.concat": {"inputSchema":obj({"values":{"type":"array","items":STRING},"separator":STRING},["values"]),"outputSchema":obj({"value":STRING})},
@@ -88,6 +94,23 @@ def transform(ref, arguments):
     if ref == "core.add": return {"value":arguments["left"]+arguments["right"]}
     if ref == "core.concat": return {"value":arguments.get("separator","").join(arguments["values"])}
     if ref == "core.message": return {"messages":[{"id":str(uuid.uuid4()),"role":arguments.get("role","user"),"content":[{"type":"text","text":arguments["text"]}]}]}
+    if ref == "ted.lotQuery":
+        from .ted_lots import lot_query
+        return {"query":lot_query(arguments["publicationNumber"])}
+    if ref == "ted.normalizeLots":
+        from .ted_lots import normalize_lots
+        return {"lots":normalize_lots(arguments["rows"])}
+    if ref == "ted.evaluateLot":
+        from .ted_lots import evaluate_lot
+        return evaluate_lot(arguments["lots"],arguments["lotId"])
+    if ref == "core.reopenTextFields":
+        values=arguments["values"]
+        field_map=arguments["fieldMap"]
+        if any(not isinstance(name,str) for name in field_map.values()) or any(field not in field_map for field in arguments["fields"]):
+            raise ExecutionError("UNKNOWN_REVIEW_FIELD", "Review item is not configured", "validation")
+        selected={field_map[field] for field in arguments["fields"]}
+        return {"values":{name:"" if name in selected else values.get(name, "")
+                          for name in field_map.values()}}
     raise ExecutionError("UNKNOWN_OPERATION","Unregistered operation")
 
 def restore_frozen_environment(env, frozen):
