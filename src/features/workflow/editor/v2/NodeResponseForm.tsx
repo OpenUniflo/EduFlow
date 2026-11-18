@@ -3,16 +3,19 @@ import type { JsonSchema, JsonValue } from '../../domain/v2/types';
 import { interactionResponseIssue } from '../../domain/v2/authoring';
 import { validateSchemaValue } from '../../domain/v2/validation';
 import { SchemaForm } from './SchemaForm';
+import { ResponsePresentation, type ResponsePresentationModel } from './ResponsePresentation';
 
 export type ResponseDraft={value:Record<string,JsonValue>;invalid?:string};
-export function NodeResponseForm({title,schema,value,onChange,onInvalid,onSubmit,busy=false,batchOnly=false,breakpoint=false,contextMissing=false,onCancel,beforeFields,additionalActions}:{title:string;schema:JsonSchema;value:Record<string,JsonValue>;onChange:(value:Record<string,JsonValue>)=>void;onInvalid:(message:string)=>void;onSubmit:()=>Promise<boolean>|boolean;busy?:boolean;batchOnly?:boolean;breakpoint?:boolean;contextMissing?:boolean;onCancel?:()=>void;beforeFields?:ReactNode;additionalActions?:ReactNode}){
+export function NodeResponseForm({title,schema,value,onChange,onInvalid,onSubmit,busy=false,batchOnly=false,breakpoint=false,contextMissing=false,onCancel,beforeFields,additionalActions,presentation}:{title:string;schema:JsonSchema;value:Record<string,JsonValue>;onChange:(value:Record<string,JsonValue>)=>void;onInvalid:(message:string)=>void;onSubmit:()=>Promise<boolean>|boolean;busy?:boolean;batchOnly?:boolean;breakpoint?:boolean;contextMissing?:boolean;onCancel?:()=>void;beforeFields?:ReactNode;additionalActions?:ReactNode;presentation?:ResponsePresentationModel}){
   const body = useRef<HTMLDivElement>(null);
   const [touched,setTouched]=useState(false);
   const [sending,setSending]=useState(false);const [error,setError]=useState('');const [invalid,setInvalid]=useState('');
   async function submit(){
     setTouched(true);
     if(contextMissing){setError('缺少可核对的审核依据，当前不能提交批准。');return;}
-    const issue=invalid||interactionResponseIssue(schema,value)||validateSchemaValue(schema,value).errors[0];
+    const choices=presentation?.choices;
+    const optionIssue=choices&&!presentation.options.some(item=>item.value===value[choices.field])?'请选择本次返回的选项。':undefined;
+    const issue=invalid||optionIssue||interactionResponseIssue(schema,value)||validateSchemaValue(schema,value).errors[0];
     if (issue) {
       setError(issue);
       requestAnimationFrame(() => {
@@ -33,7 +36,8 @@ export function NodeResponseForm({title,schema,value,onChange,onInvalid,onSubmit
       <p className="wf-field-note">{breakpoint ? '当前执行停在调试断点；继续将沿用检查点。' : '此节点正在等待你补充信息。提交后会从这里继续。'}</p>
       {contextMissing ? <p role="alert" className="wf-review-blocked">缺少可核对的执行依据，当前不能提交批准。可取消本次执行，补齐依据后重新运行；已完成的步骤会保留。</p> : null}
       <fieldset disabled={busy || sending || contextMissing}>
-        <SchemaForm showValidation={touched} schema={schema} value={value} label="需要补充的信息" prefix="node-response"
+        {presentation ? <ResponsePresentation model={presentation} value={value} onChange={next=>{onChange(next);setError('');}}/> : null}
+        <SchemaForm hiddenFields={presentation?.hiddenFields} showValidation={touched} schema={schema} value={value} label="需要补充的信息" prefix="node-response"
           onChange={next => { onChange(next as Record<string, JsonValue>); setError(''); }}
           onInvalid={message => { setInvalid(message); onInvalid(message); }}
         />

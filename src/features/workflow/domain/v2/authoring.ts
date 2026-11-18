@@ -15,7 +15,21 @@ export const authoringNodeTypes = [
   { type: "control.send", label: "动态分发 Send", group: "控制流" },
 ];
 export const nodeTypeLabel = (type: string) => authoringNodeTypes.find(item => item.type === type)?.label;
-export type NodeInteraction = { title: string; schema: JsonSchema; resumeWrites: Record<string, string> };
+const responseFactSchema = z.object({ label: z.string().min(1), path: z.string().startsWith("/"), link: z.boolean().optional() });
+const interactionPresentationSchema = z.object({
+  choices: z.object({
+    field: z.string().min(1),
+    label: z.string().min(1),
+    source: z.string().startsWith("/"),
+    value: z.string().startsWith("/"),
+    title: z.string().startsWith("/"),
+    facts: z.array(responseFactSchema).max(6),
+  }).optional(),
+  summary: z.array(responseFactSchema).max(10).optional(),
+  checklist: z.object({ fields: z.array(z.string().min(1)).max(12), onlyMissing: z.boolean().optional() }).optional(),
+});
+export type InteractionPresentation = z.infer<typeof interactionPresentationSchema>;
+export type NodeInteraction = { title: string; schema: JsonSchema; resumeWrites: Record<string, string>; presentation?: InteractionPresentation };
 /** Non-empty required response text must contain visible content; preserve valid text verbatim. */
 export function interactionResponseIssue(schema: JsonSchema, response: JsonValue): string | undefined {
   if(!response||typeof response!=="object"||Array.isArray(response))return undefined;
@@ -27,7 +41,7 @@ export function interactionResponseIssue(schema: JsonSchema, response: JsonValue
   return undefined;
 }
 export type NodeAuthoring = { interrupt?: NodeInteraction; retry?: { maxAttempts: number; intervalMs: number; backoffFactor?:number; maxIntervalMs?:number; retryOn?:string[] }; timeoutMs?: number; cache?: { ttlMs: number }; errorHandler?: { functionRef: string; functionVersion?:number }; overwrite?:string[]; defer?:boolean; command?: { enabled: boolean; destinations: string[]; graph?:"current"|"parent"; update?:Record<string, import("./types").Binding> } };
-const nodeAuthoringSchema = z.object({ interrupt:z.object({title:z.string(),schema:z.record(z.string(),jsonValueSchema),resumeWrites:z.record(z.string(),z.string())}), retry:z.object({maxAttempts:z.number().int().min(1).max(10),intervalMs:z.number().nonnegative(),backoffFactor:z.number().min(1).optional(),maxIntervalMs:z.number().nonnegative().optional(),retryOn:z.array(z.string()).optional()}).optional(), timeoutMs:z.number().positive().optional(),cache:z.object({ttlMs:z.number().positive()}).optional(),overwrite:z.array(z.string()).optional(),errorHandler:z.object({functionRef:z.string(),functionVersion:z.number().int().positive().optional()}).optional(),defer:z.boolean().optional(),command:z.object({enabled:z.boolean(),destinations:z.array(z.string()),graph:z.enum(["current","parent"]).optional(),update:z.record(z.string(),bindingSchema).optional()}).optional() }).partial().passthrough();
+const nodeAuthoringSchema = z.object({ interrupt:z.object({title:z.string(),schema:z.record(z.string(),jsonValueSchema),resumeWrites:z.record(z.string(),z.string()),presentation:interactionPresentationSchema.optional()}), retry:z.object({maxAttempts:z.number().int().min(1).max(10),intervalMs:z.number().nonnegative(),backoffFactor:z.number().min(1).optional(),maxIntervalMs:z.number().nonnegative().optional(),retryOn:z.array(z.string()).optional()}).optional(), timeoutMs:z.number().positive().optional(),cache:z.object({ttlMs:z.number().positive()}).optional(),overwrite:z.array(z.string()).optional(),errorHandler:z.object({functionRef:z.string(),functionVersion:z.number().int().positive().optional()}).optional(),defer:z.boolean().optional(),command:z.object({enabled:z.boolean(),destinations:z.array(z.string()),graph:z.enum(["current","parent"]).optional(),update:z.record(z.string(),bindingSchema).optional()}).optional() }).partial().passthrough();
 export function nodeAuthoring(node: WorkflowNodeV2): NodeAuthoring { const result=nodeAuthoringSchema.safeParse(node.config.authoring??{});return result.success?result.data as NodeAuthoring:{}; }
 /**
  * Parsed nested graphs are cached by the immutable `config.graph` value they

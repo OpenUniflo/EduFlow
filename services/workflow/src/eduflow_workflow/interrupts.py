@@ -12,8 +12,11 @@ def interaction_check(definition,node):
         raise ExecutionError('UNSUPPORTED_CAPABILITY','Unknown node runtime setting')
     if 'interrupt' not in settings: return
     spec=settings['interrupt']
-    if not isinstance(spec,dict) or set(spec)!={'title','schema','resumeWrites'} or not isinstance(spec['title'],str) or not spec['title'].strip() or len(spec['title'])>300:
+    required={'title','schema','resumeWrites'}
+    if not isinstance(spec,dict) or not required<=set(spec)<=required|{'presentation'} or not isinstance(spec['title'],str) or not spec['title'].strip() or len(spec['title'])>300:
         raise ExecutionError('INVALID_INTERRUPT','Interrupt requires a title, response schema and State mapping')
+    if 'presentation' in spec and not isinstance(spec['presentation'],dict):
+        raise ExecutionError('INVALID_INTERRUPT','Interrupt presentation must be an object')
     schema_check(spec['schema'])
     if spec['schema'].get('type')!='object': raise ExecutionError('INVALID_INTERRUPT','Response must be an object')
     if not isinstance(spec['resumeWrites'],dict): raise ExecutionError('INVALID_INTERRUPT','State mapping must be an object')
