@@ -10,12 +10,19 @@ export function NodeResponseForm({title,schema,value,onChange,onInvalid,onSubmit
   const body = useRef<HTMLDivElement>(null);
   const [touched,setTouched]=useState(false);
   const [sending,setSending]=useState(false);const [error,setError]=useState('');const [invalid,setInvalid]=useState('');
+  const choices=presentation?.choices;
+  const selectedOption=choices&&presentation.options.find(item=>item.value===value[choices.field]);
+  const [choiceAttempted,setChoiceAttempted]=useState(false);
+  const choiceInvalid=choiceAttempted&&Boolean(choices&&presentation.options.length&&!selectedOption);
   async function submit(){
     setTouched(true);
     if(contextMissing){setError('缺少可核对的审核依据，当前不能提交批准。');return;}
-    const choices=presentation?.choices;
-    const optionIssue=choices&&!presentation.options.some(item=>item.value===value[choices.field])?'请选择本次返回的选项。':undefined;
-    const issue=invalid||optionIssue||interactionResponseIssue(schema,value)||validateSchemaValue(schema,value).errors[0];
+    if(choices&&!selectedOption){
+      setChoiceAttempted(true);
+      body.current?.querySelector<HTMLInputElement>('.wf-response-choices input[type="radio"]')?.focus();
+      return;
+    }
+    const issue=invalid||interactionResponseIssue(schema,value)||validateSchemaValue(schema,value).errors[0];
     if (issue) {
       setError(issue);
       requestAnimationFrame(() => {
@@ -36,7 +43,7 @@ export function NodeResponseForm({title,schema,value,onChange,onInvalid,onSubmit
       <p className="wf-field-note">{breakpoint ? '当前执行停在调试断点；继续将沿用检查点。' : '此节点正在等待你补充信息。提交后会从这里继续。'}</p>
       {contextMissing ? <p role="alert" className="wf-review-blocked">缺少可核对的执行依据，当前不能提交批准。可取消本次执行，补齐依据后重新运行；已完成的步骤会保留。</p> : null}
       <fieldset disabled={busy || sending || contextMissing}>
-        {presentation ? <ResponsePresentation model={presentation} value={value} onChange={next=>{onChange(next);setError('');}}/> : null}
+        {presentation ? <ResponsePresentation model={presentation} value={value} choiceInvalid={choiceInvalid} onChange={next=>{onChange(next);setError('');}}/> : null}
         <SchemaForm hiddenFields={presentation?.hiddenFields} showValidation={touched} schema={schema} value={value} label="需要补充的信息" prefix="node-response"
           onChange={next => { onChange(next as Record<string, JsonValue>); setError(''); }}
           onInvalid={message => { setInvalid(message); onInvalid(message); }}
@@ -46,7 +53,10 @@ export function NodeResponseForm({title,schema,value,onChange,onInvalid,onSubmit
       {error ? <p role="alert">{error}</p> : null}
     </div>
     <div className="wf-response-actions">
-      <button type="submit" className="primary" disabled={busy || sending || batchOnly || contextMissing}>
+      {choices ? <p className="wf-response-selection" role="status">
+        {selectedOption ? `已选择 ${selectedOption.value}` : presentation.options.length ? '请先在上方选择一项，再提交。' : '本次没有可选择的项目。'}
+      </p> : null}
+      <button type="submit" className="primary" disabled={busy || sending || batchOnly || contextMissing || Boolean(choices&&!presentation.options.length)}>
         {busy || sending ? '正在提交…' : breakpoint ? '继续调试断点' : '提交回应并继续'}
       </button>
       {additionalActions}

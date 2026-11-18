@@ -22,9 +22,14 @@ it("renders only current checkpoint choices and safely formats public evidence",
   expect(model.options.map(item => item.value)).toEqual(["first", "second"]);
   const html = renderToStaticMarkup(<ResponsePresentation model={model} value={{ id: "first" }} onChange={() => {}}/>);
   expect(html).toContain("选择公告");
+  expect(html).toContain("必选一项");
   expect(html).toContain("https://example.org/first");
   expect(html).toContain("checked");
   expect(html).not.toContain("javascript:");
+  const invalidHtml = renderToStaticMarkup(<ResponsePresentation model={model} value={{}} choiceInvalid onChange={() => {}}/>);
+  expect(invalidHtml).toContain('role="alert"');
+  expect(invalidHtml).toContain('aria-describedby=');
+  expect(invalidHtml).not.toContain('checked');
 });
 
 it("uses the response mapping to hide completed fields and label missing fields", () => {

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { InteractionPresentation, NodeInteraction } from "../../domain/v2/authoring";
 import type { JsonSchema, JsonValue } from "../../domain/v2/types";
 import { valueAt } from "./SchemaForm";
@@ -62,16 +63,20 @@ export function responsePresentation(interaction: NodeInteraction | undefined, s
 
 export type ResponsePresentationModel = NonNullable<ReturnType<typeof responsePresentation>>;
 
-export function ResponsePresentation({ model, value, onChange }: {
+export function ResponsePresentation({ model, value, choiceInvalid = false, onChange }: {
   model: ResponsePresentationModel;
   value: Record<string, JsonValue>;
+  choiceInvalid?: boolean;
   onChange: (value: Record<string, JsonValue>) => void;
 }) {
   const { choices, options, summary, missingLabels, state } = model;
+  const choiceErrorId = useId();
   return <>
     {summary?.length ? <section aria-label="审批与核对依据" className="wf-response-summary"><Facts facts={summary} data={state}/></section> : null}
     {missingLabels.length ? <p className="wf-response-missing"><strong>待补齐</strong> {missingLabels.join("、")}</p> : null}
-    {choices ? <fieldset className="wf-response-choices"><legend>{choices.label}</legend>
+    {choices ? <fieldset className="wf-response-choices" aria-describedby={choiceInvalid ? choiceErrorId : undefined}>
+      <legend>{choices.label}{options.length ? '（必选一项）' : ''}</legend>
+      {choiceInvalid ? <p id={choiceErrorId} className="wf-response-choice-error" role="alert">请点击一张候选卡片的标题或单选按钮。</p> : null}
       {options.length ? options.map(option => <div className="wf-response-option" key={option.value}>
         <label><input type="radio" name={choices.field} checked={value[choices.field] === option.value} value={option.value}
           onChange={() => onChange({ ...value, [choices.field]: option.value })}/><span><strong>{option.title}</strong><small>{option.value}</small></span></label>
