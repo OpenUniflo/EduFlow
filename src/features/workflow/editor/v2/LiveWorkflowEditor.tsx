@@ -23,7 +23,7 @@ import { RouterFields } from "./RouterFields";
 import { GraphRuntimeFields } from "./GraphRuntimeFields";
 import { GraphInterfaceFields } from "./GraphInterfaceFields";
 import { scopedWorkflow } from "../../application/v2/scopedWorkflow";
-import { createScopeMemoryStore, navigationScopeUi, scopeMemoryKey, scopeUiHasVisiblePanel, type WorkflowScopeContext, type WorkflowScopeTab, type WorkflowScopeUi } from "./subgraphNavigation";import { authoringNodeTypes, createAuthoringNode, frontendCapabilities, graphAtPath, graphInNode, editorAtPath, nodeOutlets, nodeAuthoring, outletDisplayName } from "../../domain/v2/authoring";
+import { createScopeMemoryStore, navigationScopeUi, scopeMemoryKey, scopeUiHasVisiblePanel, type WorkflowScopeContext, type WorkflowScopeTab, type WorkflowScopeUi } from "./subgraphNavigation";import { authoringNodeTypes, createAuthoringNode, frontendCapabilities, graphAtPath, graphInNode, editorAtPath, nodeAtGraphPath, nodeOutlets, nodeAuthoring, outletDisplayName } from "../../domain/v2/authoring";
 import { workflowReferenceInNode, workflowReferenceUsages, type WorkflowReference } from "../../domain/v2/workflowReferences";
 import { referenceInputFields, referenceMappingIssues, referenceOutputFields, workflowReferenceConfig } from "../../domain/v2/workflowReferenceMapping";
 import { WorkflowReferencePicker, type ReferencePickerSelection } from "./WorkflowReferencePicker";
@@ -486,7 +486,23 @@ export function LiveWorkflowEditor({ initial, ownerId, navigation, launchContext
   }
   function locateResponse(nodeId:string,path?:string[],interruptId?:string){
     if(interruptId)setSelectedInterruptId(interruptId);
-    if(path&&JSON.stringify(path)!==JSON.stringify(safePath)){focusedResponse.current='';navigateGraph(path);return;}
+    if(path&&JSON.stringify(path)!==JSON.stringify(safePath)){
+      focusedResponse.current='';
+      const needsFrozenTarget=!executionView&&expectsFrozenReferences&&!nodeAtGraphPath(rootController.definition,path,nodeId);
+      if(needsFrozenTarget){
+        if(!nodeAtGraphPath(runTabDefinition,path,nodeId)){
+          controller.setError(runReferencesLoading||!rootController.runSnapshot
+            ?"正在读取本次运行的固定引用快照，请稍后进入回应。"
+            :"本次运行的固定引用快照未包含此回应节点。请查看运行详情。");
+          return;
+        }
+        navigateGraph(path,{context:"history",selectNodeId:nodeId});
+        setViewingRun(true);
+      }else{
+        navigateGraph(path);
+      }
+      return;
+    }
     setBubblesOpen(true);setInspectorOpen(false);setHistoryOpen(false);setSelection(nodeId);setEdgeSelection(null);
     const point=displayedEditor.nodes[nodeId];if(!point)return;
     // Let the history drawer close before React Flow measures the available height.
