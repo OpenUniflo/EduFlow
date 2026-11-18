@@ -46,9 +46,9 @@ async def test_preflight_rejects_cross_owner_and_mutates_nothing(preflight):
     assert caught.value.code=="ENVIRONMENT_FORBIDDEN"
 
 async def test_model_preflight_never_constructs_sdk_or_invokes_tools(preflight,monkeypatch):
-    from eduflow_workflow import runtime,tools
+    from eduflow_workflow import model_transport,tools
     def forbidden(*args,**kwargs): raise AssertionError("Preflight performed execution")
-    monkeypatch.setattr(runtime,"ChatDeepSeek",forbidden)
+    monkeypatch.setattr(model_transport,"ChatDeepSeek",forbidden)
     monkeypatch.setattr(tools,"invoke_tool",forbidden)
     monkeypatch.setenv("SYNTHETIC_PREFLIGHT_KEY","synthetic-offline-key")
     monkeypatch.setattr(server,"registry",Registry({"environments":[{"ref":"test","ownerIds":["a"],"providers":[{"ref":"p","modelRefs":["m"],"secretRef":"SYNTHETIC_PREFLIGHT_KEY"}]}]}))

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const host = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0 }));
-const api = vi.hoisted(() => ({ extension: vi.fn() }));
+const api = vi.hoisted(() => ({ extension: vi.fn(), testExtension: vi.fn() }));
 const catalog = vi.hoisted(() => ({
   data: {
     connections: [
@@ -90,6 +90,7 @@ async function flush() { for (let index = 0; index < 20; index += 1) await Promi
 beforeEach(() => {
   host.slots = []; host.cursor = 0;
   api.extension.mockReset().mockResolvedValue({ ok: true });
+  api.testExtension.mockReset();
 });
 
 describe("provider editor", () => {
@@ -118,6 +119,90 @@ describe("provider editor", () => {
     expect(textOf(tree).match(/测试模型/g)).toHaveLength(1);
   });
 
+  it("shows the current provider as a read-only identity instead of the preset grid", () => {
+    const { tree } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(find(tree, item => item.props["aria-label"] === "选择模型供应商")).toBeUndefined();
+    expect(find(tree, item => item.props["aria-label"] === "当前模型供应商")).toBeDefined();
+    expect(textOf(tree)).toContain("要换一家请新建模型供应商");
+  });
+
+  it("reuses the saved key when only the enabled models change", async () => {
+    const { tree } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    (input(tree, "手动添加模型").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "team-model-2" } });
+    const afterModel = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    const add = find(afterModel.tree, item => item.type === "button" && textOf(item) === "添加");
+    expect(add).toBeDefined();
+    (add!.props.onClick as () => void)();
+    const afterAdd = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    const save = saveButton(afterAdd.tree);
+    expect(save.props.disabled).toBe(false);
+    (save.props.onClick as () => void)();
+    await flush();
+    expect(api.extension).toHaveBeenCalledWith("local", {
+      action: "publish", kind: "connection", ref: "team_gateway", version: 2,
+      content: { type: "openai-compatible", name: "团队网关", baseUrl: "https://old.example.com/v1", modelRefs: ["team-model", "team-model-2"] },
+      credential: "",
+    });
+  });
+
+  it("edits only the display name while keeping the stable ref and saved key", async () => {
+    const { tree: initial } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(input(initial, "供应商显示名称").props.value).toBe("团队网关");
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "团队网关（生产）" } });
+    const afterName = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(textOf(afterName.tree)).toContain("team_gateway");
+    const save = saveButton(afterName.tree);
+    expect(save.props.disabled).toBe(false);
+    (save.props.onClick as () => void)();
+    await flush();
+    expect(api.extension).toHaveBeenCalledWith("local", expect.objectContaining({
+      action: "publish", kind: "connection", ref: "team_gateway", version: 2, credential: "",
+      content: expect.objectContaining({ name: "团队网关（生产）", modelRefs: ["team-model"] }),
+    }));
+  });
+
+  it("lets a new provider set its display name without changing the preset ref", async () => {
+    const { tree: initial, onSaved, onClose } = render({ kind: "provider", mode: "create", presetId: "deepseek" });
+    expect(input(initial, "供应商显示名称").props.value).toBe("DeepSeek");
+    expect(textOf(initial)).toContain("deepseek");
+
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "  团队 DeepSeek  " } });
+    (input(initial, "模型 API Key").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "sk-create" } });
+    const after = render({ kind: "provider", mode: "create", presetId: "deepseek" }, onSaved, onClose);
+    expect(input(after.tree, "供应商显示名称").props.value).toBe("  团队 DeepSeek  ");
+    const save = saveButton(after.tree);
+    expect(save.props.disabled).toBe(false);
+    (save.props.onClick as () => void)();
+    await flush();
+    expect(api.extension).toHaveBeenCalledWith("local", expect.objectContaining({
+      action: "publish", kind: "connection", ref: "deepseek", version: 1, credential: "sk-create",
+      content: expect.objectContaining({ name: "团队 DeepSeek", type: "deepseek", modelRefs: ["deepseek-flash", "deepseek-reasoner"] }),
+    }));
+    expect(onSaved).toHaveBeenCalledWith("deepseek", 1, expect.objectContaining({ name: "团队 DeepSeek" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("blocks a blank name on a new provider too", () => {
+    const { tree: initial } = render({ kind: "provider", mode: "create", presetId: "deepseek" });
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "   " } });
+    const blank = render({ kind: "provider", mode: "create", presetId: "deepseek" });
+    expect(textOf(blank.tree)).toContain("请填写显示名称");
+    expect(saveButton(blank.tree).props.disabled).toBe(true);
+  });
+
+  it("blocks an empty or over-long display name", () => {
+    const { tree: initial } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    (input(initial, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: " " } });
+    const empty = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(textOf(empty.tree)).toContain("请填写显示名称");
+    expect(saveButton(empty.tree).props.disabled).toBe(true);
+
+    (input(empty.tree, "供应商显示名称").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "x".repeat(121) } });
+    const tooLong = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(textOf(tooLong.tree)).toContain("显示名称应为 1–120 个字符");
+    expect(saveButton(tooLong.tree).props.disabled).toBe(true);
+  });
+
   it("writes an edited existing address into the next version", async () => {
     const { tree: initial, onSaved, onClose } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
     expect(input(initial, "模型 Base URL").props.value).toBe("https://old.example.com/v1");
@@ -125,6 +210,7 @@ describe("provider editor", () => {
     (input(initial, "模型 Base URL").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "https://new.example.com/v1" } });
     const afterAddress = render({ kind: "provider", mode: "edit", ref: "team_gateway" }, onSaved, onClose);
     expect(input(afterAddress.tree, "模型 Base URL").props.value).toBe("https://new.example.com/v1");
+    expect(saveButton(afterAddress.tree).props.disabled).toBe(true);
 
     const key = input(afterAddress.tree, "模型 API Key");
     (key.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "sk-local-test" } });
@@ -141,5 +227,78 @@ describe("provider editor", () => {
     });
     expect(onSaved).toHaveBeenCalledWith("team_gateway", 2, expect.objectContaining({ baseUrl: "https://new.example.com/v1" }));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("provider editor model history", () => {
+  it("keeps a model removed from the latest version as an unchecked row", () => {
+    const original = catalog.data.connections;
+    catalog.data.connections = [
+      {
+        connectionKey: "p4:owner:team_gateway:1", ref: "team_gateway", version: 1, disabled: false, hasCredential: true,
+        content: { type: "openai-compatible", name: "团队网关", baseUrl: "https://old.example.com/v1", modelRefs: ["team-model", "retired-model"] },
+      },
+      {
+        connectionKey: "p4:owner:team_gateway:2", ref: "team_gateway", version: 2, disabled: false, hasCredential: true,
+        content: { type: "openai-compatible", name: "团队网关", baseUrl: "https://old.example.com/v1", modelRefs: ["team-model"] },
+      },
+    ] as typeof original;
+    try {
+      const { tree } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+      expect(textOf(tree)).toContain("retired-model");
+      expect(input(tree, "启用模型 retired-model").props.checked).toBe(false);
+      expect(textOf(tree)).toContain("曾启用");
+    } finally {
+      catalog.data.connections = original;
+    }
+  });
+
+  it("lists test models and warns when an enabled model is missing from the test result", async () => {
+    api.testExtension.mockResolvedValue({ ok: true, models: ["listed-model"] });
+    const { tree } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    const testButton = find(tree, item => item.type === "button" && textOf(item) === "发送测试消息")!;
+    (testButton.props.onClick as () => void)();
+    await flush();
+    const after = render({ kind: "provider", mode: "edit", ref: "team_gateway" }).tree;
+    expect(textOf(after)).toContain("listed-model");
+    expect(textOf(after)).toContain("上次测试未在供应商返回的模型列表中找到");
+  });
+});
+
+describe("api editor response format", () => {
+  it("reads and saves an explicit text response format", async () => {
+    const original = catalog.data.connections;
+    catalog.data.connections = [
+      ...original,
+      {
+        connectionKey: "p4:owner:onet:1", ref: "onet", version: 1, disabled: false, hasCredential: false,
+        content: {
+          type: "http", name: "O*NET National Wages", description: "",
+          baseUrl: "https://www.onetonline.org", path: "/link/localwages/15-1252.00",
+          method: "GET", sideEffect: "read", params: [], headers: [], body: { mode: "none", text: "" },
+          auth: { type: "none" }, settings: { timeoutMs: 15000, responseFormat: "text" },
+          outputMap: [{ name: "text", path: "", type: "text" }],
+          inputSchema: { type: "object", properties: {} },
+          outputSchema: { type: "object", properties: { text: { type: "string" } } },
+        },
+      },
+    ] as typeof original;
+    try {
+      const first = render({ kind: "api", mode: "edit", ref: "onet" }).tree;
+      const settingsTab = find(first, item => item.type === "button" && textOf(item).startsWith("设置"))!;
+      (settingsTab.props.onClick as () => void)();
+      const { tree } = render({ kind: "api", mode: "edit", ref: "onet" });
+      expect(input(tree, "响应格式").props.value).toBe("text");
+      const save = saveButton(tree);
+      expect(save.props.disabled).toBe(false);
+      (save.props.onClick as () => void)();
+      await flush();
+      expect(api.extension).toHaveBeenCalledWith("local", expect.objectContaining({
+        action: "publish", kind: "connection", ref: "onet", version: 2,
+        content: expect.objectContaining({ settings: expect.objectContaining({ responseFormat: "text" }) }),
+      }));
+    } finally {
+      catalog.data.connections = original;
+    }
   });
 });

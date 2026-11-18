@@ -156,7 +156,7 @@ async def stream_model(execution,model,messages):
         except Exception:pass
         raise
 
-async def load(owner,thread,registry):
+async def load(owner,thread,registry,*,allow_stale=False):
     from .storage import Storage
     data=await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p5_read',owner,'thread',thread)
     t=data['thread'];definition=data['definition'];env=registry.environment(t['snapshot']['environment_ref'],owner)
@@ -166,32 +166,44 @@ async def load(owner,thread,registry):
     restore_frozen_environment(env,t.get('snapshot',{}).get('registry_snapshot') or {})
     if data['archived']:fail('WORKFLOW_ARCHIVED','Workflow is archived')
     from .compiler import compile_definition
-    accepted=compile_definition(definition,registry.snapshot(env))
-    if not accepted['valid'] or accepted['compileFingerprint']!=t['snapshot']['compile_fingerprint']:fail('COMPILE_FINGERPRINT_CHANGED','Execution version or authorization changed','auth')
+    from .references import frozen_references_from_snapshot
+    references=frozen_references_from_snapshot(t.get('snapshot',{}).get('registry_snapshot') or {})
+    accepted=compile_definition(definition,registry.snapshot(env),references)
+    eligible=accepted['valid'] and accepted['compileFingerprint']==t['snapshot']['compile_fingerprint']
+    if not eligible and not allow_stale:fail('COMPILE_FINGERPRINT_CHANGED','Execution version or authorization changed','auth')
     if datetime.now(timezone.utc)-datetime.fromisoformat(t['updated_at'])>__import__('datetime').timedelta(days=7):fail('THREAD_EXPIRED','Thread retention has expired')
-    return data,env
+    return data,env,eligible
 
 def config(t,namespace='',checkpoint=None):
     return {'configurable':{'thread_id':str(t),'checkpoint_ns':namespace,**({'checkpoint_id':checkpoint} if checkpoint else {})}}
 
-def scoped_definition(definition,graph_path):
+def scoped_definition(definition,graph_path,references=None):
+    from .references import reference_config
     for ident in graph_path:
         n=next((n for n in definition['nodes'] if n['id']==ident and n['type']=='core.subgraph'),None)
         if n is None:fail('INVALID_GRAPH_PATH','Choose a real child graph')
-        definition=n['config']['graph']
+        child=n['config'].get('graph')
+        if isinstance(child,dict):definition=child;continue
+        if references is None:fail('INVALID_GRAPH_PATH','Choose a real child graph')
+        definition=references.target_for(reference_config(n))['definition']
     return definition
 
-def scope_definition(root,ns):
+def scope_definition(root,ns,references=None):
+    from .references import reference_config
     current=root;path=[]
     for part in ns.split('|') if ns else []:
         label=part.split(':')[0]
         names={'eduflow_node_'+str(i):n for i,n in enumerate(sorted(current['nodes'],key=lambda n:n['id']))}
         node=names.get(label)
         if not node or node['type']!='core.subgraph':fail('INVALID_GRAPH_PATH','Namespace is not an owned child graph')
-        path.append(node['id']);current=node['config']['graph']
+        child=node['config'].get('graph')
+        if not isinstance(child,dict):
+            if references is None:fail('INVALID_GRAPH_PATH','Namespace is not an owned child graph')
+            child=references.target_for(reference_config(node))['definition']
+        path.append(node['id']);current=child
     return current,path
 
-async def clone_scopes(definition,saver,source,target,conn,fingerprint,upper=None,parents=None,scope_map=None,owner=None,root_checkpoint=None):
+async def clone_scopes(definition,saver,source,target,conn,fingerprint,upper=None,parents=None,scope_map=None,owner=None,root_checkpoint=None,references=None):
     from .compiler import graph_for
     parents=parents or {}
     scope_map=scope_map if scope_map is not None else []
@@ -214,7 +226,13 @@ async def clone_scopes(definition,saver,source,target,conn,fingerprint,upper=Non
     for old,new in zip(olds,news):
         if old.name!=new.name or old.path!=new.path:fail('BRANCH_TASK_MISMATCH','Source tasks could not be safely mapped')
         node=nodes.get(old.name)
-        if not node or node['type']!='core.subgraph' or node['config'].get('persistence')=='stateless':continue
+        if not node or node['type']!='core.subgraph':continue
+        child_definition=node['config'].get('graph')
+        if not isinstance(child_definition,dict):
+            from .references import reference_config
+            if references is None:continue
+            child_definition=references.target_for(reference_config(node))['definition']
+        if node['config'].get('persistence')=='stateless':continue
         old_ns='|'.join(filter(None,[source['configurable'].get('checkpoint_ns',''),old.name+':'+old.id]))
         new_ns='|'.join(filter(None,[target['configurable'].get('checkpoint_ns',''),new.name+':'+new.id]))
         if node['config'].get('persistence')=='per-thread':
@@ -222,7 +240,7 @@ async def clone_scopes(definition,saver,source,target,conn,fingerprint,upper=Non
         row=await (await conn.execute('select workflow_private.p5_scope_head(%s,%s,%s,%s,%s) as checkpoint_id',(owner,source['configurable']['thread_id'],old_ns,root_checkpoint,upper['checkpoint_id'] if upper else None))).fetchone()
         expected=row['checkpoint_id'] or item.metadata.get('eduflowChildCheckpoints',{}).get(old_ns)
         if expected:
-            child_config=await clone_scopes(node['config']['graph'],saver,config(source['configurable']['thread_id'],old_ns,expected),config(target['configurable']['thread_id'],new_ns),conn,fingerprint,upper,mapped,scope_map,owner,root_checkpoint)
+            child_config=await clone_scopes(child_definition,saver,config(source['configurable']['thread_id'],old_ns,expected),config(target['configurable']['thread_id'],new_ns),conn,fingerprint,upper,mapped,scope_map,owner,root_checkpoint,references)
             child_heads[new_ns]=child_config['configurable']['checkpoint_id']
         elif old.interrupts:
             fail('CHECKPOINT_MISSING','Pending child checkpoint is missing')
@@ -261,7 +279,31 @@ async def operation(body,registry):
     owner=body['ownerId'];action=body.get('action');storage=Storage(os.environ['WORKFLOW_DATABASE_URL'])
     if action=='threads':
         items=await storage.call('p5_read',owner,'threads',body['workflowId'])
-        return {'items':items,'limits':LIMITS}
+        annotated=[]
+        for item in items:
+            row={**item,'resumable':False,'blockedCode':None,'blockedReason':None}
+            status=item.get('status')
+            if status in ('waiting','active'):
+                row['resumable']=status=='waiting'
+                row['blockedReason']=None if status=='waiting' else '会话正在执行；请等待本轮结束'
+                annotated.append(row);continue
+            try:
+                data,_,eligible=await load(owner,item['thread_id'],registry,allow_stale=True)
+                t=data['thread'];run=data.get('run') or {}
+                if not eligible:
+                    row.update(blockedCode='COMPILE_FINGERPRINT_CHANGED',blockedReason='执行版本或授权已变化，只能只读查看历史检查点')
+                elif t.get('last_error'):
+                    row.update(blockedCode='THREAD_STATE',blockedReason='上一轮存在未完成或失败状态，不能直接继续')
+                elif run.get('status')!='success':
+                    row.update(blockedCode='THREAD_STATE',blockedReason='上一轮尚未成功完成，不能直接继续')
+                elif int(t.get('round_number') or 0)>=LIMITS['rounds']:
+                    row.update(blockedCode='ROUND_BUDGET_EXCEEDED',blockedReason='会话已达到轮次上限')
+                else:
+                    row['resumable']=True
+            except ExecutionError as error:
+                row.update(blockedCode=error.code,blockedReason='会话不可继续：'+str(error))
+            annotated.append(row)
+        return {'items':annotated,'limits':LIMITS}
     if action in ('memory.list','memory.put','memory.delete'):
         from .registry import requested_variable_environment
         env=registry.environment(body['environmentRef'],owner,requested_variable_environment(body))
@@ -291,7 +333,10 @@ async def operation(body,registry):
                 result=await memory_write(conn,ns,key,body.get('value'),body['expectedVersion'],'put' if action=='memory.put' else 'delete',ttl)
                 await conn.execute('insert into workflow_private.p5_requests(owner_user_id,key,hash,result) values(%s,%s,%s,%s)',(owner,request_key,hash_,Jsonb(result)))
                 return result
-    data,env=await load(owner,body['threadId'],registry);t=data['thread'];d=data['definition']
+    allow_stale=body.get('action')=='history'
+    data,env,fingerprint_ok=await load(owner,body['threadId'],registry,allow_stale=allow_stale);t=data['thread'];d=data['definition']
+    from .references import frozen_references_from_snapshot
+    references=frozen_references_from_snapshot(t.get('snapshot',{}).get('registry_snapshot') or {})
     if action=='next':
         value=body['input'];assert_no_secrets(value,env);validate_value(d['inputSchema'],value,'INVALID_RUN_INPUT')
         if len(canonical(value))>d['policy']['maxInputBytes']:fail('INPUT_TOO_LARGE','Input exceeds budget')
@@ -300,7 +345,7 @@ async def operation(body,registry):
         saver=HistorySaver(conn)
         if action=='history':
             records=[]
-            sd,path=scope_definition(d,body.get('namespace',''))
+            sd,path=scope_definition(d,body.get('namespace',''),references)
             if body.get('graphPath') is not None and body['graphPath']!=path:fail('INVALID_GRAPH_PATH','Namespace and graph path do not match')
             before=config(t['thread_id'],body.get('namespace',''),body['before']) if body.get('before') else None
             async for cp in saver.alist(config(t['thread_id'],body.get('namespace','')),before=before,limit=21):
@@ -309,8 +354,9 @@ async def operation(body,registry):
             scopes=await (await conn.execute("select distinct checkpoint_ns from workflow_checkpoints.checkpoints where thread_id=%s order by checkpoint_ns limit 100",(t['thread_id'],))).fetchall()
             scope_items=[]
             for row in scopes:
-                _,path=scope_definition(d,row['checkpoint_ns']);scope_items.append({'namespace':row['checkpoint_ns'],'graphPath':path})
-            return {'interface':{'inputSchema':d['inputSchema'],'stateSchema':sd['state']['schema'],'nodes':[{'id':n['id'],'label':n['label']} for n in sd['nodes']]},'scopes':scope_items,'items':records[:20],'nextCursor':records[19]['checkpointId'] if len(records)>20 else None,'thread':{k:v for k,v in t.items() if k not in ('snapshot','launch_context')}}
+                _,path=scope_definition(d,row['checkpoint_ns'],references);scope_items.append({'namespace':row['checkpoint_ns'],'graphPath':path})
+            blocked=None if fingerprint_ok else {'code':'COMPILE_FINGERPRINT_CHANGED','reason':'执行版本或授权已变化，只能只读查看历史检查点；继续、分支和恢复不会绕过版本校验。'}
+            return {'interface':{'inputSchema':d['inputSchema'],'stateSchema':sd['state']['schema'],'nodes':[{'id':n['id'],'label':n['label']} for n in sd['nodes']]},'scopes':scope_items,'items':records[:20],'nextCursor':records[19]['checkpointId'] if len(records)>20 else None,'thread':{k:v for k,v in t.items() if k not in ('snapshot','launch_context')},'readOnly':blocked is not None,'blockedCode':blocked['code'] if blocked else None,'blockedReason':blocked['reason'] if blocked else None}
         if action=='prepare':
             # An already accepted preview remains idempotent when new-start
             # preconditions (active source or uncertain effects) later change.
@@ -346,13 +392,13 @@ async def operation(body,registry):
                 graph=graph_for(d,forbidden,t['snapshot']['compile_fingerprint'],checkpointer=saver)
                 upper_row=await (await conn.execute("select checkpoint_id from workflow_checkpoints.checkpoints where thread_id=%s and checkpoint_ns='' and checkpoint_id>%s order by checkpoint_id limit 1",(t['thread_id'],source_id))).fetchone()
                 scope_map=[]
-                cfg=await clone_scopes(d,saver,config(t['thread_id'],'',source_id),config(target),conn,t['snapshot']['compile_fingerprint'],upper_row,scope_map=scope_map,owner=owner,root_checkpoint=source_id)
+                cfg=await clone_scopes(d,saver,config(t['thread_id'],'',source_id),config(target),conn,t['snapshot']['compile_fingerprint'],upper_row,scope_map=scope_map,owner=owner,root_checkpoint=source_id,references=references)
                 selected_scopes={u.get('namespace','') for u in updates if isinstance(u,dict)}
                 if len(selected_scopes)>1:fail('MIXED_UPDATE_SCOPES','One atomic batch updates one graph scope; prepare a separate branch for another scope')
                 ns=next(iter(selected_scopes),'')
                 mapping=next((m for m in scope_map if m['source']==ns),None)
                 if mapping is None:fail('HISTORY_SCOPE_UNAVAILABLE','The selected child is not pending at this root checkpoint')
-                sd=mapping['definition'];_,path=scope_definition(d,ns)
+                sd=mapping['definition'];_,path=scope_definition(d,ns,references)
                 names={n['id']:'eduflow_node_'+str(i) for i,n in enumerate(sorted(sd['nodes'],key=lambda n:n['id']))}
                 bulk=[]
                 for update in updates:
@@ -364,7 +410,7 @@ async def operation(body,registry):
                     over=update.get('overwrite',[])
                     if not isinstance(over,list) or set(over)-set(patch):fail('INVALID_HISTORY_UPDATE','Overwrite only declared updated fields')
                     if path and over:
-                        parent=scoped_definition(d,path[:-1]);child=next(n for n in parent['nodes'] if n['id']==path[-1])
+                        parent=scoped_definition(d,path[:-1],references);child=next(n for n in parent['nodes'] if n['id']==path[-1])
                         if child['config'].get('stateMode')=='shared':fail('INVALID_OVERWRITE','Shared child overwrite remains unsupported')
                     bulk.append([(encode_patch(sd,{'config':{'authoring':{'overwrite':over}}},patch),names[after],None)])
                 changed_scope=None
@@ -397,7 +443,7 @@ async def operation(body,registry):
                 snap=await graph.aget_state(cfg);state=decode_state(d,snap.values);assert_no_secrets(state,env);validate_value(d['state']['schema'],state,'INVALID_STATE_UPDATE')
                 if len(canonical(state))>d['policy']['maxStateBytes']:fail('STATE_TOO_LARGE','Derived State exceeds limit')
                 await conn.execute('select workflow_private.p5_head(%s,%s,%s,%s)',(owner,target,cfg['configurable']['checkpoint_id'],Jsonb(state)))
-                result={'threadId':target,'checkpointId':cfg['configurable']['checkpoint_id'],'sourceThreadId':t['thread_id'],'sourceCheckpointId':source_id,'before':decode_state(d,cp.checkpoint['channel_values']),'after':state,'next':[next((n['id'] for n in d['nodes'] if names[n['id']]==x),x) for x in snap.next],'status':'prepared','changedScope':changed_scope,'scopes':[{'namespace':m['source'],'graphPath':scope_definition(d,m['source'])[1]} for m in scope_map],'externalEffectWarning':True}
+                result={'threadId':target,'checkpointId':cfg['configurable']['checkpoint_id'],'sourceThreadId':t['thread_id'],'sourceCheckpointId':source_id,'before':decode_state(d,cp.checkpoint['channel_values']),'after':state,'next':[next((n['id'] for n in d['nodes'] if names[n['id']]==x),x) for x in snap.next],'status':'prepared','changedScope':changed_scope,'scopes':[{'namespace':m['source'],'graphPath':scope_definition(d,m['source'],references)[1]} for m in scope_map],'externalEffectWarning':True}
                 await conn.execute('insert into workflow_private.p5_requests(owner_user_id,key,hash,result) values(%s,%s,%s,%s)',(owner,key,hash_,Jsonb(result)))
                 await conn.execute('insert into workflow_private.p5_audit(owner_user_id,thread_id,operation,details) values(%s,%s,%s,%s)',(owner,target,'prepare',Jsonb(result)))
                 return result

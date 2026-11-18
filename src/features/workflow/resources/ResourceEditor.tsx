@@ -5,7 +5,7 @@ import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ConnectionTestResult, JsonSchema, JsonValue, WorkflowTool } from "../domain/v2/types";
 import { useExtensions, type Extensions, type FunctionVersion } from "../editor/v2/FunctionExecutionFields";
 import { groupCatalogByRef, type CatalogConnection } from "./resourceModel";
-import { latestVisibleProviders, providerAddress, providerBaseUrlIssue, providerDisplayName, providerModelRefs, providerPublishContent, providerTypeLabel, probeConnectionContent, probeConnectionRef } from "./providerModel";
+import { latestVisibleProviders, modelMissingFromProviderTest, providerAddress, providerBaseUrlIssue, providerCredentialRequiredOnSave, providerDisplayName, providerEditorModelRows, providerEditorModelSourceLabel, providerHistoricalModelRefs, providerModelRefs, providerPublishContent, providerTypeLabel, probeConnectionRef } from "./providerModel";
 import { findProviderPreset, providerRefFromPreset, uniqueProviderRef, visibleProviderPresets, DEEPSEEK_BASE_URL, credentialRequiredFor, normalizeBaseUrl } from "./providerPresets";
 import {
   API_AUTH_TYPES, API_BODY_MODES, API_DEFAULT_URL_HINT, API_METHODS, API_PARAM_SOURCES, apiContentFromDraft, apiDisplayUrl, apiDraftFromContent, apiDraftIssue,
@@ -110,6 +110,13 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
   const [models, setModels] = useState<string[]>(existing ? providerModelRefs(existing) : preset.id === "deepseek" ? ["deepseek-flash", "deepseek-reasoner"] : []);
   const [manualModel, setManualModel] = useState("");
   const [credential, setCredential] = useState("");
+  const [headerRows, setHeaderRows] = useState(() => {
+    const headers = existing?.content.headers;
+    return headers && typeof headers === "object" && !Array.isArray(headers)
+      ? Object.entries(headers).flatMap(([name, value]) => typeof value === "string" ? [{ name, value }] : []) : [];
+  });
+  const [sessionHeader, setSessionHeader] = useState(() => typeof existing?.content.sessionAffinityHeader === "string" ? existing.content.sessionAffinityHeader : "");
+  const [testMode, setTestMode] = useState<"text" | "stream-json">("text");
   const [testModel, setTestModel] = useState(existing ? providerModelRefs(existing)[0] ?? "" : preset.id === "deepseek" ? "deepseek-flash" : "");
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -118,19 +125,28 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
 
   const ref = existing?.ref ?? uniqueProviderRef(providerRefFromPreset(presetId === "existing" ? "deepseek" : presetId), existingRefs);
   const targetVersion = existing ? existing.version + 1 : 1;
-  const candidates = [...new Set([...models, ...discovered])];
+  const historicalModels = existing ? providerHistoricalModelRefs(existing, data.connections) : [];
+  const candidates = providerEditorModelRows(models, historicalModels, discovered);
+  const testedModels = testResult?.ok ? testResult.models : undefined;
   const credentialNeeded = credentialRequiredFor(type, baseUrl);
   const docsUrl = providerDocsUrl(type, baseUrl);
   // Worker: DeepSeek only accepts the official base URL, while OpenAI-compatible gateways need one.
   const addressIssue = type === "deepseek" ? "" : providerBaseUrlIssue(type, baseUrl, import.meta.env.DEV);
-  const testIssue = addressIssue || (!testModel ? "请先选择或添加一个模型。" : credentialNeeded && !credential.trim() && !existing ? "请先填写 API Key。" : "");
-  const saveIssue = addressIssue || (!name.trim() ? "请填写名称。" : !models.length ? "请至少启用一个模型。" : credentialNeeded && !credential.trim() ? "保存新版本需要重新填写 API Key（只写不读）。" : "");
+  const credentialRequired = providerCredentialRequiredOnSave({ existing, type, baseUrl, credential });
+  const nameIssue = !name.trim() ? "请填写显示名称。" : name.trim().length > 120 ? "显示名称应为 1–120 个字符。" : "";
+  const headerNames = [...headerRows.map(row => row.name.trim()), ...(sessionHeader.trim() ? [sessionHeader.trim()] : [])].map(name => name.toLowerCase());
+  const headerIssue = headerRows.some(row => !row.name.trim() || !row.value.trim()) ? "请填写固定 Header 的名称和值，或移除空行。"
+    : new Set(headerNames).size !== headerNames.length ? "固定 Header 和会话 Header 的名称不能重复。" : "";
+  const credentialIssue = credentialRequired ? "请填写当前地址所需的 API Key。" : "";
+  const testIssue = addressIssue || headerIssue || credentialIssue || (!testModel ? "请先选择或添加一个模型。" : "");
+  const saveIssue = addressIssue || nameIssue || headerIssue || credentialIssue || (!models.length ? "请至少启用一个模型。" : "");
 
   function choosePreset(id: string) {
     const next = findProviderPreset(id);
     if (!next) return;
     setPresetId(id); setType(next.type); setName(next.label); setBaseUrl(next.baseUrl);
     setModels(next.id === "deepseek" ? ["deepseek-flash", "deepseek-reasoner"] : []);
+    setHeaderRows([]); setSessionHeader("");
     setTestModel(next.id === "deepseek" ? "deepseek-flash" : ""); setTestResult(null); setDiscovered([]); setFeedback(null);
   }
 
@@ -142,39 +158,37 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
     setManualModel("");
   }
 
+  function connectionContent(enabledModels: string[]): Record<string, JsonValue> {
+    const fields = { type, name: name.trim(), baseUrl: type === "deepseek" ? DEEPSEEK_BASE_URL : normalizeBaseUrl(baseUrl) };
+    const content = existing ? providerPublishContent(existing, enabledModels, fields) : { ...fields, modelRefs: enabledModels };
+    if (headerRows.length) content.headers = Object.fromEntries(headerRows.map(row => [row.name.trim(), row.value.trim()]));
+    else delete content.headers;
+    if (sessionHeader.trim()) content.sessionAffinityHeader = sessionHeader.trim();
+    else delete content.sessionAffinityHeader;
+    return content;
+  }
+
   async function test() {
     if (testIssue) { setFeedback({ ok: false, text: testIssue }); return; }
     setBusy(true); setFeedback(null); setTestResult(null);
-    const probe = existing ? "" : probeConnectionRef();
     try {
-      if (existing) {
-        setTestResult(await workflowApiV2.testExtension(environmentRef, { ref: existing.ref, version: existing.version, testModel, testMessage: "请用一句话确认连接可用。" }));
-      } else {
-        const content = probeConnectionContent({ type, baseUrl });
-        content.modelRefs = [...new Set([...models, testModel])];
-        await workflowApiV2.extension(environmentRef, { action: "publish", kind: "connection", ref: probe, version: 1, content, credential });
-        setTestResult(await workflowApiV2.testExtension(environmentRef, { ref: probe, version: 1, testModel, testMessage: "请用一句话确认连接可用。" }));
-      }
+      const content = connectionContent([...new Set([...models, testModel])]);
+      if (!content.name) delete content.name;
+      const result = await workflowApiV2.testExtension(environmentRef, {
+        ref: existing?.ref ?? probeConnectionRef(), version: existing?.version ?? 1,
+        content, credential, testModel, testMode, testMessage: "请用一句话确认连接可用。",
+      });
+      setTestResult(result);
+      if (result.ok) setDiscovered(result.models ?? []);
     } catch (reason) {
       setFeedback({ ok: false, text: workflowErrorMessage(reason) });
-    } finally {
-      if (probe) { try { await workflowApiV2.extension(environmentRef, { action: "disable", kind: "connection", ref: probe, version: 1 }); } catch { /* probe is hidden even if cleanup fails */ } }
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
 
   async function save() {
     if (saveIssue) { setFeedback({ ok: false, text: saveIssue }); return; }
     setBusy(true); setFeedback(null);
-    const content: Record<string, JsonValue> = existing
-      ? providerPublishContent(existing, models, {
-          type,
-          name: name.trim(),
-          baseUrl: type === "deepseek" ? DEEPSEEK_BASE_URL : normalizeBaseUrl(baseUrl),
-        })
-      : type === "deepseek"
-        ? { type: "deepseek", name: name.trim(), baseUrl: DEEPSEEK_BASE_URL, modelRefs: [...models] }
-        : { type: "openai-compatible", name: name.trim(), baseUrl: normalizeBaseUrl(baseUrl), modelRefs: [...models] };
+    const content = connectionContent(models);
     try {
       await workflowApiV2.extension(environmentRef, { action: "publish", kind: "connection", ref, version: targetVersion, content, credential });
       refresh(); onSaved?.(ref, targetVersion, content); onClose();
@@ -183,23 +197,37 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
     } finally { setBusy(false); }
   }
 
-  return <EditorFrame tone="model" icon={<Sparkles size={17}/>} title={existing ? "编辑模型供应商" : "添加模型供应商"} subtitle={`${name || "未命名供应商"} · ${existing ? "已有供应商" : "从资源中心添加"}`} footerNote="保存后生成新版本，正在使用旧版本的节点可在节点中升级" test={<TestPane title="测试" hint="选一个模型发一条测试消息，不会保存。">
+  return <EditorFrame tone="model" icon={<Sparkles size={17}/>} title={existing ? "编辑模型供应商" : "添加模型供应商"} subtitle={`${name.trim() || "未命名供应商"} · ${existing ? "已有供应商" : "从资源中心添加"}`} footerNote="保存后生成新版本，正在使用旧版本的节点可在节点中升级" test={<TestPane title="测试" hint="使用当前表单的连接配置发送测试请求。">
       <div>
         <label htmlFor="wf-provider-test-model">测试模型</label>
         <select id="wf-provider-test-model" aria-label="测试模型" value={testModel} onChange={event => setTestModel(event.target.value)}><option value="">选择模型</option>{candidates.map(model => <option key={model} value={model}>{model}</option>)}</select>
       </div>
+      <div>
+        <label htmlFor="wf-provider-test-mode">测试方式</label>
+        <select id="wf-provider-test-mode" value={testMode} onChange={event => { setTestMode(event.target.value === "stream-json" ? "stream-json" : "text"); setTestResult(null); }}>
+          <option value="text">普通回复</option>
+          <option value="stream-json">流式结构化输出</option>
+        </select>
+      </div>
       <button type="button" className="wf-editor-test-primary" disabled={busy || Boolean(testIssue)} title={testIssue || undefined} onClick={() => void test()}><Play size={12}/>{busy ? "正在测试…" : "发送测试消息"}</button>
       {testResult ? <div className="wf-editor-test-result">
         <TestStatus result={testResult}/>
-        {testResult.reply ? <><div className="wf-editor-test-block"><h4>回复首句</h4><div className="wf-editor-test-line"><span>{testResult.reply}</span></div></div><div className="wf-editor-test-foot">只显示首句，完整回复不会保存</div></> : null}
+        {testResult.reply ? <><div className="wf-editor-test-block"><h4>{testMode === "stream-json" ? "结构化输出" : "回复预览"}</h4><div className="wf-editor-test-line"><span>{testResult.reply}</span></div></div><div className="wf-editor-test-foot">测试回复不会保存</div></> : null}
         {!testResult.ok && testResult.error ? <div className="wf-editor-test-block"><h4>错误</h4><div className="wf-editor-test-line"><span>{testResult.error.message}</span></div></div> : null}
       </div> : null}
     </TestPane>} feedback={feedback} busy={busy} saveDisabled={Boolean(saveIssue)} onClose={onClose} onSave={() => void save()}>
-    <Section title="供应商" hint="选择一家，保存后就是一个独立的模型供应商">
-      <div className="wf-editor-provider-grid" role="group" aria-label="选择模型供应商">
-        {existing ? <button type="button" className="wf-editor-provider" aria-pressed={presetId === "existing"} onClick={() => setPresetId("existing")}><span className="wf-editor-provider-mark">{name.slice(0, 1)}</span><span>{name}</span><Check size={14}/></button> : null}
-        {visibleProviderPresets(true).map(item => <button type="button" key={item.id} className="wf-editor-provider" aria-pressed={!existing && presetId === item.id} onClick={() => choosePreset(item.id)}><span className="wf-editor-provider-mark">{item.label.slice(0, 1)}</span><span>{item.id === "custom-openai" ? "OpenAI 兼容" : item.label}</span>{!existing && presetId === item.id ? <Check size={14}/> : null}</button>)}
-      </div>
+    <Section title="供应商" hint={existing ? "显示名称可修改；稳定标识和已有引用不变" : "选择一家，保存后就是一个独立的模型供应商"}>
+      {existing ? <div className="wf-editor-provider is-locked" aria-label="当前模型供应商">
+        <span className="wf-editor-provider-mark">{name.trim().slice(0, 1) || "?"}</span>
+        <span><strong>{providerTypeLabel(existing)}</strong><small>稳定标识 <code>{existing.ref}</code> 不随名称改变；要换一家请新建模型供应商。</small></span>
+      </div> : <div className="wf-editor-provider-grid" role="group" aria-label="选择模型供应商">
+        {visibleProviderPresets(true).map(item => <button type="button" key={item.id} className="wf-editor-provider" aria-pressed={presetId === item.id} onClick={() => choosePreset(item.id)}><span className="wf-editor-provider-mark">{item.label.slice(0, 1)}</span><span>{item.id === "custom-openai" ? "OpenAI 兼容" : item.label}</span>{presetId === item.id ? <Check size={14}/> : null}</button>)}
+      </div>}
+      <Field label="显示名称">
+        <input aria-label="供应商显示名称" maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="例如：团队模型网关" />
+        {nameIssue ? <span className="wf-editor-field-error" role="alert">{nameIssue}</span> : null}
+      </Field>
+      {!existing ? <p className="wf-editor-hint">稳定标识 <code>{ref}</code> 由供应商类型生成，不随显示名称改变。</p> : null}
     </Section>
     <Section title="连接" hint="API 地址和 Key 只保存在这个供应商里，不会写进节点" extra={<span className="wf-editor-hint">{credentialNeeded ? "需要凭据" : "本地地址无需凭据"}</span>}>
       <Field label="API 地址">
@@ -215,12 +243,28 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
         {addressIssue ? <span className="wf-editor-field-error" role="alert">{addressIssue}</span> : null}
       </Field>
       {type === "deepseek" ? <p className="wf-editor-hint">DeepSeek 固定使用官方地址。使用代理或其他地址请选择「OpenAI 兼容」。</p> : null}
-      <Field label={<>{name || "供应商"} API Key{docsUrl ? <> <a className="wf-editor-docs-link" href={docsUrl} target="_blank" rel="noreferrer">去哪里获取</a></> : null}</>}><input aria-label="模型 API Key" type="password" autoComplete="new-password" value={credential} onChange={event => setCredential(event.target.value)} placeholder={existing ? "重新输入 Key 才能保存新版本" : `粘贴 ${name || "供应商"} API Key`}/></Field>
+      <Field label={<>{name || "供应商"} API Key{docsUrl ? <> <a className="wf-editor-docs-link" href={docsUrl} target="_blank" rel="noreferrer">去哪里获取</a></> : null}</>}><input aria-label="模型 API Key" type="password" autoComplete="new-password" value={credential} onChange={event => setCredential(event.target.value)} placeholder={existing ? credentialRequired ? existing.hasCredential ? "改动地址后需重新输入 Key" : "请填写 API Key" : "留空则沿用已保存的 Key" : `粘贴 ${name || "供应商"} API Key`}/></Field>
       <p className="wf-editor-hint">密钥只用于调用这个供应商，页面上不会再次显示完整内容。</p>
+    </Section>
+    <Section title="请求头（可选）" hint="固定 Header 会随每次请求发送。API Key 请填写在上方凭据栏。">
+      {headerRows.map((row, index) => <div className="wf-editor-param-row" key={index}>
+        <input className="wf-editor-col-name" aria-label={`固定 Header 名称 ${index + 1}`} placeholder="X-Project" value={row.name} maxLength={80} onChange={event => { setHeaderRows(current => current.map((item, at) => at === index ? { ...item, name: event.target.value } : item)); setTestResult(null); }}/>
+        <span className="wf-editor-col-value"><input aria-label={`固定 Header 值 ${index + 1}`} value={row.value} maxLength={1000} onChange={event => { setHeaderRows(current => current.map((item, at) => at === index ? { ...item, value: event.target.value } : item)); setTestResult(null); }}/></span>
+        <button type="button" className="wf-editor-remove" aria-label={`删除固定 Header ${index + 1}`} onClick={() => { setHeaderRows(current => current.filter((_, at) => at !== index)); setTestResult(null); }}><Trash2 size={13}/></button>
+      </div>)}
+      <div className="wf-editor-actions"><button type="button" className="wf-editor-addrow" disabled={headerRows.length >= 20} onClick={() => setHeaderRows(current => [...current, { name: "", value: "" }])}><Plus size={11}/>添加固定 Header</button></div>
+      <Field label="会话 Header 名称">
+        <input aria-label="会话 Header 名称" value={sessionHeader} maxLength={80} placeholder="X-Session-Id" onChange={event => { setSessionHeader(event.target.value); setTestResult(null); }}/>
+        <small className="wf-editor-hint">EduFlow 自动生成值，同一个工作流会话复用，每次连接测试单独生成。</small>
+      </Field>
+      {headerIssue ? <span className="wf-editor-field-error" role="alert">{headerIssue}</span> : null}
     </Section>
     <Section title="可用模型" hint={`勾选要出现在节点里的模型，已选 ${models.length} 个`}>
       <div className="wf-editor-model-list">
-        {candidates.length ? candidates.map(model => <label key={model} className="wf-editor-model-row"><input type="checkbox" aria-label={`启用模型 ${model}`} checked={models.includes(model)} onChange={event => setModels(current => event.target.checked ? (current.includes(model) ? current : [...current, model]) : current.filter(item => item !== model))}/><span><code>{model}</code><small>{discovered.includes(model) ? "从供应商获取" : "已启用"}</small></span></label>) : <div className="wf-editor-model-row"><span><small>测试连接后会列出可用模型；也可以手动填写模型名。</small></span></div>}
+        {candidates.length ? candidates.map(model => {
+          const missing = modelMissingFromProviderTest(model, models, testedModels, Boolean(testResult?.ok));
+          return <label key={model} className="wf-editor-model-row"><input type="checkbox" aria-label={`启用模型 ${model}`} checked={models.includes(model)} onChange={event => setModels(current => event.target.checked ? (current.includes(model) ? current : [...current, model]) : current.filter(item => item !== model))}/><span><code>{model}</code><small>{providerEditorModelSourceLabel(model, models, historicalModels, discovered)}</small>{missing ? <small className="wf-editor-model-warning">上次测试未在供应商返回的模型列表中找到</small> : null}</span></label>;
+        }) : <div className="wf-editor-model-row"><span><small>测试连接后会列出可用模型；也可以手动填写模型名。</small></span></div>}
         <div className="wf-editor-model-add"><input aria-label="手动添加模型" value={manualModel} onChange={event => setManualModel(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addManualModel(); } }} placeholder="列表里没有？输入模型名"/><button type="button" onClick={addManualModel}>添加</button></div>
       </div>
     </Section>
@@ -352,13 +396,14 @@ function ApiEditor({ environmentRef, target, onClose, onSaved, data, refresh }: 
         <p className="wf-editor-hint">认证凭据只保存在连接里；测试请求和节点输出都不会包含完整凭据。</p>
       </div> : null}
       {tab === "settings" ? <div className="wf-editor-grid-3">
+        <Field label="响应格式"><select aria-label="响应格式" value={draft.settings.responseFormat} onChange={event => update({ settings: { ...draft.settings, responseFormat: event.target.value === "text" ? "text" : "json" } })}><option value="json">JSON（默认）</option><option value="text">文本 text/* · UTF-8</option></select></Field>
         <Field label="超时（秒）"><input aria-label="超时秒数" type="number" min={1} max={120} value={Math.round(draft.settings.timeoutMs / 1000)} onChange={event => update({ settings: { ...draft.settings, timeoutMs: Math.max(1, Number(event.target.value)) * 1000 } })}/></Field>
         <Field label="重试"><input aria-label="重试次数" type="number" min={0} max={3} value={draft.settings.retries} onChange={event => update({ settings: { ...draft.settings, retries: Math.max(0, Math.min(3, Number(event.target.value))) } })}/></Field>
-        <Field label="结果取值路径"><input aria-label="结果取值路径" value={draft.settings.resultPath} onChange={event => update({ settings: { ...draft.settings, resultPath: event.target.value } })} placeholder="留空表示整个响应"/></Field>
-        <p className="wf-editor-hint">超时按节点本次执行的上限截断；只有读取连接会自动重试。</p>
+        <Field label="结果取值路径"><input aria-label="结果取值路径" value={draft.settings.resultPath} onChange={event => update({ settings: { ...draft.settings, resultPath: event.target.value } })} placeholder={draft.settings.responseFormat === "text" ? "文本响应不使用此路径" : "留空表示整个响应"}/></Field>
+        <p className="wf-editor-hint">超时按节点本次执行的上限截断；只有读取连接会自动重试。文本响应严格校验 text/* 与 UTF-8，并用响应字段映射整段文本。</p>
       </div> : null}
     </Section>
-    <Section title="响应" hint="节点输出字段，留空则把整个响应作为输出" extra={<span className="wf-editor-hint">返回内容类型 · JSON 自动识别</span>}>
+    <Section title="响应" hint={draft.settings.responseFormat === "text" ? "可选：添加输出字段并留空取值位置以映射整段文本；不添加则输出整段文本" : "节点输出字段，留空则把整个响应作为输出"} extra={<span className="wf-editor-hint">{draft.settings.responseFormat === "text" ? "text/* · UTF-8" : "JSON 自动解析"}</span>}>
       <div className="wf-editor-table-head wf-editor-cols-output"><span>字段名</span><span>取值位置</span><span>类型</span></div>
       {draft.outputMap.map((field, index) => <div className="wf-editor-table-row wf-editor-cols-output" key={index}>
         <input aria-label={`输出字段名 ${index + 1}`} value={field.name} onChange={event => updateOutput(index, { name: event.target.value })}/>

@@ -22,9 +22,16 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     this.emit();
   }
 
+  listPathsForKnowledge(knowledgeId: string, context: { mode?: MicroLearningPath["mode"] } = {}) {
+    return this.paths.filter((path) => path.knowledgeId === knowledgeId && (!context.mode || path.mode === context.mode));
+  }
+
   getPath(knowledgeId: string, context: { courseId?: string; mode?: MicroLearningPath["mode"]; pathId?: string } = {}) {
     const compatible = this.paths.filter((path) => path.knowledgeId === knowledgeId && (!context.mode || path.mode === context.mode));
-    if (context.pathId) return compatible.find(path => path.id === context.pathId && (path.courseId === context.courseId || (!path.courseId && path.scope === "global"))) ?? null;
+    if (context.pathId) {
+      if (context.courseId) return compatible.find(path => path.id === context.pathId && (path.courseId === context.courseId || (!path.courseId && path.scope === "global"))) ?? null;
+      return compatible.find(path => path.id === context.pathId) ?? null;
+    }
     return compatible.find((path) => path.courseId === context.courseId) ?? compatible.find((path) => path.scope === "global") ?? null;
   }
 

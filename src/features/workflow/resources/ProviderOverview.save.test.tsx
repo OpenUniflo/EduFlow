@@ -189,3 +189,31 @@ describe("ProviderOverview staging and save", () => {
     expect(text).toContain("1 个节点");
   });
 });
+
+describe("provider test model warning", () => {
+  it("warns without blocking save when an enabled model is absent from the last test", async () => {
+    api.testExtension.mockResolvedValue({ ok: true, models: ["gateway-a"] });
+    const props = baseProps([remoteProvider]);
+    render(props); await flush();
+    let tree = render(props);
+    const test = find(tree, element => element.props["data-provider-action"] === "test")!;
+    (test.props.onClick as () => void)();
+    await flush();
+    tree = render(props);
+    expect(textOf(tree)).toContain("上次测试未在供应商返回的模型列表中找到");
+    expect(find(tree, element => element.props["data-provider-action"] === "save")).toBeUndefined();
+    expect(find(tree, element => element.props["data-provider-action"] === "edit")).toBeTruthy();
+  });
+});
+
+describe("provider model history in the overview", () => {
+  it("keeps a model removed from the latest version as an unchecked 曾启用 row", async () => {
+    const oldVersion = connection("local_openai", 1, { type: "openai-compatible", name: "本地网关", baseUrl: "http://127.0.0.1:18080/v1", modelRefs: ["fake-openai-chat", "retired-model"] });
+    const newVersion = connection("local_openai", 2, { type: "openai-compatible", name: "本地网关", baseUrl: "http://127.0.0.1:18080/v1", modelRefs: ["fake-openai-chat"] });
+    render(baseProps([oldVersion, newVersion])); await flush();
+    const tree = render(baseProps([oldVersion, newVersion]));
+    expect(textOf(tree)).toContain("retired-model");
+    expect(textOf(tree)).toContain("曾启用");
+    expect(modelSwitch(tree, "retired-model")!.props.checked).toBe(false);
+  });
+});

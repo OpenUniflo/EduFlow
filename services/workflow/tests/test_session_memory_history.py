@@ -90,6 +90,47 @@ def test_history_version_policy_matches_product_coordinator():
 def test_scope_projection_does_not_accept_a_non_subgraph_namespace():
     with pytest.raises(ExecutionError):scope_definition(sample(),'eduflow_node_0:forged')
 
+@pytest.mark.asyncio
+async def test_thread_list_marks_stale_compile_fingerprint_as_read_only(monkeypatch):
+    from datetime import datetime, timezone
+    from eduflow_workflow.compiler import compile_definition
+    from eduflow_workflow.registry import Registry
+    import eduflow_workflow.session_memory_history as history
+    import eduflow_workflow.storage as storage_module
+
+    definition=sample();registry=Registry({"environments":[{"ref":"test-env","name":"Test","ownerIds":["test-user"]}]})
+    env=registry.environment("test-env","test-user")
+    current=compile_definition(definition,registry.snapshot(env))["compileFingerprint"]
+    thread={"thread_id":"00000000-0000-4000-8000-000000000001","current_run_id":"run","checkpoint_id":"cp","status":"closed","round_number":1,"state":{},"updated_at":datetime.now(timezone.utc).isoformat()}
+    read={"thread":{**thread,"snapshot":{"environment_ref":"test-env","registry_snapshot":{},"compile_fingerprint":current}},"definition":definition,"run":{"status":"success"},"archived":False}
+    class FakeStorage:
+        def __init__(self,*args,**kwargs):pass
+        async def call(self,operation,*args):
+            if operation=="p5_read" and args[1]=="threads":return [{**thread,"snapshot":{}}]
+            if operation=="p5_read" and args[1]=="thread":return read
+            raise AssertionError(operation)
+    monkeypatch.setattr(storage_module,"Storage",FakeStorage)
+    monkeypatch.setenv("WORKFLOW_DATABASE_URL","postgresql://unused")
+    monkeypatch.setattr(registry,"environment",lambda *args,**kwargs: env)
+    live=await history.operation({"ownerId":"test-user","action":"threads","workflowId":"w"},registry)
+    assert live["items"][0]["resumable"] is True
+    stale={**read,"thread":{**read["thread"],"snapshot":{**read["thread"]["snapshot"],"compile_fingerprint":"stale"}}}
+    class StaleStorage(FakeStorage):
+        async def call(self,operation,*args):
+            if operation=="p5_read" and args[1]=="threads":return [{**thread,"snapshot":{}}]
+            if operation=="p5_read" and args[1]=="thread":return stale
+            raise AssertionError(operation)
+    monkeypatch.setattr(storage_module,"Storage",StaleStorage)
+    blocked=await history.operation({"ownerId":"test-user","action":"threads","workflowId":"w"},registry)
+    assert blocked["items"][0]["resumable"] is False
+    assert blocked["items"][0]["blockedCode"]=="COMPILE_FINGERPRINT_CHANGED"
+    _,_,eligible=await history.load("test-user",thread["thread_id"],registry,allow_stale=True)
+    assert eligible is False
+    with pytest.raises(ExecutionError) as error:
+        await history.load("test-user",thread["thread_id"],registry)
+    assert error.value.code=="COMPILE_FINGERPRINT_CHANGED"
+
+
 async def test_configurable_custom_progress_uses_actual_sdk_execution():
     d=sample();d['nodes'][1].update(type='core.progress',config={'message':'阶段处理完成','percent':35},inputs={},writes={'value':'/percent'})
     run=execution(d)

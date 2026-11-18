@@ -47,11 +47,12 @@ describe('V2 necessary route and distinct candidate space', () => {
     expect(route(input([], ['S>T'], ['T', 'S'], ['S'])).orderedNodeIds).toEqual(['S', 'T']);
     expect(route(input(['S>X'], ['S>T'], ['T', 'X'], ['S'])).selectedNodeIds).toEqual(['S', 'T', 'X']);
   });
-  it('includes the satisfied hard frontier without unanchored gray roots', () => {
+  it('seeds an unacquired factual root even without acquired state', () => {
     const data = input(['A>B', 'B>T'], [], ['T'], ['A']);
     expect(buildCapabilityModel(data).actionableNodeIds).toEqual(['A', 'B']);
-    expect(buildCapabilityModel({ ...data, currentNodeIds: [] }).actionableNodeIds).toEqual([]);
+    expect(buildCapabilityModel({ ...data, currentNodeIds: [] }).actionableNodeIds).toEqual(['A']);
     expect(route(data).orderedNodeIds).toEqual(['A', 'B', 'T']);
+    expect(route({ ...data, currentNodeIds: [] }).orderedNodeIds).toEqual(['A', 'B', 'T']);
   });
   it('does not confuse one hard predecessor with AND learnability', () => {
     const data = { ...input(['A>T', 'M>T']), nodeIds: ['A', 'T'] };
@@ -59,16 +60,21 @@ describe('V2 necessary route and distinct candidate space', () => {
     expect(buildCapabilityModel(data).orderedNodeIds).toContain('T');
     expect(planCourseRoute(data)).toMatchObject({ valid: false, conflicts: [{ kind: 'unavailable_hard_prerequisite', nodeId: 'M', rootNodeId: 'T' }] });
   });
-  it('cuts unreachable soft intermediates rather than leaving disconnected upstream candidates', () => {
-    const data = { ...input(['M>B'], ['A>B', 'B>T']), nodeIds: ['A', 'B', 'T'] };
+  it('cuts an unreachable hard intermediate rather than leaving a disconnected upstream candidate', () => {
+    const data = { ...input(['M>B', 'B>T'], ['A>B']), nodeIds: ['A', 'B', 'T'] };
     expect(buildCapabilityModel(data).orderedNodeIds).toEqual(['T']);
-    expect(planCourseRoute(data)).toMatchObject({valid:false,conflicts:[{kind:'target_without_acquired_path'}]});
+    expect(planCourseRoute(data)).toMatchObject({valid:false,conflicts:[{kind:'unavailable_hard_prerequisite',nodeId:'M',rootNodeId:'T'}]});
+  });
+  it('lets a soft-only target become a start without inventing a hard gate', () => {
+    const data = { ...input([], ['A>B', 'B>T']), nodeIds: ['A', 'B', 'T'] };
+    expect(route(data).orderedNodeIds).toEqual(['T']);
   });
   it('keeps unavailable targets without inventing facts or outside identities', () => {
     const data = { ...input(['M>B'], ['A>B', 'B>T'], ['T', 'B']), nodeIds: ['A', 'B', 'T'] };
     const model = buildCapabilityModel(data);
     expect(model.orderedNodeIds).toEqual(['B', 'T']);
-    expect(model.disconnectedCourseKnowledgeIds).toEqual(['B', 'T']);
+    expect(model.disconnectedCourseKnowledgeIds).toEqual(['B']);
+    expect(model.connectedCourseKnowledgeIds).toEqual(['T']);
     expect(model.orderedNodeIds).not.toContain('M');
   });
   it('omits unrelated acquired nodes and stops closure at an acquired boundary', () => {
@@ -157,15 +163,15 @@ describe('V2.1 current gap candidate space', () => {
     { name: 'all targets acquired', hard: ['X>B', 'Y>C'], targets: ['B', 'C'], current: ['B', 'C'], kept: ['B', 'C'] },
     { name: 'acquired target supports future gap', hard: ['B>X', 'X>C'], targets: ['B', 'C'], current: ['B'], kept: ['B', 'X', 'C'] },
     { name: 'AND satisfied', hard: ['A>X', 'B>X', 'X>T'], targets: ['T'], current: ['A', 'B'], kept: ['A', 'B', 'X', 'T'] },
-    { name: 'AND rejects an unacquired second root', hard: ['A>X', 'B>X', 'X>T'], targets: ['T'], current: ['A'], kept: ['T'] },
-    { name: 'unacquired roots are not project entries', hard: ['X>Y', 'Y>T'], targets: ['T'], current: [], kept: ['T'] },
+    { name: 'AND includes an unacquired second root as a start', hard: ['A>X', 'B>X', 'X>T'], targets: ['T'], current: ['A'], kept: ['A', 'B', 'T', 'X'] },
+    { name: 'unacquired roots are project entries', hard: ['X>Y', 'Y>T'], targets: ['T'], current: [], kept: ['T', 'X', 'Y'] },
     { name: 'pending target continues downstream', hard: ['A>T', 'T>X', 'X>U'], targets: ['T', 'U'], current: ['A'], kept: ['A', 'T', 'X', 'U'] },
   ])('$name', ({ hard, targets, current, kept }) => {
     expect(buildCapabilityModel(input(hard, [], targets, current)).orderedNodeIds.slice().sort()).toEqual(kept.slice().sort());
   });
   it('soft adds candidates without gating or entering the default selected route', () => {
     const data = input(['A>X', 'X>T'], ['A>S', 'S>T', 'M>T'], ['T'], ['A']);
-    expect(buildCapabilityModel(data).orderedNodeIds.slice().sort()).toEqual(['A','S','T','X']);
+    expect(buildCapabilityModel(data).orderedNodeIds.slice().sort()).toEqual(['A','M','S','T','X']);
     expect(route(data).selectedNodeIds).toEqual(['A', 'T', 'X']);
   });
   it('preserves factual edges between members retained for a current gap', () => {
@@ -181,17 +187,18 @@ describe('V2.1 current gap candidate space', () => {
     expect(intent).toEqual(saved);
     expect(routeStructure(data, intent)).toEqual(routeStructure({ ...data, currentNodeIds: ['A'] }, intent));
   });
-  it('preserves factual relations among unanchored targets without admitting gray roots', () => {
+  it('admits an unacquired target as a start and keeps its factual relation', () => {
     const model = buildCapabilityModel(input(['X>T', 'T>U'], [], ['T', 'U']));
-    expect(model.orderedNodeIds).toEqual(['T','U']);
-    expect(model.prerequisiteEdges).toEqual([]);
-    expect(model.disconnectedCourseKnowledgeIds).toEqual(['T','U']);
+    expect(model.orderedNodeIds).toEqual(['X','T','U']);
+    expect(model.prerequisiteEdges.map(e => e.id)).toEqual(['T>U', 'X>T']);
+    expect(model.disconnectedCourseKnowledgeIds).toEqual([]);
+    expect(planCourseRoute(input(['X>T', 'T>U'], [], ['T', 'U']))).toMatchObject({ valid: true });
   });
-  it('an unanchored target soft edge does not confer support or gate a supported target', () => {
+  it('an unacquired soft-support target remains a start without gating a hard-supported target', () => {
     const model = buildCapabilityModel(input(['A>T'], ['U>T'], ['T', 'U'], ['A']));
-    expect(model.prerequisiteEdges.map(e => e.id)).toEqual(['A>T']);
-    expect(model.disconnectedCourseKnowledgeIds).toEqual(['U']);
-    expect(model.connectedCourseKnowledgeIds).toEqual(['T']);
+    expect(model.prerequisiteEdges.map(e => e.id)).toEqual(['A>T', 'U>T']);
+    expect(model.disconnectedCourseKnowledgeIds).toEqual([]);
+    expect(model.connectedCourseKnowledgeIds).toEqual(['T', 'U']);
   });
 
 });

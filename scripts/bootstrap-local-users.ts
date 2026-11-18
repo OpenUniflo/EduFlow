@@ -7,7 +7,6 @@ import knowledgeHandler from "../api/knowledge";
 import materialsHandler from "../api/materials";
 import progressHandler from "../api/_handlers/progress";
 import { assertLocalSupabaseUrl } from "./local-supabase";
-import { demoUserCourseStateSeed } from "../src/demo/users/demoUserCourseState.seed";
 
 const ADMIN_EMAIL = "local-admin@eduflow.local";
 const STUDENT_EMAIL = "local-student@eduflow.local";
@@ -161,19 +160,6 @@ async function verifyKnowledgePrerequisites(server: LocalServer) {
   }
 }
 
-async function seedGoldenProgress(server: LocalServer, userIds: string[]) {
-  const updatedAt = new Date().toISOString();
-  for (const userId of userIds) {
-    const state = demoUserCourseStateSeed(userId, "agentic-ai-golden");
-    const course = await server.from("user_course_states").upsert({ user_id: userId, course_id: state.courseId, recent_lesson_id: state.recentLessonId, updated_at: updatedAt });
-    assert.ifError(course.error);
-    // Demo's historical "completed" has no acceptance evidence; retain it as a
-    // submitted record rather than falsely claiming accepted practice.
-    const assignments = await server.from("user_assignment_states").upsert(Object.values(state.assignmentStates).map((assignment) => ({ user_id: userId, course_id: state.courseId, assignment_id: assignment.assignmentId, status: assignment.status === "completed" ? "submitted" : assignment.status === "in-progress" ? "started" : assignment.status === "not-started" ? "not_started" : assignment.status, progress: assignment.progress, updated_at: updatedAt })));
-    assert.ifError(assignments.error);
-  }
-}
-
 export async function bootstrapLocalUsers() {
   const supabaseUrl = assertLocalSupabaseUrl(required("SUPABASE_URL"));
   const secretKey = required("SUPABASE_SECRET_KEY");
@@ -204,7 +190,6 @@ export async function bootstrapLocalUsers() {
     { id: teacher.id, display_name: "Local Teacher", role: "teacher", capabilities: [] }
   ]);
   assert.ifError(profiles.error);
-  await seedGoldenProgress(server, [admin.id, student.id, teacher.id]);
 
   const knowledgeStates = await server.from("user_knowledge_states").upsert(ADMIN_KNOWLEDGE.map((state) => ({
     user_id: admin.id,

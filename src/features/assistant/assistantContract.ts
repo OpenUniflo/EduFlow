@@ -1,6 +1,9 @@
 export const assistantWorkspaces = ["learning", "explore", "courses", "canvas", "teaching", "system", "material", "messages"] as const;
 export type AssistantWorkspace = (typeof assistantWorkspaces)[number];
 
+/** Assistant entry points a page can claim from the floating surface. */
+export type AssistantSurfaceCapability = "goal-planning";
+
 export type AssistantContextSnapshot = {
   workspace: AssistantWorkspace;
   experienceMode: "learn" | "design";
@@ -19,6 +22,7 @@ export type AssistantContextSnapshot = {
   segmentId?: string;
   assignmentId?: string;
   workflowId?: string;
+  workflowNodeId?: string;
   runId?: string;
   actionId?: string;
   taskId?: string;
@@ -28,11 +32,25 @@ export type AssistantContextSnapshot = {
   selectedObject?: string;
 };
 
+/** AI SDK UI message part stored on the server; card parts keep references only. */
+export type AssistantTimelinePart = { type: string; [key: string]: unknown };
+
 export type AssistantMessage = {
   id: string;
   sessionId: string;
   role: "user" | "assistant";
   content: string;
+  messageKind?: "utterance" | "action" | "goal_clarification";
+  /** Server-owned action identity; lets the timeline follow its own actions. */
+  dedupeKey?: string;
+  /** Ordered text + display-card parts. Absent on pre-stage-3 rows. */
+  parts?: AssistantTimelinePart[];
+  /** The learner stopped this turn; the marker lives in `parts` and is kept across reloads. */
+  stopped?: boolean;
+  /** The server persisted a failed generation; partial text/cards are kept. */
+  failedReason?: string;
+  /** Present when the server hid a malformed assistant row (for example protocol_leak). */
+  invalidReason?: string;
   structuredContent?: AssistantStructuredContent;
   context: AssistantContextSnapshot;
   createdAt: string;
@@ -81,6 +99,10 @@ export type AssistantSession = {
   title?: string;
   createdAt: string;
   updatedAt: string;
+  /** Conversation partition: Home, a page entry, the Archive panel or a workspace. */
+  source?: string;
+  /** The conversation created a personal Course, so it cannot be deleted. */
+  hasCourse?: boolean;
 };
 
 export type AssistantSessionDetail = AssistantSession & { messages: AssistantMessage[] };
@@ -135,7 +157,7 @@ export function parseAssistantStructuredContent(value: unknown): AssistantStruct
   throw new Error("Assistant structured content type is unsupported");
 }
 
-const optionalIdentityKeys = ["repeatAttemptId", "presentation", "edgeId", "routeVersionId", "actionRunId", "evidenceSourceId", "diagnosisRunId", "courseId", "chapterId", "lessonId", "knowledgeId", "materialId", "segmentId", "assignmentId", "workflowId", "runId", "actionId", "taskId", "microPathId", "microUnitId", "microStepId", "selectedObject"] as const;
+const optionalIdentityKeys = ["repeatAttemptId", "presentation", "edgeId", "routeVersionId", "actionRunId", "evidenceSourceId", "diagnosisRunId", "courseId", "chapterId", "lessonId", "knowledgeId", "materialId", "segmentId", "assignmentId", "workflowId", "workflowNodeId", "runId", "actionId", "taskId", "microPathId", "microUnitId", "microStepId", "selectedObject"] as const;
 
 export function parseAssistantContext(value: unknown): AssistantContextSnapshot {
   if (!value || typeof value !== "object") throw new Error("Assistant context is required");

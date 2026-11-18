@@ -1,22 +1,313 @@
-import {expect,it,vi} from 'vitest';
-import {tool} from 'ai';
-import {MockLanguageModelV4,simulateReadableStream} from 'ai/test';
-import {z} from 'zod';
-import type {VercelRequest,VercelResponse} from '@vercel/node';
-const mocks=vi.hoisted(()=>({provider:vi.fn(),client:vi.fn(),tools:vi.fn()}));
-vi.mock('@ai-sdk/openai-compatible',()=>({createOpenAICompatible:()=>mocks.provider}));
-vi.mock('../../api/_lib/supabase.js',()=>({createUserSupabase:mocks.client}));
-vi.mock('../../api/_lib/env.js',()=>({readLlmEnvironment:()=>({llmModel:'test-model',llmBaseUrl:'https://test.invalid',llmApiKey:'test-only'})}));
-vi.mock('../../api/_lib/assistantTools.js',()=>({createAssistantTools:mocks.tools}));
+import { expect, it, vi } from 'vitest';
+import { tool } from 'ai';
+import { MockLanguageModelV4, simulateReadableStream } from 'ai/test';
+import { z } from 'zod';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+const mocks = vi.hoisted(() => ({ provider: vi.fn(), client: vi.fn(), tools: vi.fn() }));
+vi.mock('@ai-sdk/openai-compatible', () => ({ createOpenAICompatible: () => mocks.provider }));
+vi.mock('../../api/_lib/supabase.js', () => ({ createUserSupabase: mocks.client, createServerSupabase: () => ({}) }));
+vi.mock('../../api/_lib/env.js', () => ({ readLlmEnvironment: () => ({ llmModel: 'test-model', llmBaseUrl: 'https://test.invalid', llmApiKey: 'test-only' }) }));
+vi.mock('../../api/_lib/assistantTools.js', () => ({ createAssistantTools: mocks.tools, assistantPlugins: [], assistantWriteTools: {} }));
 import handler from '../../api/assistant';
-it('a provider repeatedly reading tools still produces and persists an answer within the bounded stream',async()=>{
- const records:Array<Record<string,any>>=[];const tables:string[]=[];
- const client={from(table:string){tables.push(table);const query={select(){return query;},eq(){return query;},order(){return query;},limit(){return query;},insert(value:Record<string,any>){records.push({...value,id:String(records.length),sequence:records.length});return query;},update(){return query;},maybeSingle:async()=>({data:{id:'owned-session',user_id:'owned'},error:null}),then(resolve:(result:unknown)=>unknown){return Promise.resolve({data:table==='assistant_messages'?[...records].reverse():null,error:null}).then(resolve);}};return query;}};
- mocks.client.mockResolvedValue({client,user:{id:'owned'}});
- const read=vi.fn(async()=>({title:'Actual visible course'}));mocks.tools.mockReturnValue({lookup:tool({inputSchema:z.object({}),execute:read})});
- const model=new MockLanguageModelV4({doStream:async(options)=>{const final=options.toolChoice?.type==='none';return {stream:simulateReadableStream({chunks:[{type:'stream-start',warnings:[]},...(final?[{type:'text-start',id:'answer'},{type:'text-delta',id:'answer',delta:'Actual visible course is available.'},{type:'text-end',id:'answer'}]:[{type:'tool-call',toolCallId:crypto.randomUUID(),toolName:'lookup',input:'{}'}]),{type:'finish',finishReason:{unified:final?'stop':'tool-calls',raw:final?'stop':'tool_calls'},usage:{inputTokens:{total:1,noCache:1,cacheRead:0,cacheWrite:0},outputTokens:{total:1,text:final?1:0,reasoning:0}}}] as any}),warnings:[]};}});
- mocks.provider.mockReturnValue(model);
- let output='';let status=0;const response={writeHead(code:number){status=code;},write(chunk:Uint8Array){output+=new TextDecoder().decode(chunk);return true;},end(){},setHeader(){},status(code:number){status=code;return response;},json(value:unknown){throw new Error(JSON.stringify(value));}};
- await handler({method:'POST',headers:{},query:{},body:{sessionId:'owned-session',message:'Which course is available?',context:{workspace:'courses',experienceMode:'learn'}}} as VercelRequest,response as unknown as VercelResponse);
- expect(status).toBe(200);expect(output).toBe('Actual visible course is available.');expect(read).toHaveBeenCalledTimes(3);expect(model.doStreamCalls).toHaveLength(4);expect(records.filter(record=>record.role==='assistant')).toEqual([expect.objectContaining({content:output})]);expect(new Set(tables)).toEqual(new Set(['assistant_sessions','assistant_messages']));
+
+type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'comma-final' | 'length-final' | 'tool-loop-ten' | 'hang-empty' | 'hang-text' | 'discard-text';
+
+function toolCallStream() {
+  return {
+    stream: simulateReadableStream({
+      chunks: [
+        { type: 'stream-start', warnings: [] },
+        { type: 'tool-call', toolCallId: crypto.randomUUID(), toolName: 'lookup', input: '{}' },
+        { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage: usage() }
+      ] as any
+    }),
+    warnings: []
+  };
+}
+
+function toolCallWithTextStream() {
+  return {
+    stream: simulateReadableStream({
+      chunks: [
+        { type: 'stream-start', warnings: [] },
+        { type: 'text-start', id: 'answer' },
+        { type: 'text-delta', id: 'answer', delta: 'INVISIBLE PREAMBLE' },
+        { type: 'text-end', id: 'answer' },
+        { type: 'tool-call', toolCallId: crypto.randomUUID(), toolName: 'lookup', input: '{}' },
+        { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage: usage() }
+      ] as any
+    }),
+    warnings: []
+  };
+}
+
+function simulatedText(delta: string, finish = 'stop') {
+  const chunks: any[] = [{ type: 'stream-start', warnings: [] }];
+  if (delta) {
+    chunks.push({ type: 'text-start', id: 'answer' }, { type: 'text-delta', id: 'answer', delta }, { type: 'text-end', id: 'answer' });
+  }
+  chunks.push({ type: 'finish', finishReason: { unified: finish, raw: finish }, usage: usage() });
+  return { stream: simulateReadableStream({ chunks }), warnings: [] };
+}
+
+function usage() {
+  return { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } };
+}
+
+function harness(mode: Mode) {
+  const records: Array<Record<string, any>> = [];
+  const tables: string[] = [];
+  const client = {
+    from(table: string) {
+      tables.push(table);
+      const filters: Array<[string, unknown]> = [];
+      let updateValue: Record<string, any> | undefined;
+      const query: any = {
+        select() { return query; },
+        eq(column: string, value: unknown) { filters.push([column, value]); return query; },
+        in() { return query; },
+        or() { return query; },
+        order() { return query; },
+        limit() { return query; },
+        insert(value: Record<string, any> | Array<Record<string, any>>) {
+          for (const row of Array.isArray(value) ? value : [value]) records.push({ ...row, id: String(records.length), sequence: records.length });
+          return query;
+        },
+        update(value: Record<string, any>) { updateValue = value; return query; },
+        maybeSingle: async () => ({ data: table === 'assistant_sessions' ? { id: 'owned-session', user_id: 'owned' } : null, error: null }),
+        single: async () => ({ data: table === 'assistant_sessions' ? { id: 'owned-session', user_id: 'owned' } : table === 'assistant_messages' ? records[records.length - 1] : null, error: null }),
+        then(resolve: (result: unknown) => unknown) {
+          if (updateValue && table === 'assistant_messages') {
+            for (const record of records) {
+              if (filters.every(([column, value]) => record[column] === value)) Object.assign(record, updateValue);
+            }
+          }
+          const data = table === 'assistant_messages' ? [...records].reverse() : null;
+          return Promise.resolve({ data, error: null }).then(resolve);
+        }
+      };
+      return query;
+    }
+  };
+  mocks.client.mockResolvedValue({ client, user: { id: 'owned' } });
+  const read = vi.fn(async () => ({ title: 'Actual visible course' }));
+  mocks.tools.mockReturnValue({ lookup: tool({ inputSchema: z.object({}), execute: read }) });
+  let phase1Calls = 0;
+  const model = new MockLanguageModelV4({
+    doStream: async (options) => {
+      phase1Calls += 1;
+      if (mode === 'leak-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="lookup">');
+      if (mode === 'discard-text') return phase1Calls === 1 ? toolCallWithTextStream() : simulatedText('VISIBLE FINAL ANSWER');
+      if (mode === 'comma-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('这里还有三点：');
+      if (mode === 'length-final') return simulatedText('这是被截断的半句话，推理还在展开而纯行动的', 'length');
+      if (mode === 'tool-loop-ten') return toolCallStream();
+      if (mode === 'empty-final') return simulatedText('');
+      if (mode === 'hang-empty') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); }, cancel() {} }), warnings: [] };
+      if (mode === 'hang-text') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); controller.enqueue({ type: 'text-start', id: 'answer' }); controller.enqueue({ type: 'text-delta', id: 'answer', delta: '已经生成的一段内容' }); }, cancel() {} }), warnings: [] };
+      if (mode === 'natural-text') return simulatedText('Natural final answer.');
+      if (mode === 'multi-tool') return phase1Calls <= 3 ? toolCallStream() : simulatedText('Natural final answer.');
+      return phase1Calls === 1 ? toolCallStream() : simulatedText('Natural final answer.');
+    }
+  });
+  mocks.provider.mockReturnValue(model);
+  return { records, tables, read, model };
+}
+
+async function call(response: ReturnType<typeof responseRecorder>, body: Record<string, unknown> = {}) {
+  await handler(
+    { method: 'POST', headers: {}, query: {}, body: { sessionId: 'owned-session', messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Which course is available?' }] }], context: { workspace: 'courses', experienceMode: 'learn' }, ...body } } as VercelRequest,
+    response.response
+  );
+}
+
+function responseRecorder() {
+  let status = 0;
+  let output = '';
+  let body: unknown;
+  const headers: Record<string, string> = {};
+  const closeHandlers: Array<() => void> = [];
+  const response = {
+    writableFinished: false,
+    destroyed: false,
+    status(code: number) { status = code; return response; },
+    json(value: unknown) { body = value; return response; },
+    setHeader(key: string, value: string) { headers[key.toLocaleLowerCase()] = value; },
+    setHeaders(values: Record<string, string>) { for (const [key, value] of Object.entries(values)) response.setHeader(key, value); },
+    writeHead(code: number) { status = code; },
+    write(chunk: Uint8Array | string) { output += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk); return true; },
+    flush() { return undefined; },
+    once(event: string, handler: () => void) { if (event === 'close') closeHandlers.push(handler); return response; },
+    end() { response.writableFinished = true; },
+    on() { return response; },
+    removeListener() { return response; }
+  };
+  return { response: response as unknown as VercelResponse, status: () => status, output: () => output, body: () => body, headers: () => headers, disconnect: () => { for (const handler of closeHandlers) handler(); } };
+}
+
+it('streams one bounded answer loop with research + card tools', async () => {
+  const { records, read, model } = harness('tool-once');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).toContain('Natural final answer.');
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(model.doStreamCalls).toHaveLength(2);
+  expect(records.filter((record) => record.role === 'assistant')).toEqual([expect.objectContaining({ content: 'Natural final answer.' })]);
+  expect(new Set(recorder.output().match(/"type":"[a-z-]+"/g) ?? []).size).toBeGreaterThan(0);
+});
+
+it('shows the model its own earlier prose so it does not repeat it', async () => {
+  const { model, records } = harness('discard-text');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  const secondPrompt = JSON.stringify((model.doStreamCalls[1] as any).prompt);
+  expect(secondPrompt).toContain('INVISIBLE PREAMBLE');
+  expect(secondPrompt).toContain('lookup');
+  expect(records.filter((record) => record.role === 'assistant').map((record) => record.content)).toEqual(['INVISIBLE PREAMBLEVISIBLE FINAL ANSWER']);
+  expect(recorder.output()).toContain('INVISIBLE PREAMBLE');
+});
+
+it('handles several tool rounds and still produces one clean answer', async () => {
+  const { records, read, model } = harness('multi-tool');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).toContain('Natural final answer.');
+  expect(read).toHaveBeenCalledTimes(3);
+  expect(model.doStreamCalls).toHaveLength(4);
+  expect(records.filter((record) => record.role === 'assistant')).toHaveLength(1);
+});
+
+it('streams an answer with no tool call', async () => {
+  const { model } = harness('natural-text');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).toContain('Natural final answer.');
+  expect(model.doStreamCalls).toHaveLength(1);
+});
+
+it('does not send a marked protocol leak back to the model', async () => {
+  const { records, model } = harness('natural-text');
+  records.push(
+    { id: 'old-user', sequence: 0, role: 'user', content: 'earlier question', message_kind: 'utterance', invalid_reason: null },
+    { id: 'old-leak', sequence: 1, role: 'assistant', content: '<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="lookup">', message_kind: 'utterance', invalid_reason: 'protocol_leak' }
+  );
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  const sent = (model.doStreamCalls[0] as any).prompt as Array<{ role: string; content: unknown }>;
+  const serialized = JSON.stringify(sent);
+  expect(serialized).not.toContain('DSML');
+  expect(serialized).not.toContain('earlier question');
+  expect(serialized).toContain('Which course is available?');
+});
+
+it('does not replay a persisted failed turn to the model', async () => {
+  const { records, model } = harness('natural-text');
+  records.push(
+    { id: 'old-user', sequence: 0, role: 'user', content: 'old failed question', message_kind: 'utterance', invalid_reason: null },
+    { id: 'old-failed', sequence: 1, role: 'assistant', content: 'partial failed answer', message_kind: 'utterance', invalid_reason: null, parts: [{ type: 'text', text: 'partial failed answer' }, { type: 'data-failed', data: { reason: 'length' } }] }
+  );
+  const recorder = responseRecorder();
+  await call(recorder);
+  const sent = JSON.stringify((model.doStreamCalls[0] as any).prompt);
+  expect(sent).not.toContain('old failed question');
+  expect(sent).not.toContain('partial failed answer');
+  expect(sent).toContain('Which course is available?');
+});
+
+it('persists a failed row for a protocol leak without storing protocol text', async () => {
+  const { records, model } = harness('leak-final');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).not.toContain('DSML');
+  expect(recorder.output()).not.toContain('Natural final answer.');
+  expect(model.doStreamCalls).toHaveLength(2);
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].content).toBe('');
+  expect(assistant[0].parts).toEqual([{ type: 'data-failed', data: { reason: 'protocol' } }]);
+});
+
+it('does not guess incompleteness from a trailing colon', async () => {
+  const { records } = harness('comma-final');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).not.toContain('data-failed');
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].content).toBe('这里还有三点：');
+  expect(JSON.stringify(assistant[0].parts)).not.toContain('data-failed');
+});
+
+it('marks a finish reason of length as failed and keeps the partial answer', async () => {
+  const { records } = harness('length-final');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).toContain('data-failed');
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].content).toBe('这是被截断的半句话，推理还在展开而纯行动的');
+  expect(assistant[0].parts).toContainEqual({ type: 'data-failed', data: { reason: 'length' } });
+});
+
+it('persists an empty final answer as one failed turn', async () => {
+  const { records } = harness('empty-final');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].parts).toEqual([{ type: 'data-failed', data: { reason: 'empty' } }]);
+});
+
+it('forbids tools on the final step of the bounded loop', async () => {
+  const { model } = harness('tool-loop-ten');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(model.doStreamCalls).toHaveLength(10);
+  const last = model.doStreamCalls[model.doStreamCalls.length - 1] as any;
+  expect(last.toolChoice).toEqual({ type: 'none' });
+});
+
+it('marks the user turn as stopped when the client disconnects before any text', async () => {
+  const { records } = harness('hang-empty');
+  const recorder = responseRecorder();
+  const request = call(recorder);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  recorder.disconnect();
+  await request;
+  const user = records.find((record) => record.role === 'user') as Record<string, any>;
+  expect(user.parts).toContainEqual({ type: 'data-stopped', data: { reason: 'learner' } });
+  expect(records.filter((record) => record.role === 'assistant')).toEqual([]);
+});
+
+it('persists partial text and a stopped marker when the client stops mid-stream', async () => {
+  const { records } = harness('hang-text');
+  const recorder = responseRecorder();
+  const request = call(recorder);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  recorder.disconnect();
+  await request;
+  const assistant = records.find((record) => record.role === 'assistant') as Record<string, any>;
+  expect(assistant.content).toBe('已经生成的一段内容');
+  expect(assistant.parts).toContainEqual({ type: 'text', text: '已经生成的一段内容' });
+  expect(assistant.parts).toContainEqual({ type: 'data-stopped', data: { reason: 'learner' } });
+  expect(JSON.stringify(assistant.parts)).not.toContain('data-incomplete');
+});
+
+it('stores card parts as object references only', async () => {
+  const { records } = harness('tool-once');
+  const recorder = responseRecorder();
+  await call(recorder);
+  const assistant = records.find((record) => record.role === 'assistant') as Record<string, any>;
+  expect(Array.isArray(assistant.parts)).toBe(true);
+  expect(JSON.stringify(assistant.parts)).not.toContain('display');
 });

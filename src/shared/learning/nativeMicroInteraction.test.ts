@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNativeMicroInteractionCorrect, validateNativeMicroInteraction, type NativeMicroInteraction } from "./nativeMicroInteraction";
+import { isNativeMicroInteractionCorrect, nativeChoiceOptionStates, validateNativeMicroInteraction, type NativeMicroInteraction } from "./nativeMicroInteraction";
 
 const examples: Array<{ interaction: NativeMicroInteraction; pass: string[] | number[]; fail: string[] | number[] }> = [
   { interaction: { type: "categorize", items: [{ id: "rule", label: "Rule" }, { id: "learn", label: "Learn" }], categories: ["fixed", "data"], correctCategories: ["fixed", "data"] }, pass: ["fixed", "data"], fail: ["data", "fixed"] },
@@ -13,6 +13,19 @@ describe("native Micro interaction contract", () => {
     expect(validateNativeMicroInteraction(interaction)).toEqual([]);
     expect(isNativeMicroInteractionCorrect(interaction, pass)).toBe(true);
     expect(isNativeMicroInteractionCorrect(interaction, fail)).toBe(false);
+  });
+
+  it("reveals option correctness only after a submitted answer", () => {
+    const choice: NativeMicroInteraction = { type: "choice", options: ["Reason", "Act", "Observation"], correctIndex: 0 };
+    expect(nativeChoiceOptionStates(choice, "Act", false)).toBeNull();
+    expect(nativeChoiceOptionStates(choice, "Act", true)?.map((item) => item.state)).toEqual(["correct", "incorrect", "idle"]);
+
+    const multiple: NativeMicroInteraction = { type: "multiple-choice", options: ["A", "B", "C"], correctIndexes: [0, 2] };
+    expect(nativeChoiceOptionStates(multiple, [0, 1], true)).toEqual([
+      { optionIndex: 0, selected: true, correct: true, state: "correct" },
+      { optionIndex: 1, selected: true, correct: false, state: "incorrect" },
+      { optionIndex: 2, selected: false, correct: true, state: "correct" }
+    ]);
   });
 
   it("lets Explore collect a valid observation without inventing a correct target", () => {

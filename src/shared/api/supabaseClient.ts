@@ -6,6 +6,9 @@ function requiredClientEnv(name: string, value: string | undefined) {
   return value;
 }
 
+/** Captured before Supabase consumes the recovery fragment from the URL. */
+export const passwordRecoveryRequested = typeof window !== "undefined" && /(?:^|[#&])type=recovery(?:&|$)/.test(window.location.hash);
+
 export const supabaseClient = createClient(
   requiredClientEnv("VITE_SUPABASE_URL", import.meta.env.VITE_SUPABASE_URL),
   requiredClientEnv("VITE_SUPABASE_PUBLISHABLE_KEY", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)

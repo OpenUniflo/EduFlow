@@ -1,0 +1,126 @@
+.ef-micro-step-list {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+
+.ef-micro-step-list > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-12);
+}
+
+.ef-micro-step-list > header h2 {
+  margin: 0;
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+}
+
+.ef-micro-step-list > header span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-micro-step-units {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+
+.ef-micro-step-unit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-micro-step-unit h3 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+}
+
+.ef-micro-step-unit h3 > span {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-700);
+}
+
+.ef-micro-step-unit ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ef-micro-step-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+}
+
+.ef-micro-step-row.is-learned {
+  border-color: color-mix(in srgb, var(--target) 34%, var(--line));
+  background: color-mix(in srgb, var(--target-soft) 36%, var(--surface));
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.ef-micro-step-row:disabled {
+  opacity: .72;
+  cursor: default;
+}
+
+.ef-micro-step-check {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  border-radius: var(--r-full);
+  background: var(--line);
+  color: var(--surface);
+}
+
+.ef-micro-step-row.is-learned .ef-micro-step-check {
+  background: var(--target);
+}
+
+.ef-micro-step-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ef-micro-step-copy strong {
+  overflow: hidden;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-micro-step-copy small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-micro-step-row.is-learned .ef-micro-step-copy small {
+  color: color-mix(in srgb, var(--target) 72%, var(--ink-2));
+}

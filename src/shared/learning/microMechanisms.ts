@@ -88,6 +88,12 @@ export function flowAdvance(definition: FlowDefinition, edgeIds: string[], execu
   return { executed: event ? executed + 1 : executed, reason: event ? "advanced" : "completed", error: null };
 }
 
+/** How far a flow can advance with the connections currently present. */
+export function flowStepLimit(definition: FlowDefinition, edgeIds: readonly string[]) {
+  const firstBlocked = definition.events.findIndex((event) => event.edgeId && !edgeIds.includes(event.edgeId));
+  return firstBlocked < 0 ? definition.events.length : firstBlocked;
+}
+
 export function mechanismFeedback(definition: MicroMechanism, input: unknown): MechanismFeedback {
   const parsed = mechanismAnswerSchema.safeParse(input);
   if (!parsed.success) return { correct: false, reason: "not-started", message: "请先操作并执行观察。" };

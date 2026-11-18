@@ -147,6 +147,57 @@ export function connectionReferenceRows(workflows: readonly ReferenceWorkflow[],
   return rows;
 }
 
+/**
+ * Registered function usages across the root definition and nested subgraphs.
+ * Function references are owner-local names without a `p4:` prefix, pinned by
+ * `functionVersion`; error handlers use the same `functionRef`/`functionVersion`
+ * pair under `config.authoring.errorHandler`. One node contributes at most one
+ * row even when it uses the same function as both its body and its handler.
+ */
+export function functionReferenceRows(workflows: readonly ReferenceWorkflow[], ref: unknown): ConnectionReferenceRow[] {
+  const wanted = typeof ref === "string" ? ref.trim() : "";
+  if (!wanted || wanted.length > 256) return [];
+  const rows: ConnectionReferenceRow[] = [];
+  const seen = new Set<string>();
+  const visit = (workflow: ReferenceWorkflow, graph: Record<string, unknown>, graphPath: string[]) => {
+    for (const node of nodesOf(graph)) {
+      const nodeId = typeof node.id === "string" ? node.id : "";
+      if (!nodeId) continue;
+      const config = objectOf(node.config) ?? {};
+      const handler = objectOf(objectOf(config.authoring)?.errorHandler);
+      const versions: (number | undefined)[] = [];
+      if (node.type === "core.function" && config.implementation === "registered" && config.functionRef === wanted) {
+        versions.push(typeof config.functionVersion === "number" && Number.isSafeInteger(config.functionVersion) ? config.functionVersion : undefined);
+      }
+      if (handler?.functionRef === wanted) {
+        versions.push(typeof handler.functionVersion === "number" && Number.isSafeInteger(handler.functionVersion) ? handler.functionVersion : undefined);
+      }
+      if (versions.length) {
+        const version = versions[0];
+        const identity = `${workflow.workflowId}\u0000${graphPath.join("/")}\u0000${nodeId}\u0000${version ?? "unknown"}`;
+        if (!seen.has(identity)) {
+          seen.add(identity);
+          rows.push({
+            workflowId: workflow.workflowId,
+            workflowName: workflow.workflowName,
+            revision: workflow.revision,
+            graphPath: [...graphPath],
+            nodeId,
+            nodeLabel: nodeLabelOf(node, nodeId),
+            ...(version === undefined ? {} : { version }),
+          });
+        }
+      }
+      if (graphPath.length < MAX_SUBGRAPH_DEPTH) {
+        const child = childGraphOf(node);
+        if (child) visit(workflow, child, [...graphPath, nodeId]);
+      }
+    }
+  };
+  for (const workflow of workflows) if (workflow.archived !== true) visit(workflow, workflow.definition, []);
+  return rows;
+}
+
 /** Decodes the first segment of a JSON Pointer, which is the environment variable key. */
 export function pointerFieldName(pointer: unknown): string | undefined {
   if (typeof pointer !== "string") return undefined;
@@ -218,4 +269,152 @@ export function variableReferenceRows(workflows: readonly ReferenceWorkflow[]): 
     visit(workflow.definition, []);
   }
   return rows;
+}
+
+/** Fixed independent Workflow reference carried by a `core.subgraph` node. */
+export type WorkflowReferenceEdge = {
+  graphPath: string[];
+  nodeId: string;
+  nodeLabel: string;
+  targetWorkflowId: string;
+  targetRevision: number;
+  environmentRef: string;
+  inputs: Record<string, unknown>;
+  writes: Record<string, unknown>;
+};
+
+export const MAX_WORKFLOW_REFERENCE_DEPTH = 8;
+export const MAX_WORKFLOW_REFERENCE_NODES = 64;
+export const MAX_WORKFLOW_REFERENCE_CHAIN_NODES = 256;
+export const MAX_WORKFLOW_REFERENCE_WORKFLOWS = 32;
+
+function referenceShapeOf(node: Record<string, unknown>): { config: Record<string, unknown>; reference: Record<string, unknown> } | undefined {
+  if (node.type !== "core.subgraph") return undefined;
+  const config = objectOf(node.config);
+  const reference = objectOf(config?.workflowRef);
+  return config && reference ? { config, reference } : undefined;
+}
+
+function validReferenceRevision(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= 2147483647 ? value : undefined;
+}
+
+/** One reference node's declared target, or undefined when the node is embedded/not a subgraph. */
+export function workflowReferenceOfNode(node: Record<string, unknown>): Omit<WorkflowReferenceEdge, "graphPath" | "nodeId" | "nodeLabel" | "inputs" | "writes"> | undefined {
+  const shape = referenceShapeOf(node);
+  if (!shape) return undefined;
+  const workflowId = typeof shape.reference.workflowId === "string" ? shape.reference.workflowId.trim() : "";
+  const revision = validReferenceRevision(shape.reference.revision);
+  const environmentRef = typeof shape.config.environmentRef === "string" ? shape.config.environmentRef.trim() : "";
+  if (!workflowId || revision === undefined || !environmentRef) return undefined;
+  return { targetWorkflowId: workflowId, targetRevision: revision, environmentRef };
+}
+
+/**
+ * Structural issues for the reference form. Embedded graphs remain accepted.
+ * Reference nodes pin one exact revision, one explicit environment and isolated
+ * state; `config.graph` and `config.workflowRef` are mutually exclusive.
+ */
+export function workflowReferenceIssues(definition: Record<string, unknown>, path: string[] = []): string[] {
+  const issues: string[] = [];
+  const nodes = nodesOf(definition);
+  for (const node of nodes) {
+    const nodeId = typeof node.id === "string" ? node.id : "";
+    if (node.type !== "core.subgraph" || !nodeId) continue;
+    const config = objectOf(node.config);
+    const location = [...path, nodeId].join(" / ");
+    if (!config) { issues.push(`${location}: 子图配置无效`); continue; }
+    if (config.graph !== undefined && config.workflowRef !== undefined) {
+      issues.push(`${location}: 不能同时保存内嵌子图和固定版本引用`);
+      continue;
+    }
+    if (config.workflowRef === undefined) {
+      if (!objectOf(config.graph) || !Array.isArray(objectOf(config.graph)?.nodes)) issues.push(`${location}: 缺少内嵌子图或固定版本引用`);
+      continue;
+    }
+    const reference = objectOf(config.workflowRef);
+    if (!reference) { issues.push(`${location}: 固定版本引用格式无效`); continue; }
+    const keys = Object.keys(reference).sort();
+    if (keys.length !== 2 || keys[0] !== "revision" || keys[1] !== "workflowId") issues.push(`${location}: 固定版本引用只能包含 workflowId 和 revision`);
+    if (typeof reference.workflowId !== "string" || !reference.workflowId.trim() || reference.workflowId.trim().length > 128) issues.push(`${location}: 目标工作流标识无效`);
+    if (validReferenceRevision(reference.revision) === undefined) issues.push(`${location}: 固定修订必须是正整数`);
+    if (typeof config.environmentRef !== "string" || !config.environmentRef.trim() || config.environmentRef.trim().length > 160) issues.push(`${location}: 必须指定目标运行环境`);
+    if (config.stateMode !== undefined && config.stateMode !== "independent") issues.push(`${location}: 引用只能使用隔离状态`);
+    if (config.persistence !== undefined && config.persistence !== "per-invocation") issues.push(`${location}: 引用只能使用每次调用隔离的检查点`);
+    const extra = Object.keys(config).filter((key) => !["workflowRef", "environmentRef", "stateMode", "persistence"].includes(key));
+    if (extra.length) issues.push(`${location}: 引用配置包含未知字段 ${extra.join(", ")}`);
+  }
+  if (path.length < MAX_WORKFLOW_REFERENCE_DEPTH) {
+    for (const node of nodes) {
+      const child = objectOf(node.config)?.graph;
+      if (node.type === "core.subgraph" && child && typeof child === "object" && !Array.isArray(child)) {
+        issues.push(...workflowReferenceIssues(child as Record<string, unknown>, [...path, typeof node.id === "string" ? node.id : "?"]));
+      }
+    }
+  } else if (nodes.some((node) => node.type === "core.subgraph" && objectOf(objectOf(node.config)?.graph))) {
+    issues.push(`${path.join(" / ")}: 子图嵌套超过 ${MAX_WORKFLOW_REFERENCE_DEPTH} 层`);
+  }
+  return issues;
+}
+
+/** Fixed reference edges across the root definition and its embedded graphs. */
+export function workflowReferenceEdges(definition: Record<string, unknown>): WorkflowReferenceEdge[] {
+  const edges: WorkflowReferenceEdge[] = [];
+  const visit = (graph: Record<string, unknown>, graphPath: string[]) => {
+    for (const node of nodesOf(graph)) {
+      const nodeId = typeof node.id === "string" ? node.id : "";
+      if (!nodeId) continue;
+      const target = workflowReferenceOfNode(node);
+      if (target) {
+        const config = objectOf(node.config) ?? {};
+        edges.push({
+          graphPath: [...graphPath],
+          nodeId,
+          nodeLabel: nodeLabelOf(node, nodeId),
+          ...target,
+          inputs: objectOf(node.inputs) ?? {},
+          writes: objectOf(node.writes) ?? {},
+        });
+      }
+      if (graphPath.length < MAX_WORKFLOW_REFERENCE_DEPTH) {
+        const child = childGraphOf(node);
+        if (child) visit(child, [...graphPath, nodeId]);
+      }
+    }
+  };
+  visit(definition, []);
+  return edges;
+}
+
+export type FixedReferenceIssue = { code: "WORKFLOW_REFERENCE_CYCLE" | "WORKFLOW_REFERENCE_LIMIT"; message: string };
+
+/**
+ * Checks an actual fixed-revision dependency closure. Callers resolve each exact
+ * `(workflowId, revision)` to its definition; a missing target is a separate
+ * availability error. The same target may be reused from many nodes.
+ */
+export function fixedRevisionReferenceIssue(
+  root: { workflowId: string; revision: number },
+  resolve: (workflowId: string, revision: number) => Record<string, unknown> | undefined,
+): FixedReferenceIssue | undefined {
+  const rootIdentity = `${root.workflowId}@${root.revision}`;
+  const seenTargets = new Set<string>();
+  let nodeCount = 0;
+  const visit = (workflowId: string, revision: number, path: string[]): FixedReferenceIssue | undefined => {
+    const identity = `${workflowId}@${revision}`;
+    if (path.includes(identity)) return { code: "WORKFLOW_REFERENCE_CYCLE", message: `固定版本引用形成循环：${[...path, identity].join(" -> ")}` };
+    if (path.length > MAX_WORKFLOW_REFERENCE_DEPTH) return { code: "WORKFLOW_REFERENCE_LIMIT", message: `固定版本引用超过 ${MAX_WORKFLOW_REFERENCE_DEPTH} 层` };
+    const definition = resolve(workflowId, revision);
+    if (!definition) return undefined;
+    for (const edge of workflowReferenceEdges(definition)) {
+      nodeCount += 1;
+      seenTargets.add(`${edge.targetWorkflowId}@${edge.targetRevision}`);
+      if (nodeCount > MAX_WORKFLOW_REFERENCE_CHAIN_NODES) return { code: "WORKFLOW_REFERENCE_LIMIT", message: `引用闭包超过 ${MAX_WORKFLOW_REFERENCE_CHAIN_NODES} 个引用节点` };
+      if (seenTargets.size > MAX_WORKFLOW_REFERENCE_WORKFLOWS) return { code: "WORKFLOW_REFERENCE_LIMIT", message: `引用闭包超过 ${MAX_WORKFLOW_REFERENCE_WORKFLOWS} 个目标修订` };
+      const issue = visit(edge.targetWorkflowId, edge.targetRevision, [...path, identity]);
+      if (issue) return issue;
+    }
+    return undefined;
+  };
+  return visit(root.workflowId, root.revision, []);
 }

@@ -18,7 +18,7 @@
 | 官方图检查点 | `workflow_checkpoints` schema | LangGraph 执行状态和子图 namespace |
 | 长期记忆 | `workflow_memory` schema | 跨 Thread 的授权持久记忆 |
 | 可复用数据库模板 | `public.workflow_templates` | 模板来源，实例化后成为用户流程 |
-| 本次三套示例的可复现定义与布局 | [仓库场景文件](../../src/demo/workflow/scenarios) | 显式演示 seed，不是生产读取 fallback |
+| 本次三套示例的可复现定义与布局 | 历史文件 `src/demo/workflow/scenarios`（已随演示 seed 移除；当前以数据库为准） | 显式演示 seed 的历史记录，不是生产读取 fallback |
 | 少量“起步流程”配置 | `src/features/workflow/domain/v2/authoringExamples.ts` 等 | 编辑器中构造初稿；其中前端预览示例需与真实执行区分 |
 
 你在界面保存流程后，数据库会产生新修订；仓库 JSON 不会自动被反向改写。反过来，改仓库 JSON 也不会自动覆盖数据库里你编辑过的流程。创建脚本只补充新示例，不强行覆盖已有条目。导出的配置是定义与布局材料，不是独立可执行部署包。
@@ -27,7 +27,7 @@
 
 ## 开始前统一操作
 
-1. 打开 [EduFlow](http://127.0.0.1:5173)，登录 `local-student@eduflow.local`。密码见 [本机私有账号页](../../.acceptance/manual-demo-20261020/accounts.private.md)。教师、管理员不自动拥有这些私有流程。
+1. 打开 [EduFlow](http://127.0.0.1:5173)，登录 `local-student@eduflow.local`。密码见本机私有账号页（本机私有路径，不进入版本库：`.acceptance/manual-demo-20261020/accounts.private.md`）。教师、管理员不自动拥有这些私有流程。
 2. 从下表直接进入，或在 **画布** 工作流库搜索“场景 A”“场景 B”“场景 C”。页面已打开但列表没刷新时重新进入工作流库。
 3. 顶部选择 **真实执行**，运行环境 **Local acceptance**。不要选“前端预览”或“P5 本地受控流式验收”。
 4. 点 **执行**，在 **本次运行输入 → 高级 JSON** 粘贴对应输入，点 **校验 → 运行**。输入是本次调用数据，不随工作流定义保存。
@@ -199,6 +199,6 @@
 
 本次准备不修改 Hosted，也不改写旧 P6 独立验收签署。这些新增示例的 API 自测不是新的独立技术/无背景用户签字；您可按本手册重新操作并记录实际结果。
 
-源码 seed：[订单场景](../../src/demo/workflow/scenarios/order-service.json)、[并行评审](../../src/demo/workflow/scenarios/parallel-review.json)、[项目记忆](../../src/demo/workflow/scenarios/project-followup.json)。创建工具：[create-agent-scenarios.mjs](../../scripts/workflow/examples/create-agent-scenarios.mjs)。仅需重新准备缺失条目时运行，现有场景不会被它覆盖；不要为演示反复重建。
+源码 seed（历史路径，已随演示 seed 移除）：`src/demo/workflow/scenarios/order-service.json`、`src/demo/workflow/scenarios/parallel-review.json`、`src/demo/workflow/scenarios/project-followup.json`。创建工具：[create-agent-scenarios.mjs](../../scripts/workflow/examples/create-agent-scenarios.mjs)。仅需重新准备缺失条目时运行，现有场景不会被它覆盖；不要为演示反复重建。
 
 模型实跑验证工具有单独的显式开关与调用账：[verify-agent-scenarios.mjs](../../scripts/workflow/checks/verify-agent-scenarios.mjs)。它不是日常启动步骤，不要在演示前顺手运行，以免产生额外费用。页面每轮运行也会单独调用模型；取消/失败可能收费。本地供应商密钥只保留在服务端，输入和导出不得携带明文密钥。

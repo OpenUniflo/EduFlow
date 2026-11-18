@@ -11,7 +11,7 @@ import { WorkflowDialog } from "./WorkflowDialog";
  * The single run entry. Required startup input, inline startup checks and one Run button;
  * no separate preflight/rerun dialogs. The caller auto-saves dirty definitions on Run.
  */
-export function RunPreparationDialog({ draftId, schema, value, onChange, onInvalid, busy, dirty, inputInvalid, warning, reuseNotice, omissions, issues = [], focusErrorRequest = 0, focusPointer = null, onCancel, onRun, onIssue }: {
+export function RunPreparationDialog({ draftId, schema, value, onChange, onInvalid, busy, dirty, inputInvalid, warning, reuseNotice, omissions, issues = [], focusErrorRequest = 0, focusPointer = null, onCancel, onRun, onIssue, hasRun = false }: {
   draftId: string;
   schema: JsonSchema;
   value: JsonValue;
@@ -31,6 +31,8 @@ export function RunPreparationDialog({ draftId, schema, value, onChange, onInval
   onCancel: () => void;
   onRun: () => void;
   onIssue?: (issue: RunPreflightIssue) => void;
+  /** A run is already active or finished: the one close action reads 关闭. */
+  hasRun?: boolean;
 }) {
   const [touched, setTouched] = useState(false);
   const validation = validateSchemaValue(schema, value);
@@ -38,7 +40,8 @@ export function RunPreparationDialog({ draftId, schema, value, onChange, onInval
   const hasDraft = Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length);
   const showIssue = !valid && !inputInvalid && (touched || focusErrorRequest > 0 || hasDraft);
   const fields = Object.keys(schema.properties ?? {}).length;
-  return <WorkflowDialog title="运行" error={inputInvalid || undefined} className="wf-run-dialog" onClose={onCancel}>
+  const closeLabel = busy || hasRun ? "关闭" : "取消";
+  return <WorkflowDialog title="运行" error={inputInvalid || undefined} className="wf-run-dialog" onClose={onCancel} showClose={false}>
     {issues.length ? <section className="wf-run-check" aria-label="运行前检查"><strong>运行前还需要处理 {issues.length} 项</strong><ul>{issues.map(issue => <li key={issue.id}><button type="button" onClick={() => onIssue?.(issue)}><span>{issue.title}</span><small>{issue.detail}</small></button></li>)}</ul></section> : null}
     {reuseNotice ? <p role="status">{reuseNotice}</p> : null}
     {omissions?.length ? <InputReuseOmissions fields={omissions}/> : null}
@@ -47,7 +50,7 @@ export function RunPreparationDialog({ draftId, schema, value, onChange, onInval
     {dirty ? <p className="wf-field-note">当前修改会在运行前自动保存；保存失败不会启动运行。</p> : null}
     {warning ? <p role="alert">{warning}</p> : null}
     <div className="wf-dialog-actions">
-      <button type="button" onClick={onCancel}>取消</button>
+      <button type="button" onClick={onCancel}>{closeLabel}</button>
       <button type="button" className="primary" disabled={!valid || busy} onClick={onRun}>{busy ? "正在运行…" : "运行"}</button>
     </div>
   </WorkflowDialog>;

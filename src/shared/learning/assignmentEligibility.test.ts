@@ -19,6 +19,6 @@ describe('shared Assignment eligibility', () => {
     expect(assignmentEligibility({...ready,published:false}).canStart).toBe(false);
   });
   it('maps actual state to task CTA', () => {
-    expect([undefined,'started','needs_revision','submitted','accepted'].map(status => assignmentEligibility({...ready,status}).cta)).toEqual(['开始实训','继续实训','继续修改','查看提交','查看结果']);
+    expect([undefined,'started','needs_revision','submitted','accepted'].map(status => assignmentEligibility({...ready,status}).cta)).toEqual(['开始动手任务','继续动手任务','继续修改','查看提交','查看结果']);
   });
 });

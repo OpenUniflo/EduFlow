@@ -13,7 +13,8 @@ export type EmbeddingEnvironment = {
 };
 
 export type LlmEnvironment = {
-  llmProvider: "deepseek";
+  /** Any non-empty OpenAI-compatible provider label; never a whitelist. */
+  llmProvider: string;
   llmBaseUrl: string;
   llmApiKey: string;
   llmModel: string;
@@ -83,7 +84,7 @@ export function readEmbeddingEnvironment(env: NodeJS.ProcessEnv = process.env): 
 
 export function readLlmEnvironment(env: NodeJS.ProcessEnv = process.env): LlmEnvironment {
   return {
-    llmProvider: exact("LLM_PROVIDER", env.LLM_PROVIDER, "deepseek"),
+    llmProvider: required("LLM_PROVIDER", env.LLM_PROVIDER).trim(),
     llmBaseUrl: serverBaseUrl("LLM_BASE_URL", env.LLM_BASE_URL),
     llmApiKey: required("LLM_API_KEY", env.LLM_API_KEY),
     llmModel: required("LLM_MODEL", env.LLM_MODEL)

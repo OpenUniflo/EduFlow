@@ -99,7 +99,7 @@ function prepare(input: RoutePlanningInput) {
 }
 
 function capability(data: ReturnType<typeof prepare>, enables: readonly CapabilityEnable[] = []): CapabilityModel {
-  const { course, edges, current, actionable, compare, ids } = data;
+  const { course, edges, current, actionable, compare, ids, incoming: prerequisiteIncoming, order } = data;
   const supportEdges: CapabilityRelation[] = [
     ...edges.map(edge => ({ ...edge, relation: 'prerequisite' as const })),
     ...enables.filter(edge => ids.has(edge.target)).map(edge => ({ ...edge })),
@@ -111,16 +111,31 @@ function capability(data: ReturnType<typeof prepare>, enables: readonly Capabili
     incoming.get(edge.target)!.push(edge); outgoing.get(edge.source)?.push(edge);
     if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! + 1);
   }
-  // Only formal acquired capabilities supply project path entries. A factual
-  // root is not an acquired entry merely because it has no incoming relations.
-  const supported = new Set(current); const frontier = [...supported];
+  const unfinishedTargets = new Set([...course.keys()].filter(id => !current.has(id)));
+  // A factual root is an entry only when it can reach an unfinished target
+  // without first crossing an acquired boundary. A root merely upstream of an
+  // acquired capability is history, not a new starting point.
+  const rootReach = new Set(unfinishedTargets);
+  const rootQueue = [...unfinishedTargets];
+  for (let i = 0; i < rootQueue.length; i++) for (const edge of incoming.get(rootQueue[i]) ?? []) {
+    if (!ids.has(edge.source) || current.has(edge.source) || rootReach.has(edge.source)) continue;
+    rootReach.add(edge.source); rootQueue.push(edge.source);
+  }
+  const roots = order.filter(id => !current.has(id)
+    && prerequisiteIncoming.get(id)!.every(edge => edge.strength !== 'hard')
+    && rootReach.has(id));
+  // Entries are formally acquired capabilities plus unacquired factual roots.
+  // Factual roots without incoming hard prerequisites are valid starts; a
+  // hard prerequisite that is unavailable keeps the node out of the model.
+  const startIds = new Set([...current, ...roots]);
+  const supported = new Set(startIds); const frontier = [...startIds];
   for (let i = 0; i < frontier.length; i++) for (const edge of outgoing.get(frontier[i])!) {
     if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! - 1);
     if (!supported.has(edge.target) && hardRemaining.get(edge.target) === 0) {
       supported.add(edge.target); frontier.push(edge.target);
     }
   }
-  const visited = new Set([...course.keys()].filter(id => !current.has(id) && supported.has(id)));
+  const visited = new Set([...unfinishedTargets].filter(id => supported.has(id)));
   const queue = [...visited];
   for (let i = 0; i < queue.length; i++) {
     const id = queue[i];
@@ -129,9 +144,9 @@ function capability(data: ReturnType<typeof prepare>, enables: readonly Capabili
       visited.add(edge.source); queue.push(edge.source);
     }
   }
-  const paths=anchoredCapabilityPaths(visited,supportEdges,current,new Set([...course.keys()].filter(id=>!current.has(id))));
+  const paths=anchoredCapabilityPaths(visited,supportEdges,startIds,unfinishedTargets);
   // Targets remain explicit context even without an entry. Gray membership and
-  // projected relations require an actual acquired-to-target path witness.
+  // projected relations require an actual start-to-target path witness.
   const members = new Set([...course.keys(),...paths.members]);
   const retainedSupport = paths.edges;
   const retainedIds=new Set(retainedSupport.map(edge=>edge.id));

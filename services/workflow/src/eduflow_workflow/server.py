@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, HTTPException
 from .compiler import compile_definition, envelope, validate_structure
 from .contracts import ExecutionError, VERSION, digest, validate_value, canonical, bind, DEPENDENCY_MANIFEST
 from .registry import Registry, HARD_LIMITS, OPERATIONS, requested_variable_environment, restore_frozen_environment
+from .references import resolve_definition_references, frozen_references_from_snapshot, authorize_frozen_references, current_reference_snapshot, environment_for
 from .tools import discover
 from .credentials import assert_no_secrets
 from .support import stategraph_support
@@ -95,7 +96,7 @@ async def catalog(body:dict):
 async def discovery(body:dict):
     env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
     try:
-        tools=await discover(registry,env,body["connectorRef"])
+        tools=await discover(registry,env,body["connectorRef"],include_all=True)
     except ExecutionError:
         raise
     except Exception:
@@ -103,20 +104,22 @@ async def discovery(body:dict):
     path=os.environ.get("WORKFLOW_CATALOG_FILE")
     if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted':
         from .storage import Storage
+        from .extensions import save_discovered_catalog
         connector=next(c for c in env['connectors'] if c['ref']==body['connectorRef'])
-        await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_catalog_put',
-            env['ref']+':'+connector['ref'],digest(connector),tools)
+        await save_discovered_catalog(Storage(os.environ['WORKFLOW_DATABASE_URL']),env['ref']+':'+connector['ref'],connector,tools)
         registry._refreshed_at=-100
         refresh();env=registry.environment(env['ref'],body['ownerId'])
     elif path:
         from pathlib import Path
+        from .extensions import connector_cache_digest
         connector=next(c for c in env["connectors"] if c["ref"]==body["connectorRef"])
         catalog=json.loads(Path(path).read_text()) if Path(path).exists() else {}
-        catalog[env["ref"]+":"+connector["ref"]]={"connectorDigest":digest(connector),"tools":tools}
+        catalog[env["ref"]+":"+connector["ref"]]={"connectorDigest":connector_cache_digest(connector),"tools":tools}
         temporary=Path(path+".tmp");temporary.write_text(json.dumps(catalog));temporary.replace(path)
         # Reload so all process roles observe the same catalog revision.
         refresh();env=registry.environment(body["environmentRef"],body["ownerId"])
-    return {"items":registry.public_tools(env),"nextCursor":None,"environment":registry.public_environment(env)}
+    connector=next((c for c in env["connectors"] if c["ref"]==body["connectorRef"]),None)
+    return {"items":registry.public_tools(env),"nextCursor":None,"environment":registry.public_environment(env),"discoveredToolNames":list(connector.get("discoveredToolNames") or []) if connector else []}
 
 @app.post("/v1/document")
 async def document(body:dict):
@@ -131,16 +134,23 @@ async def hash_value(body:dict): return {"digest":digest(body["value"])}
 async def validation(body:dict):
     # Authorization is always fresh. This endpoint performs no save, enqueue,
     # provider construction, model invocation, discovery or tool execution.
-    env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
+    variable_environment_id=requested_variable_environment(body)
+    env=environment_for(registry,body["environmentRef"],body["ownerId"],variable_environment_id)
     definition=body["definition"]
     assert_no_secrets(definition,env)
     snapshot=registry.snapshot(env)
     structure=validate_structure(definition,registry.nodes,OPERATIONS)
     diagnostics=[{**item,"scope":"definition"} for item in structure["diagnostics"]]
     result=structure
+    references=None
     environment_ready=False
     if structure["valid"]:
-        result=compile_definition(definition,snapshot)
+        from .storage import Storage
+        storage=Storage(os.environ["WORKFLOW_DATABASE_URL"]) if os.environ.get("WORKFLOW_DATABASE_URL") else None
+        references=await resolve_definition_references(storage,registry,body["ownerId"],definition,env["ref"],variable_environment_id)
+        result=compile_definition(definition,snapshot,references)
+        if references is not None:
+            snapshot={**snapshot,"workflowReferences":references}
         # Authoring warnings are already reported by structure validation; only
         # blocking environment diagnostics decide readiness.
         diagnostics.extend({**item,"scope":"environment"} for item in result["diagnostics"] if item.get("severity","error")=="error")
@@ -186,16 +196,22 @@ async def node_test(body:dict):
 @app.post('/v1/resume-validate')
 async def resume_validation(body:dict):
     from .interrupts import validate_resume
+    from .storage import Storage
     thread=body['thread']; snapshot=thread['snapshot']; definition=body['definition']
-    env=registry.environment(snapshot['environment_ref'],body['ownerId'])
+    variable_environment_id=snapshot['registry_snapshot'].get('variableEnvironmentId') if isinstance(snapshot.get('registry_snapshot'),dict) else None
+    env=environment_for(registry,snapshot['environment_ref'],body['ownerId'],variable_environment_id)
     # Ordinary workspace values and the variable environment selection are frozen;
     # authorization/catalog identity stays fresh.
     restore_frozen_environment(env,snapshot['registry_snapshot'])
-    result=compile_definition(definition,registry.snapshot(env))
+    references=frozen_references_from_snapshot(snapshot.get('registry_snapshot'))
+    storage=Storage(os.environ["WORKFLOW_DATABASE_URL"]) if os.environ.get("WORKFLOW_DATABASE_URL") else None
+    current_environments=await authorize_frozen_references(storage,registry,body['ownerId'],references,env['ref'],variable_environment_id)
+    current_references=current_reference_snapshot(references,current_environments) if references is not None else None
+    result=compile_definition(definition,registry.snapshot(env),current_references)
     if not result['valid'] or result['compileFingerprint']!=snapshot['compile_fingerprint'] or env['revision']!=snapshot['environment_revision']:
         raise ExecutionError('COMPILE_FINGERPRINT_CHANGED','Frozen checkpoint executor or authorization has changed')
     await assert_checkpoints(thread)
-    validate_resume(definition,thread,body['responses'],env)
+    validate_resume(definition,thread,body['responses'],env,references)
     return {'valid':True}
 
 

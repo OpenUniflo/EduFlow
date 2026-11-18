@@ -21,7 +21,7 @@ const required = [
   'tests/workflow-integration/contracts/schema_differential.py', 'tests/workflow-integration/contracts/hash_differential.py',
   'tests/workflow-integration/contracts/langgraph_parallel_interrupts.py', 'tests/workflow-integration/contracts/langgraph_execution_policies.py',
   'tests/workflow-integration/contracts/langgraph_checkpoints_store.py', 'tests/workflow-integration/contracts/model_stream_completion.py',
-  'scripts/workflow/checks/test.mjs', 'src/demo/workflow/scenarios/parallel-model-reference.json',
+  'scripts/workflow/checks/test.mjs',
 ];
 for (const path of required) if (!existsSync(path)) failures.push(`Missing current maintained file: ${path}`);
 const acceptanceFiles = new Set(['README.md', 'DELIVERY_STATUS.md', 'WORKFLOW_MANUAL_ACCEPTANCE_GUIDE.md', 'WORKFLOW_AGENT_SCENARIOS_GUIDE.md', 'WORKFLOW_USER_REVIEW_2026-10-20.md']);
@@ -57,6 +57,5 @@ const templateCheck = spawnSync('git', ['check-ignore', '--no-index', '--stdin']
 if (![0, 1].includes(templateCheck.status) || templateCheck.stdout.trim()) failures.push('Environment template ignore check failed');
 const commands = JSON.parse(readFileSync('package.json', 'utf8')).scripts;
 for (const [name, command] of Object.entries(commands)) if (/scripts\/acceptance\//.test(command)) failures.push(`Command uses retired phase scripts: ${name}`);
-assert.equal(JSON.parse(readFileSync('src/demo/workflow/scenarios/parallel-model-reference.json', 'utf8')).definition.schemaVersion, '2.0');
 console.log(JSON.stringify({ passed: !failures.length, trackedIgnoredFiles: trackedIgnored.length, requiredCurrentFiles: required.length, imports, links, optionalArtifactLinks: optionalArtifacts, failures }, null, 2));
 if (failures.length) process.exitCode = 1;

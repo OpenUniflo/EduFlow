@@ -20,7 +20,7 @@ const groups: ComponentGroup[] = [
 const moreGroups: ComponentGroup[] = [
   { title: "高级执行", items: [
     { type: "core.function", label: "函数", description: "运行一小段代码处理数据", group: "高级执行", tone: "blue", icon: Code2 },
-    { type: "core.subgraph", label: "子图", description: "把一组节点收进独立流程", group: "高级执行", tone: "blue", icon: Boxes },
+    { type: "core.subgraph", label: "调用工作流", description: "按固定版本调用一个已有工作流", group: "高级执行", tone: "blue", icon: Boxes },
     { type: "control.fork", label: "并行分支", description: "同时执行多条分支", group: "高级执行", tone: "blue", icon: GitFork },
     { type: "control.join", label: "等待汇合", description: "等所有分支结束后继续", group: "高级执行", tone: "blue", icon: Combine },
     { type: "core.tool_dispatch", label: "工具调用批次", description: "一次执行模型要求的多个工具", group: "高级执行", tone: "blue", icon: Send },

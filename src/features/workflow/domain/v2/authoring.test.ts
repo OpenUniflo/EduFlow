@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createEditorV2, createWorkflowV2 } from "./factory";
-import { authoringDiagnostics, createAuthoringNode, editorAtPath, frontendCapabilities, graphAtPath, interactionResponseIssue, nodeOutlets, outletDisplayName, pruneGraphLayouts, replaceGraph, replaceGraphEditor } from "./authoring";
+import { authoringDiagnostics, createAuthoringNode, editorAtPath, frontendCapabilities, graphAtPath, graphInNode, interactionResponseIssue, nodeOutlets, outletDisplayName, pruneGraphLayouts, replaceGraph, replaceGraphEditor } from "./authoring";
 function document() { const graph = createWorkflowV2(); graph.nodes.splice(1, 0, createAuthoringNode("core.subgraph", "nested")); return { graph, editor: createEditorV2(graph) }; }
 describe("frontend graph authoring boundary", () => {
   it("rejects whitespace in required non-empty responses without rewriting valid text or falsy values",()=>{
@@ -20,6 +20,24 @@ describe("frontend graph authoring boundary", () => {
     expect(editorAtPath(saved.editor, ["nested"], child).nodes.start).toEqual({ x: 456, y: 789 });
     expect(saved.editor.nodes.start).toEqual(editor.nodes.start);
   });
+  it("keeps an unchanged nested graph identity stable across scope reads", () => {
+    const { graph } = document();
+    const child = graphAtPath(graph, ["nested"]);
+    expect(graphInNode(graph.nodes.find(node => node.id === "nested")!)).toBe(child);
+    expect(graphAtPath(graph, ["nested"])).toBe(child);
+    // Edits replace the nested graph object, so the next read must be a new result.
+    const replaced = replaceGraph(graph, ["nested"], { ...child, name: "新子图" });
+    const next = graphAtPath(replaced, ["nested"]);
+    expect(next).not.toBe(child);
+    expect(next.name).toBe("新子图");
+  });
+  it("does not treat a fixed reference node as an embedded subgraph scope", () => {
+    const graph = createWorkflowV2();
+    graph.nodes.splice(1, 0, { ...createAuthoringNode("core.subgraph", "reference"), config: { workflowRef: { workflowId: "target", revision: 1 }, environmentRef: "local" } });
+    const node = graph.nodes.find(item => item.id === "reference")!;
+    expect(graphInNode(node)).toBeUndefined();
+    expect(() => graphAtPath(graph, ["reference"])).toThrow("子图不存在");
+  });
   it("prunes layouts when subgraphs are deleted and rejects invalid navigation", () => {
     const { graph, editor } = document(); const child = graphAtPath(graph, ["nested"]);
     const saved = replaceGraphEditor(editor, ["nested"], editorAtPath(editor, ["nested"], child));
@@ -28,7 +46,7 @@ describe("frontend graph authoring boundary", () => {
   });
   it("does not call frontend extensions live executable", () => {
     const { graph } = document(); graph.nodes.push({ ...createAuthoringNode("core.function", "f"), config: { authoring: { interrupt: { title: "question", schema: {}, resumeWrites: {} } } } });
-    expect(frontendCapabilities(graph)).toEqual(expect.arrayContaining(["子图", "函数", "节点中断与恢复"]));
+    expect(frontendCapabilities(graph)).toEqual(expect.arrayContaining(["调用工作流", "函数", "节点中断与恢复"]));
     expect(frontendCapabilities(createWorkflowV2())).toEqual([]);
   });
   it("exposes independent parallel outlets and diagnoses unresolved Send targets", () => {

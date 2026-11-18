@@ -224,6 +224,8 @@ async def test_thread_load_restores_the_frozen_selection_before_recompiling(monk
     # The owner's current default moved to another environment after this thread started.
     different = {**CONFIGURATION, 'default_environment_id': 'prod', 'variables': [{'key': 'API_HOST', 'value': 'https://changed.example', 'overrides': {}}]}
     monkeypatch.setattr(Registry, 'variable_configuration', lambda self, owner: copy.deepcopy(different))
-    _, environment = await session_memory_history.load('a', '00000000-0000-0000-0000-000000000001', registry)
+    data, environment, eligible = await session_memory_history.load('a', '00000000-0000-0000-0000-000000000001', registry)
+    assert data['thread'] == thread
+    assert eligible is True
     assert environment['variables'] == frozen['variables'] == {'API_HOST': 'https://dev.example', 'LIMIT': 1, 'FLAG': True}
     assert environment['variableEnvironment'] == {'id': 'dev', 'name': '开发'}

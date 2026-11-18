@@ -11,8 +11,8 @@
 - Prerequisite closure MUST use only factual `prerequisite` KnowledgeEdges, remain deterministic, deduplicated, and cycle-safe, and keep target Knowledge distinct from prerequisites. Course matching MUST be based on real Knowledge coverage, expose understandable coverage/gaps, and prefer a suitable existing Course identity before Personal Course creation.
 - `CourseTargetKnowledge` is the structured Course destination and MUST remain distinct from optional human-readable `targetOutcome`. Standard and Personal Courses share the Course domain, repository, graph projection, and routes.
 - A Personal Course is learner-owned and owner-visible only. Course Creator MAY persist it as an owner-private `draft`; it becomes learner-usable only after explicit Publish and full route validation. It MAY project a minimal curriculum from an existing Course or shared Knowledge, but MUST NOT copy KnowledgeNode or KnowledgeEdge facts and MUST NOT require fabricated Material, Micro, Assignment, Outcome, or FinalProject assets.
-- Selecting an existing Course and creating a Personal Course are explicit authenticated learner actions. The LLM tool loop MUST NOT perform the Personal Course write, and Goal planning MUST NOT manufacture a formal Next Action before the Navigation Engine exists.
-- Learner-facing Course Search results and Course Creation Briefs MUST be persisted at their conversation position as structured Assistant timeline content. A session MAY contain multiple independent planning results and MUST NOT use one global mutable Goal Plan as historical UI authority.
+- Selecting an existing Course and creating a Personal Course are explicit authenticated learner actions. The LLM tool loop MUST NOT perform the Personal Course write, and Goal planning MUST NOT manufacture a formal Next Action; the deterministic Navigation Engine owns it and the Assistant may only report its server decision.
+- Learner-facing Course Search results and Course Creation Briefs MUST be persisted at their conversation position as Assistant answer cards (legacy structured timeline content remains readable). The stored card keeps object references; its title, coverage and status are rendered from current product data. A session MAY contain multiple independent planning results and MUST NOT use one global mutable Goal Plan as historical UI authority.
 - Course match levels and coverage metrics are advisory ranking/explanation signals. They MUST NOT remove the learner's ability to use a displayed Course, create from it, continue searching, or prepare a personalized Course route.
 - Goal Planner MUST hand creation to the Course creation domain through a recoverable Course Creation Brief. The Assistant tool loop MUST NOT silently create a Personal Course, and novice-language acceptance MUST NOT be satisfied with test-specific phrase mappings or Knowledge/Course fixtures.
 
@@ -22,7 +22,7 @@
 - Reference Material is optional and MUST NOT be required for Course creation, Knowledge scope, curriculum, or structural validity. Unsupported arbitrary Material parsing MUST remain explicit rather than fabricating Knowledge or asset mappings.
 - Course Creator AI uses the one visible EduFlow Assistant identity. AI and manual edits MUST converge on Proposal -> visual Preview/Diff -> deterministic validation -> explicit user confirmation -> Apply. The model MUST NOT directly mutate Course authority data or Publish.
 - Course Creator prerequisite labels and edges come only from factual Knowledge Graph `prerequisite` relations. Reference Course curriculum order MAY guide teaching order but MUST NOT create or alter KnowledgeEdge facts.
-- A user-facing personalized route produced by Course Creator is a Personal/goal-specific Course. It is not the dynamic learner-specific Learning Path, NavigationDecision, eligible frontier, or Next Action owned by the future Navigation Engine.
+- A user-facing personalized route produced by Course Creator is a Personal/goal-specific Course. It is not the dynamic learner-specific Learning Path, NavigationDecision, eligible frontier, or Next Action owned by the deterministic Navigation Engine.
 
 ## Course Views
 
@@ -37,7 +37,11 @@
 
 - Course nodes MUST NOT overlap, share coordinates, or use modulo-based placement. Edges MUST route outside node interiors with readable source/target ports.
 - ELK (layered DAG) is the single layout authority for course structure; every renderer consumes the same ELK coordinates for the same structural revision.
-- The learner course immersive view (skill tree, practice shadow layer, capability model 3D, flattened route editor) is one three.js scene. The front pose uses a near-orthographic camera so the tree reads as 2D; rotation, flattening and skill/practice layer swaps are camera/node animations inside that scene. Node capsules, labels and Object Shell cards are DOM overlays anchored to scene coordinates. The learner view MUST NOT switch renderers at runtime.
+- The learner Course page defaults to the ordinary 路线 document: one continuous route through every chapter, chapter banners on that route and a way back to Home. It MUST NOT load three.js, create a WebGL context, or represent the route only inside 3D. The three.js course scene is the separate 课程树 view and is loaded on demand with a dynamic import (2026-11-08; spec: `docs/design/new-ui/DESKTOP_MIGRATION_PLAN.md` §10.6–10.8):
+  - 课程树: the skill tree on the front plane, the practice tree as its stacked reflection, and the Project Capability Model on deeper planes behind, revealed by free orbit rotation with no on/off control, each capability placed behind the Course Knowledge it supports (double-click on blank space returns to the front pose). Skill tree, practice tree and capability model MUST NOT be separate tabs. Practice reflections are the same size as the cards they mirror, and swapping layers is an animated interpolation. The learner's current route is shown by default as a single pulse-beam style (adopted or course-order route alike) with step numbers, and can be toggled off; route editing adds an amber preview beam alongside the dimmed current one. The beam passes through every node of the current route in execution order at each node's rendered position (cardless capability and intermediate nodes included; independent of step numbers), is drawn above cards and planes but below page overlays, and is a faint glow track with a few staggered comet pulses flowing at a constant per-step speed; the practice tree and layer swap use the same anchors. Selecting a node shows only its one-hop related nodes (dependencies, route neighbors, directly linked capabilities) with names, drawn at their real positions at every angle; everything else dims without names and stays clickable. The course tree and the Archive course plane share one interaction implementation (camera, zoom toolbar, hover, selection, names, picking) and one course color encoding; capability nodes are always points, never cards. A knowledge card and its practice reflection are two faces of one node and are not highlighted separately. Route editing flattens the same nodes into the layered 2D editor.
+- 路线 is a normal vertical winding step path (completed, current with a start card, not started; chapter banners) scrolled to the current step, rendered without three.js. The Course page shows this once as its default document and MUST NOT duplicate it as a tab or side panel there; Home reuses the same route component in its right-hand panel for any selected Course because that is a different surface and it never loads the 3D scene. In the panel every step, label, banner and action card MUST fit without horizontal scrolling or clipping, and the current step MUST be visible on open.
+- The route shows all chapters on one road with no folded rows. Chapter banners sit on the road at a short gap, and a sticky header shows the current chapter and progress while scrolling. It opens scrolled to the current step. One action card is shown at a time, below the current step by default and moving to a selected node; selecting a node MUST NOT move any node or recompute the layout. A banner or card MUST NOT be covered by the route canvas.
+- Rotation, flattening and skill/practice swaps are camera/node animations inside that scene. Knowledge, practice and capability cards and chapter panels are 3D panels attached to their layer (CSS3D) that tilt with the plane; with view angle they continuously simplify from full card to name-only pill to screen-facing point, never by per-card threshold popping, and never show mirrored text from behind; zooming out uses the same stages, so one Knowledge always has exactly one marker. On oblique views, names come from a stable rule (selected, hovered, distance-based with a small cap, hysteresis, frozen while the camera moves) rather than from geometric collision results; a node has at most one name at a time, anchored to its own node or hidden, and excentric labels appear only when the pick radius is ambiguous and replace the other names; chapter names are not persistent there. Picking is screen-space nearest-node with a minimum hit radius and works at every angle; selecting never moves the camera, and a selected node stays visible through occluding layers. See the plan §10.10. The learner view MUST NOT switch renderers at runtime. Camera controls are identical to the Archive: left-drag rotates freely through 360°, wheel/pinch zooms, right- or Shift-drag pans the orbit center, with inertia; pan bounds include every layer.
 - React Flow remains the renderer for editing canvases (Course Creator structure editing, Workflow editor).
 - Chapter and Atomic views MUST share one hierarchical course topology and MUST NOT use unrelated independent layout systems.
 - Renderer-specific graph objects are projections only and MUST NOT become domain data.
@@ -58,7 +62,7 @@
 
 - A Course may be structurally valid with no CourseAssignment or AssignmentCoverage. Missing Assignment coverage is a non-blocking asset gap reported by the Course asset coverage audit.
 - Assignment is curriculum data and MUST NOT be represented as a KnowledgeNode or KnowledgeRelation.
-- The user-facing UI term remains "实训树"; the domain model uses Assignment.
+- The user-facing UI term is 动手任务 (and 动手任务树 for the practice layer); the domain model uses Assignment.
 - Assignments are not limited to workflow-canvas tasks. Workflow canvas is an optional execution environment selected by `Assignment.mode`.
 - AssignmentCoverage is N:M. One Assignment may cover multiple KnowledgeNodes, and one KnowledgeNode may be covered by multiple Assignments.
 - Knowledge and Assignment companion cards occupy one stable graph footprint.
@@ -107,7 +111,7 @@
 
 ## Course Selection & Drawer Invariants
 
-- In the new UI, "Drawer" means the node Object Shell (card S anchored at the node, expandable to a side panel); it never slides in from the screen edge.
+- In the new UI, "Drawer" means the node Object Shell. Selecting a node in the course scene or a step in the 路线 view opens it directly as a floating side panel inset from the right edge (never a full-height drawer sliding from the edge); the scene shifts so the selection stays visible. Selection dims unrelated cards and keeps the node's dependencies, covering practices, supporting capabilities and adjacent route steps highlighted. Blank click or Esc closes it.
 
 - Course selection MUST be anchor-based. A selected anchor is a stable location in the course graph: a Chapter or an atomic KnowledgeNode.
 - 技能树 / 实训树 mode determines the active Knowledge / Assignment detail facet. Switching mode MUST preserve the selected anchor and synchronize an open Drawer instead of closing it or leaving stale content.
@@ -119,9 +123,9 @@
 ## Data-driven Frontend Invariants
 
 - Generic pages and services MUST resolve course data by route `courseId`; an unknown course or cross-course material reference MUST render Not Found and MUST NOT fall back to a demo course.
-- Course Center cards, search results, metrics, recent learning, Atlas course links, material navigation, and workflow launch context MUST be derived from repositories and runtime data.
-- Agentic AI and Python Engineering identifiers, titles, counts, lesson rules, or workflow mappings may exist only in explicit demo seeds/adapters, never in generic UI algorithms.
-- Adding a valid course seed to the demo repository MUST be sufficient for it to appear in Course Center and work through the shared routes and projections.
+- Archive course-panel cards, search results, metrics, recent learning, Atlas course links, material navigation, and workflow launch context MUST be derived from repositories and runtime data.
+- Concrete course identifiers, titles, counts, lesson rules, or workflow mappings MUST NOT appear in generic UI algorithms; they exist only as database content.
+- Adding a valid Course to the database MUST be sufficient for it to appear in the Archive course panel and work through the shared routes and projections.
 
 ## Repository and Projection Invariants
 
@@ -185,11 +189,16 @@
 
 ## UI Demo Boundary
 
-- Generic product pages MUST NOT contain concrete Demo course identities such as Agentic AI or Python Engineering unless that content is explicitly injected by a Demo configuration or adapter.
+- Generic product pages MUST NOT contain concrete course identities; all course content comes from the database.
 
-## Assignment Experience and Demo Provider Boundaries
+## Assignment Experience Boundaries
 
 - `AssignmentExperience` is optional execution/presentation metadata on CourseAssignment; it MUST NOT create a parallel Practice ontology or change Assignment ownership and coverage semantics.
-- Generic Assignment UI may select an answer, code/file, trace, or workflow renderer only from explicit Assignment metadata and MUST NOT branch on Demo Course or Assignment identities.
-- Generic Lesson and Workflow UI consume provider/result contracts. Concrete Demo lesson scripts and fixed assessment content MUST live under `src/demo` and be injected by the application composition root.
+- A practice (CourseAssignment) is one concrete task: a clear task description plus a submission. There are no per-type practice editors (2026-10-30).
+- A practice may be linked to works the learner creates for it. From the practice, the learner can create a new platform work (today: a Workflow, optionally from the Course starter template) that is linked to the practice, or link an existing work. Future platform execution forms link the same way.
+- Submission references a frozen version of a linked work, plus optional uploaded files/links and a note for anything the platform cannot execute. Later edits to the work never change a submitted version.
+- Practice is evaluated only by evaluators (teacher or AI); deterministic rule grading belongs to Micro Learning feedback, not practice.
+- Question/answer checks are not practice. Existing `answer` practices are removed; existing `code` and `trace` experiences become file-upload practice.
+- Generic Assignment UI MUST NOT branch on concrete Course or Assignment identities.
+- Generic Lesson and Workflow UI consume provider/result contracts. Lesson scripts and assessment content are database content; no concrete lesson script or assessment content lives in the repository.
 - Workflow assessment resolution MUST use the complete explicit `(courseId, assignmentId, workflowTemplateId)` launch context; template identity alone MUST NOT select Course-specific feedback.

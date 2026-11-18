@@ -87,7 +87,7 @@ describe('Course navigator projection', () => {
     const completed: NavigationDecision = { ...decision, path: [{ ...decision.path[0], state: 'learned' }], nextAction: { kind: 'next', resourceKind: 'course', reasonCode: 'course_route_complete', reason: 'Done' } };
     const pending = project({ decision: completed });
     expect(pending.emptyState.title).toBe('当前学习内容已完成');
-    expect(pending.emptyState.reason).toContain('4 项实训');
+    expect(pending.emptyState.reason).toContain('4 项动手任务');
     expect(pending.courseComplete).toBe(false);
     expect(project({ decision: completed, courseState: state({ first: 'accepted', second: 'completed', third: 'accepted', fourth: 'accepted' }) }).emptyState.title).toBe('课程已完成');
     expect(project({ decision: completed, courseState: state({ first: 'submitted', second: 'accepted', third: 'accepted', fourth: 'accepted' }) }).courseComplete).toBe(false);
@@ -96,7 +96,7 @@ describe('Course navigator projection', () => {
     const missing = { ...decision, nextAction: { kind: 'next' as const, resourceKind: 'course' as const, nodeId: id, reasonCode: 'learning_content_unavailable', reason: 'Missing' } };
     expect(project({ decision: missing }).emptyState.title).toBe('下一步能力：Route Knowledge');
     expect(project({ decision: missing }).nextAction).toBeNull();
-    expect(project({ decision: missing }).emptyState.reason).toContain('4 项实训仍保留在下方');
+    expect(project({ decision: missing }).emptyState.reason).toContain('4 项动手任务仍保留在下方');
     expect(project({ decision: { ...missing, nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
     expect(project({ decision: { ...missing, path: [], nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
   });

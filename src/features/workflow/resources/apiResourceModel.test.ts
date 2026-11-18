@@ -27,7 +27,7 @@ describe("generic API resource model", () => {
         { name: "secret", source: "variable", value: "API_KEY", required: false, description: "" },
       ],
       auth: { type: "bearer", name: "" },
-      settings: { timeoutMs: 15000, retries: 1, resultPath: "data" },
+      settings: { timeoutMs: 15000, retries: 1, resultPath: "data", responseFormat: "json" },
       outputMap: [{ name: "items", path: "items", type: "array" }],
     });
     expect(content.baseUrl).toBe("https://api.github.com");
@@ -88,6 +88,38 @@ describe("generic API resource model", () => {
     expect(draft.params.some(param => param.name === "removeWordsIfNoResults")).toBe(false);
     expect(draft.params.find(param => param.name === "hitsPerPage")).toMatchObject({ source: "fixed", value: "5" });
     expect(draft.outputMap).toEqual([{ name: "hits", path: "hits", type: "array" }, { name: "total", path: "nbHits", type: "number" }]);
+  });
+
+  it("omits the default JSON response format and persists an explicit text format", () => {
+    const json = apiContentFromDraft({ ...emptyApiDraft(), name: "x", url: "https://example.com/a" });
+    expect(json.settings).toEqual({ timeoutMs: 15000, retries: 0 });
+    const text = apiContentFromDraft({
+      ...emptyApiDraft(), name: "x", url: "https://example.com/a",
+      settings: { timeoutMs: 15000, retries: 0, resultPath: "", responseFormat: "text" },
+    });
+    expect(text.settings).toEqual({ timeoutMs: 15000, retries: 0, responseFormat: "text" });
+    expect(text.outputSchema).toEqual({ type: "string" });
+    expect(apiDraftFromContent(text).settings.responseFormat).toBe("text");
+    expect(apiDraftFromContent(json).settings.responseFormat).toBe("json");
+  });
+
+  it("maps a text response to an object only through explicit output fields", () => {
+    const content = apiContentFromDraft({
+      ...emptyApiDraft(), name: "x", url: "https://example.com/a",
+      settings: { timeoutMs: 15000, retries: 0, resultPath: "", responseFormat: "text" },
+      outputMap: [{ name: "text", path: "", type: "text" }],
+    });
+    expect(content.outputMap).toEqual([{ name: "text", path: "", type: "text" }]);
+    expect(content.outputSchema).toEqual({ type: "object", properties: { text: { type: "string" } } });
+  });
+
+  it("rejects a result path for a text response", () => {
+    const draft = {
+      ...emptyApiDraft(), name: "x", url: "https://example.com/a",
+      settings: { timeoutMs: 15000, retries: 0, resultPath: "data", responseFormat: "text" as const },
+    };
+    expect(apiDraftIssue(draft)).toContain("结果取值路径");
+    expect(apiDraftIssue({ ...draft, settings: { ...draft.settings, resultPath: "" }, outputMap: [{ name: "text", path: "text", type: "text" }] })).toContain("取值位置");
   });
 
   it("keeps generated references valid and unique", () => {

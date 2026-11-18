@@ -1,10 +1,13 @@
 .eduflow-assistant.course-design-assistant { flex-direction: column; align-items: flex-end; gap: 12px; }
-.eduflow-assistant .eduflow-assistant-panel { width: min(360px, calc(100vw - 48px)); padding: 18px; border: 1px solid var(--atlas-border, #dce3ed); background: var(--atlas-surface, #fff); transform-origin: bottom right; }
-.eduflow-assistant .eduflow-assistant-panel header { gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--atlas-border, #e3e8ef); }
-.eduflow-assistant .eduflow-assistant-panel header > div:first-child { min-width: 0; justify-content: flex-start; }
-.eduflow-assistant .eduflow-assistant-panel header span { min-width: 0; gap: 5px; }
-.eduflow-assistant .eduflow-assistant-panel header strong { font-size: 14px; color: var(--atlas-ink); }
-.eduflow-assistant .eduflow-assistant-panel header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted); }
+.eduflow-assistant .eduflow-assistant-panel { width: min(360px, calc(100vw - 48px)); max-width: 100%; min-width: 0; box-sizing: border-box; overflow-x: clip; padding: 18px; border: 1px solid var(--atlas-border, #dce3ed); background: var(--atlas-surface, #fff); transform-origin: bottom right; }
+.eduflow-assistant .eduflow-assistant-panel :is(.conversation-workspace,.conversation-timeline,.conversation-message,.conversation-message-content,.conversation-composer) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.eduflow-assistant .eduflow-assistant-panel .conversation-timeline { overflow-x: clip; }
+.eduflow-assistant .eduflow-assistant-panel .conversation-message-content { overflow-x: clip; }
+.eduflow-assistant .eduflow-assistant-panel > header { gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--atlas-border, #e3e8ef); }
+.eduflow-assistant .eduflow-assistant-panel > header > div:first-child { min-width: 0; justify-content: flex-start; }
+.eduflow-assistant .eduflow-assistant-panel > header span { min-width: 0; gap: 5px; }
+.eduflow-assistant .eduflow-assistant-panel > header strong { font-size: 14px; color: var(--atlas-ink); }
+.eduflow-assistant .eduflow-assistant-panel > header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted); }
 .eduflow-assistant .assistant-window-controls { flex-shrink: 0; gap: 4px; }
 .eduflow-assistant .assistant-window-controls button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; color: var(--atlas-muted); background: transparent; cursor: pointer; }
 .eduflow-assistant .assistant-window-controls button:hover, .eduflow-assistant .assistant-window-controls button[aria-pressed="true"] { color: var(--atlas-brand); background: #eef1ff; }
@@ -13,14 +16,89 @@
 .eduflow-assistant .assistant-primary-operation small { color: var(--atlas-muted); font-size: 11px; }
 .eduflow-assistant .assistant-conversation-messages { max-height: 220px; }
 .eduflow-assistant .assistant-chat-message p, .eduflow-assistant .assistant-empty, .eduflow-assistant .assistant-error { font-size: 12px; line-height: 1.6; }
-.eduflow-assistant .assistant-input-mode button, .eduflow-assistant .assistant-open-full { font-size: 11px; }
+.eduflow-assistant .assistant-input-mode button { font-size: 11px; }
+.eduflow-assistant .conversation-composer-actions button[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+.eduflow-assistant .ef-assistant-card-foot,
+.eduflow-assistant .ef-assistant-card-actions,
+.eduflow-assistant .ef-assistant-card-choice { min-width: 0; max-width: 100%; }
+.eduflow-assistant .ef-assistant-card-frame,
+.eduflow-assistant .ef-assistant-micro-frame,
+.eduflow-assistant .ef-ui-obj,
+.eduflow-assistant .ef-card-compact,
+.eduflow-assistant .ef-assistant-micro-head { min-width: 0; max-width: 100%; }
+.eduflow-assistant .ef-assistant-micro-head { grid-template-columns: 28px minmax(0, 1fr); }
+.eduflow-assistant .ef-assistant-micro-head > .ef-ui-pill { grid-column: 2; justify-self: start; }
+.eduflow-assistant .ef-assistant-card-foot { flex-wrap: wrap; }
+.eduflow-assistant .ef-assistant-card-foot > span { overflow-wrap: anywhere; }
+.eduflow-assistant .ef-assistant-summary-map,
+.eduflow-assistant .ef-assistant-md-table { overflow-x: clip; }
+.eduflow-assistant .ef-assistant-md-table table { table-layout: fixed; }
+.eduflow-assistant .ef-assistant-md-table th,
+.eduflow-assistant .ef-assistant-md-table td { overflow-wrap: anywhere; }
+.eduflow-assistant .ef-assistant-md pre { max-width: 100%; overflow-x: clip; white-space: pre-wrap; overflow-wrap: anywhere; }
+.eduflow-assistant .ef-assistant-md code { overflow-wrap: anywhere; }
 .eduflow-assistant .course-design-assistant-input { margin-top: 0; }
 .eduflow-assistant .course-design-assistant-input input { padding: 11px 12px; font-size: 13px; }
 .eduflow-assistant button:focus-visible, .eduflow-assistant input:focus-visible { outline: 2px solid var(--atlas-brand); outline-offset: 3px; }
 .eduflow-assistant button:disabled { opacity: .5; cursor: not-allowed; }
-.eduflow-assistant .assistant-open-full { justify-content: flex-end; color: var(--atlas-muted); font-weight: 500; }
-@media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: 24px; } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
+
+@media(max-width:900px) {
+  .eduflow-assistant.course-design-assistant { bottom: var(--ef-mobile-nav-clearance); }
+  .eduflow-assistant .eduflow-assistant-panel { max-height: calc(100dvh - var(--ef-mobile-nav-clearance) - 80px); }
+}
+@media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: var(--ef-mobile-nav-clearance); } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
 @media(prefers-reduced-motion:reduce) { .eduflow-assistant.course-design-assistant, .eduflow-assistant .course-design-assistant-trigger { transition: none; } .eduflow-assistant .course-design-assistant-trigger:hover { transform: none; } .eduflow-assistant .spin { animation: none; } }
 
 /* The full Workbench already owns a conversation and stable Composer. */
 body:has(.conversation-workbench) .eduflow-assistant { display:none; }
+
+/* Reserve the floating trigger inside the bottom action bar, so neither the
+ * bar buttons nor the inspector content underneath are covered. */
+body:has(.ef-practice-page) .ef-practice-shell .ef-ui-obj-foot {
+  padding-right: calc(var(--sp-16) + 76px);
+}
+@media (min-width: 901px) {
+  body:has(.creator-page) .creator-footer {
+    padding-right: calc(var(--sp-16) + 76px);
+  }
+}
+body:has(.creator-page) .creator-shell {
+  padding-bottom: calc(var(--sp-32) + 72px);
+}
+/* Phones reserve vertical space instead of narrowing the footer: the fixed
+ * trigger sits below the action, so the primary label keeps one line. */
+@media (max-width: 900px) {
+  body:has(.creator-page) .creator-shell {
+    padding-bottom: calc(var(--ef-mobile-nav-clearance) + var(--ef-assistant-trigger-size) + var(--sp-16));
+  }
+}
+
+/* Micro Learning is an immersive bottom-action page: reserve the trigger's
+ * width inside the footer and completion footer instead of covering 继续. */
+body:has(.ef-micro-page) .ef-micro-shell .ef-ui-obj-foot {
+  padding-right: calc(var(--sp-16) + 76px);
+}
+body:has(.ef-micro-page) .ef-micro-shell .micro-completion-footer {
+  padding-right: calc(var(--sp-16) + 76px);
+}
+
+/* Follow-up chips are model copy, not a fixed strip. In the narrow floating
+ * panel they wrap instead of being clipped, and the full text stays in title. */
+.eduflow-assistant .ef-assistant-followups {
+  min-width: 0;
+  max-width: 100%;
+}
+.eduflow-assistant .ef-assistant-followups .ef-ui-chip {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--ctl-32);
+  padding-block: var(--sp-4);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
+}

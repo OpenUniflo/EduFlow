@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpenAICompatibleJsonGenerationClient } from "./llm";
+import { llmRequestHeaders, OpenAICompatibleJsonGenerationClient } from "./llm";
 
 const config = { llmProvider: "deepseek" as const, llmBaseUrl: "https://api.deepseek.com", llmApiKey: "server-only-key", llmModel: "deepseek-v4-flash" };
 const input = { stage: "extraction" as const, promptVersion: "p1", schemaVersion: "s1", system: "Return JSON", user: "DATA", maxTokens: 100, temperature: 0.1 };
@@ -7,6 +7,38 @@ const input = { stage: "extraction" as const, promptVersion: "p1", schemaVersion
 function response(content: unknown, finishReason = "stop") {
   return new Response(JSON.stringify({ id: "req-1", model: "deepseek-v4-flash", choices: [{ finish_reason: finishReason, message: { content } }], usage: { prompt_tokens: 10, completion_tokens: 20 } }), { status: 200 });
 }
+
+describe("LLM request identity headers", () => {
+  it("hashes the session key stably and never sends the raw key", () => {
+    const headers = llmRequestHeaders("session-raw-123");
+    expect(headers["x-opencode-session"]).toMatch(/^[0-9a-f]{32}$/);
+    expect(headers["x-opencode-session"]).toBe(llmRequestHeaders("session-raw-123")["x-opencode-session"]);
+    expect(headers["x-opencode-session"]).not.toBe(llmRequestHeaders("session-raw-456")["x-opencode-session"]);
+    expect(JSON.stringify(headers)).not.toContain("session-raw");
+    expect(headers["User-Agent"]).toBe("eduflow/1.0");
+  });
+
+  it("merges the identity headers with the existing authorization and content type", async () => {
+    const request = vi.fn<typeof fetch>(async () => response('{"candidates":[]}'));
+    await new OpenAICompatibleJsonGenerationClient(config, request, 60_000, "attempt-raw-1").generateJson(input);
+    const headers = new Headers(request.mock.calls[0][1]?.headers);
+    expect(headers.get("authorization")).toBe(`Bearer ${config.llmApiKey}`);
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(headers.get("x-opencode-session")).toBe(llmRequestHeaders("attempt-raw-1")["x-opencode-session"]);
+    expect(headers.get("user-agent")).toBe("eduflow/1.0");
+  });
+
+  it("keeps one generated session stable across a client's retries", async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(response('{"candidates":[]}'));
+    await new OpenAICompatibleJsonGenerationClient(config, request).generateJson(input);
+    const first = new Headers(request.mock.calls[0][1]?.headers).get("x-opencode-session");
+    const second = new Headers(request.mock.calls[1][1]?.headers).get("x-opencode-session");
+    expect(first).toMatch(/^[0-9a-f]{32}$/);
+    expect(second).toBe(first);
+  });
+});
 
 describe("DeepSeek JSON generation adapter", () => {
   it("requests JSON mode and returns parsed output with reproducibility metadata", async () => {

@@ -22,6 +22,7 @@ const CODE_TITLES: Record<string, string> = {
   MODEL_REQUEST_FAILED: "模型请求失败", MODEL_ADAPTER_FAILED: "模型请求失败", MODEL_FORBIDDEN: "模型未授权", SECRET_REVOKED: "模型请求失败",
   MODEL_TIMEOUT: "模型回复超时", MODEL_STREAM_INTERRUPTED: "模型输出中断", MODEL_OUTPUT_TRUNCATED: "模型回答未完成", NODE_TIMEOUT: "节点执行超时",
   TOOL_REQUEST_FAILED: "工具请求失败", HTTP_TOOL_FAILED: "工具请求失败", TOOL_FAILED: "工具请求失败", TOOL_TIMEOUT: "工具请求超时",
+  TOOL_RESPONSE_NOT_TEXT: "工具响应格式不符", TOOL_RESPONSE_CHARSET_UNSUPPORTED: "工具响应编码不支持", TOOL_RESPONSE_ENCODING_INVALID: "工具响应编码无效",
   BINDING_MISSING: "数据字段缺失", INVALID_STATE_UPDATE: "写入数据不符合要求", INVALID_NODE_OUTPUT: "写入数据不符合要求", INVALID_NODE_INPUT: "节点输入不符合要求",
   WAIT_EXPIRED: "等待回应已到期", WORKER_LOST: "执行服务中断", RUN_CANCELLED: "运行已取消",
   RUN_TIMEOUT: "运行超过时长上限", QUEUE_TIMEOUT: "排队超时",
@@ -88,6 +89,12 @@ function baseTitle(error: WorkflowExecutionError): { title: string; actions: Err
   if (error.code === "INVALID_STATE_UPDATE" && error.actualType && error.field) return { title: "写入的数据类型不符", actions: [{ label: `把字段改为${error.actualLabel ?? "新类型"}`, hint: "fix-field-type" }, { label: "定位字段", hint: "field" }] };
   if (error.code === "INVALID_STATE_UPDATE" || error.code === "INVALID_NODE_OUTPUT") return { title: "写入数据不符合要求", actions: [{ label: "定位出错字段", hint: "field" }] };
   if (error.code === "INVALID_NODE_INPUT") return { title: "节点输入不符合要求", actions: [{ label: "定位出错字段", hint: "field" }] };
+  if (["MCP_AUTH_REQUIRED", "MCP_CONNECTION_FAILED", "MCP_CONNECTION_DISABLED", "CONNECTOR_FORBIDDEN", "CONNECTOR_UNAVAILABLE"].includes(error.code)) {
+    return { title: "MCP 连接不可用", actions: [{ label: "检查 MCP 连接", hint: "tool-settings" }, { label: "重新运行", hint: "run" }] };
+  }
+  if (["TOOL_RESPONSE_NOT_TEXT", "TOOL_RESPONSE_CHARSET_UNSUPPORTED", "TOOL_RESPONSE_ENCODING_INVALID"].includes(error.code)) {
+    return { title: "工具响应格式不符", actions: [{ label: "检查工具设置", hint: "tool-settings" }, { label: "重新运行", hint: "run" }] };
+  }
   if (error.code.startsWith("TOOL") || error.code.startsWith("HTTP_TOOL") || error.code.startsWith("MCP_TOOL")) {
     return { title: "工具请求失败", actions: [{ label: "检查工具设置", hint: "tool-settings" }, { label: "重新运行", hint: "run" }] };
   }
@@ -123,9 +130,12 @@ export function presentExecutionError(error: WorkflowExecutionError | undefined,
   const base = baseTitle(error);
   const modelFailure = ["MODEL_REQUEST_FAILED", "MODEL_ADAPTER_FAILED", "MODEL_FORBIDDEN", "MODEL_TIMEOUT", "MODEL_STREAM_INTERRUPTED", "MODEL_OUTPUT_TRUNCATED"].includes(error.code);
   const toolFailure = error.code.startsWith("TOOL") || error.code.startsWith("HTTP_TOOL") || error.code.startsWith("MCP_TOOL");
+  const mcpFailure = ["MCP_AUTH_REQUIRED", "MCP_CONNECTION_FAILED", "MCP_CONNECTION_DISABLED", "CONNECTOR_FORBIDDEN", "CONNECTOR_UNAVAILABLE"].includes(error.code);
+  const textFormatFailure = ["TOOL_RESPONSE_NOT_TEXT", "TOOL_RESPONSE_CHARSET_UNSUPPORTED", "TOOL_RESPONSE_ENCODING_INVALID"].includes(error.code);
   const message = writeMismatchMessage(error)
-    ?? (error.reason ? executionErrorReason(error)
+    ?? (textFormatFailure ? "工具返回的内容不是受支持的 text/* UTF-8 文本，请在连接设置中检查响应格式。" : error.reason ? executionErrorReason(error)
     : modelFailure ? "模型服务暂时不可用，请检查模型设置与网络连接。"
+    : mcpFailure ? "MCP 连接授权失效或不可用。请在资源中心检查连接或重新授权后重试。"
     : toolFailure ? "工具服务暂时不可用，请检查工具设置与网络连接。"
     : reasonForBinding(error));
   const savedAt = options.savedAt ? new Date(options.savedAt) : undefined;

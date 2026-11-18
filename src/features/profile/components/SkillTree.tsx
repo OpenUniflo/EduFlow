@@ -5,7 +5,7 @@ import { SkillTreeModule } from "./SkillTreeModule";
 
 export function SkillTree({ modules }: { modules: ProfileSkillModule[] }) {
   if (!modules.length) {
-    return <ProfileEmptyState message="还没有技能树数据，完成一个实训任务后这里会自动更新。" />;
+    return <ProfileEmptyState message="还没有技能树数据，完成一个动手任务任务后这里会自动更新。" />;
   }
 
   return (

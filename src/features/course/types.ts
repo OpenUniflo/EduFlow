@@ -184,6 +184,8 @@ export type UserAssignmentState = {
   assignmentId: string;
   status: UserAssignmentStatus;
   progress?: number;
+  /** Durable row timestamp used to order actionable tasks without inventing recency. */
+  updatedAt?: string;
 };
 
 export type CurriculumSequence = {

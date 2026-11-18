@@ -4,9 +4,10 @@ import type { CatalogConnection } from "./resourceModel";
 import {
   addModelSummary, canSaveModelDraft, draftModelsFor, filterProviderCards, isProbeConnection, isLocalProvider,
   latestVisibleProviders, mergeModelSelection, modelRowsFor, modelSelectionDirty, modelSourceLabel, modelUsageCount,
-  nextProviderVersion, probeConnectionContent, probeConnectionRef, providerDraftIssue, providerPublishRequest,
+  nextProviderVersion, probeConnectionContent, probeConnectionRef, providerCredentialRequiredOnSave, providerDraftIssue, providerModelSummary, providerPublishRequest,
   providerTestIssue, providerTestStatusLabel, providerUsageCount, providerVersions, stagedModelChanges,
   stagedProviderSummary, toggleDraftModel, firstUserModelProvider, userModelProviders,
+  providerHistoricalModelRefs, providerEditorModelRows, providerEditorModelSourceLabel, modelMissingFromProviderTest,
 } from "./providerModel";
 
 const connection = (ref: string, version: number, content: Record<string, JsonValue>, extra: Partial<CatalogConnection> = {}): CatalogConnection => ({
@@ -173,6 +174,25 @@ describe("dialog validation", () => {
   });
 });
 
+describe("provider model summary", () => {
+  it("reports the enabled model count and every enabled name", () => {
+    expect(providerModelSummary(["deepseek-flash", "deepseek-reasoner"])).toBe("已启用 2 个模型 · deepseek-flash、deepseek-reasoner");
+    expect(providerModelSummary([])).toBe("未启用模型");
+  });
+});
+
+describe("provider credential reuse", () => {
+  it("reuses a saved key when only the enabled model list changed", () => {
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai()), type: "openai-compatible", baseUrl: "https://models.example/v1/", credential: "" })).toBe(false);
+  });
+
+  it("requires a fresh key when the address changed or the saved version has none", () => {
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai()), type: "openai-compatible", baseUrl: "https://new.example.com/v1", credential: "" })).toBe(true);
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai(), { hasCredential: false }), type: "openai-compatible", baseUrl: "https://models.example/v1", credential: "" })).toBe(true);
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai()), type: "openai-compatible", baseUrl: "https://new.example.com/v1", credential: "sk-test" })).toBe(false);
+  });
+});
+
 describe("dialog helpers", () => {
   it("summarizes create and add-to-existing outcomes", () => {
     expect(addModelSummary({ mode: "create", name: "通义千问", version: 0, enabledCount: 2, addedCount: 0 })).toBe("将创建供应商「通义千问」v1，启用 2 个模型");
@@ -196,5 +216,24 @@ describe("user model provider selection", () => {
     expect(userModelProviders(providers).map(item => item.ref)).toEqual(["local-env-deepseek"]);
     expect(firstUserModelProvider(providers)?.ref).toBe("local-env-deepseek");
     expect(firstUserModelProvider([provider("deepseek", "environment")])).toBeUndefined();
+  });
+});
+
+describe("provider editor model history", () => {
+  it("keeps a removed model as an unchecked, previously enabled row", () => {
+    const oldVersion = connection("gateway", 1, openai({ modelRefs: ["model-a", "model-b"] }));
+    const newVersion = connection("gateway", 2, openai({ modelRefs: ["model-a"] }));
+    const historical = providerHistoricalModelRefs(newVersion, [oldVersion, newVersion]);
+    const rows = providerEditorModelRows(["model-a"], historical, []);
+    expect(rows).toEqual(["model-a", "model-b"]);
+    expect(providerEditorModelSourceLabel("model-b", ["model-a"], historical, [])).toBe("曾启用");
+  });
+
+  it("adds models returned by the last test and warns about enabled models that are missing", () => {
+    const rows = providerEditorModelRows(["manual-model"], [], ["listed-a", "listed-b"]);
+    expect(rows).toEqual(["manual-model", "listed-a", "listed-b"]);
+    expect(modelMissingFromProviderTest("manual-model", ["manual-model"], ["listed-a"], true)).toBe(true);
+    expect(modelMissingFromProviderTest("listed-a", ["listed-a"], ["listed-a"], true)).toBe(false);
+    expect(modelMissingFromProviderTest("manual-model", ["manual-model"], undefined, true)).toBe(false);
   });
 });

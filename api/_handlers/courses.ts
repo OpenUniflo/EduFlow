@@ -49,12 +49,12 @@ async function validatePersistedCourseForPublish(client: ReturnType<typeof creat
   const targets = rows.get("course_target_knowledge")!;
   if (optionalText(course, "course_type") === "personal" && (!targets.length || targets.some((row) => !coveredIds.has(text(row, "knowledge_id"))))) throw new ApiError(422, "course_target_invalid", "个人课程的核心目标无效。");
   const assignmentIds = new Set(rows.get("course_assignments")!.map((row) => text(row, "id"))); const materialIds = new Set(rows.get("materials")!.map((row) => text(row, "id"))); const segmentPairs = new Set(rows.get("material_segments")!.map((row) => `${text(row, "material_id")}:${text(row, "id")}`));
-  if (rows.get("assignment_coverages")!.some((row) => !assignmentIds.has(text(row, "assignment_id")) || !coveredIds.has(text(row, "node_id")))) throw new ApiError(422, "course_assignment_invalid", "课程实践任务包含失效关系。");
+  if (rows.get("assignment_coverages")!.some((row) => !assignmentIds.has(text(row, "assignment_id")) || !coveredIds.has(text(row, "node_id")))) throw new ApiError(422, "course_assignment_invalid", "课程动手任务包含失效关系。");
   if (rows.get("material_knowledge_coverages")!.some((row) => !materialIds.has(text(row, "material_id")) || !segmentPairs.has(`${text(row, "material_id")}:${text(row, "segment_id")}`) || !coveredIds.has(text(row, "node_id")))) throw new ApiError(422, "course_material_invalid", "课程学习资料包含失效关系。");
   const dependencyRows = rows.get("assignment_dependencies")!; const dependencies = new Map<string, string[]>();
-  dependencyRows.forEach((row) => { const source = text(row, "source_assignment_id"); const target = text(row, "target_assignment_id"); if (!assignmentIds.has(source) || !assignmentIds.has(target) || source === target) throw new ApiError(422, "course_assignment_invalid", "课程实践任务依赖无效。"); dependencies.set(source, [...(dependencies.get(source) ?? []), target]); });
+  dependencyRows.forEach((row) => { const source = text(row, "source_assignment_id"); const target = text(row, "target_assignment_id"); if (!assignmentIds.has(source) || !assignmentIds.has(target) || source === target) throw new ApiError(422, "course_assignment_invalid", "课程动手任务依赖无效。"); dependencies.set(source, [...(dependencies.get(source) ?? []), target]); });
   const visiting = new Set<string>(); const visited = new Set<string>();
-  function visit(id: string) { if (visiting.has(id)) throw new ApiError(422, "course_assignment_cycle", "课程实践任务依赖不能形成循环。"); if (visited.has(id)) return; visiting.add(id); (dependencies.get(id) ?? []).forEach(visit); visiting.delete(id); visited.add(id); }
+  function visit(id: string) { if (visiting.has(id)) throw new ApiError(422, "course_assignment_cycle", "课程动手任务依赖不能形成循环。"); if (visited.has(id)) return; visiting.add(id); (dependencies.get(id) ?? []).forEach(visit); visiting.delete(id); visited.add(id); }
   assignmentIds.forEach(visit);
   const materialCovered = new Set(rows.get("material_knowledge_coverages")!.map((row) => text(row, "node_id"))).size;
   const assignmentCovered = new Set(rows.get("assignment_coverages")!.map((row) => text(row, "node_id"))).size;

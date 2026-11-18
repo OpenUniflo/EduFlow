@@ -1,0 +1,295 @@
+/* N26b global search. Tokens and shared glass primitives only. */
+.ef-cmdk-layer {
+  position: fixed;
+  z-index: 220;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px var(--sp-24) var(--sp-16);
+}
+
+.ef-cmdk-scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 36%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: ef-cmdk-fade var(--dur-base) var(--ease-out);
+}
+
+.ef-cmdk {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(760px, 100%);
+  max-height: min(840px, calc(100dvh - 64px));
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--sh-3);
+  animation: ef-cmdk-in var(--dur-base) var(--ease-out);
+}
+
+.ef-cmdk::after {
+  z-index: 8;
+}
+
+.ef-cmdk-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 56px;
+  padding: 0 var(--sp-16);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-cmdk-search > svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  color: var(--muted);
+}
+
+.ef-cmdk-input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+  font-weight: var(--fw-500);
+}
+
+.ef-cmdk-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.ef-cmdk-search kbd,
+.ef-cmdk-foot kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-cmdk-search > kbd {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.ef-cmdk-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  padding: 6px var(--sp-8);
+  scrollbar-width: thin;
+}
+
+.ef-cmdk-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ef-cmdk-group > b {
+  padding: 1px var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  letter-spacing: .04em;
+}
+
+.ef-cmdk-row {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-8);
+  border: 1px solid transparent;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.ef-cmdk-row:hover,
+.ef-cmdk-row.is-on {
+  border-color: color-mix(in srgb, var(--brand) 28%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-cmdk-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.ef-cmdk-row.is-on .ef-cmdk-icon {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--surface);
+}
+
+.ef-cmdk-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.ef-cmdk-copy b {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-cmdk-meta {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  white-space: nowrap;
+}
+
+.ef-cmdk-arrow {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: var(--muted);
+}
+
+.ef-cmdk-row.is-on .ef-cmdk-arrow {
+  color: var(--brand-ink);
+}
+
+.ef-cmdk-empty {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  padding: var(--sp-32);
+  text-align: center;
+}
+
+.ef-cmdk-empty-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-cmdk-empty b {
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-600);
+}
+
+.ef-cmdk-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-cmdk-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: 36px;
+  padding: var(--sp-8) var(--sp-16);
+  border-top: 1px solid var(--line);
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-cmdk-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  white-space: nowrap;
+}
+
+.ef-cmdk-stats {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes ef-cmdk-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ef-cmdk-in {
+  from { opacity: 0; transform: translateY(-8px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-cmdk,
+  .ef-cmdk-scrim {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ef-cmdk {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .ef-cmdk-layer {
+    padding: var(--sp-16);
+  }
+
+  .ef-cmdk {
+    max-height: calc(100dvh - 32px);
+  }
+
+  .ef-cmdk-foot .ef-cmdk-key {
+    display: none;
+  }
+
+  .ef-cmdk-stats {
+    margin-left: 0;
+  }
+}

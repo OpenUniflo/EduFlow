@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import "./workflowV2.css";
 
 /** Native modal dialog supplies keyboard trapping; closure restores the initiating control. */
-export function WorkflowDialog({ title, error, onClose, children, className = "" }: { title: string; error?: string; className?: string; onClose: () => void; children: ReactNode }) {
+export function WorkflowDialog({ title, error, onClose, children, className = "", showClose = true }: { title: string; error?: string; className?: string; onClose: () => void; children: ReactNode; showClose?: boolean }) {
   const reference = useRef<HTMLDialogElement>(null);
   const id = useId();
   // Capture before the close button's React autoFocus runs during mount.
@@ -23,5 +24,5 @@ export function WorkflowDialog({ title, error, onClose, children, className = ""
     if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
   }
-  return <dialog ref={reference} className={`wf-v2-migration nokey ${className}`} aria-labelledby={id} aria-describedby={error ? errorId : undefined} onKeyDown={trapTab} onCancel={event => { event.preventDefault(); onClose(); }}><header className="wf-v2-dialog-header"><span id={id} className="wf-v2-dialog-title">{title}</span><button type="button" autoFocus aria-label={`关闭${title}`} onClick={onClose}>关闭</button>{error ? <p id={errorId} className="wf-v2-dialog-error" role="alert" tabIndex={0}>{error}</p> : null}</header>{children}</dialog>;
+  return <dialog ref={reference} className={`wf-v2-migration nokey ${className}`} aria-labelledby={id} aria-describedby={error ? errorId : undefined} onKeyDown={trapTab} onCancel={event => { event.preventDefault(); onClose(); }}><header className="wf-v2-dialog-header"><span id={id} className="wf-v2-dialog-title">{title}</span>{showClose ? <button type="button" autoFocus aria-label={`关闭${title}`} onClick={onClose}>关闭</button> : null}{error ? <p id={errorId} className="wf-v2-dialog-error" role="alert" tabIndex={0}>{error}</p> : null}</header>{children}</dialog>;
 }

@@ -20,6 +20,8 @@ dist/
 /.acceptance/
 /output/
 /.playwright-cli/
+/.local-handoffs/
+/.tmp-preview/
 
 # Generated reports, raw captures and immutable local evidence archives.
 # Reusable inputs belong in fixtures/acceptance; conclusions in docs/acceptance.
@@ -37,3 +39,10 @@ dist/
 /tests/workflow-integration/acceptance/
 
 .pnpm-store/
+
+# Product content snapshots (courses, knowledge, materials …). Content lives in the
+# database; snapshots are local-only and MUST NOT be committed.
+/content-snapshots/
+
+# Local agent scratch output (self-check scripts, screenshots, logs).
+/scratchpad/

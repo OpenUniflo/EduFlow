@@ -75,13 +75,13 @@ describe('explicit Action execution authority', () => {
   it('rejects a new route Action when its source is missing, including non-gating relations', async () => {
     input.currentNodeIds = [];
     input.courseOrder = [{ nodeId: 'source', lessonOrder: 0, coverageOrder: 0 }, ...input.courseOrder];
-    input.prerequisiteEdges = [];
+    input.prerequisiteEdges = [{ id: 'missing>source', source: 'missing', target: 'source', strength: 'hard' }];
     input.enablesEdges = [{ id: 'edge', source: 'source', target: 'target', relation: 'enables', strength: 1 }];
     await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_outside_project' });
   });
   it('retains target hard gates for a new formally selected relation', async () => {
     input.prerequisiteEdges = [...input.prerequisiteEdges, { id: 'other-hard', source: 'other', target: 'target', strength: 'hard' }];
-    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_outside_project' });
+    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'target_prerequisite_required' });
   });
   it('does not repeat a retained Practice through an explicitly excluded capability', async () => {
     tables.knowledge_edge_actions[0].type = 'practice_task';
@@ -135,6 +135,6 @@ it('accepts either independent hard incoming Action without waiting for the othe
   expect((await requireActionExecution(client,'learner','course','other-action')).routeVersionId).toBe('version');
   expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
   input.currentNodeIds=['source'];
-  await expect(requireActionExecution(client,'learner','course','other-action')).rejects.toMatchObject({code:'action_outside_project'});
-  await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'action_outside_project'});
+  await expect(requireActionExecution(client,'learner','course','other-action')).rejects.toMatchObject({code:'route_step_not_available'});
+  await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'target_prerequisite_required'});
 });

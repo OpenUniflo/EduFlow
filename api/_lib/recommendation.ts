@@ -24,7 +24,7 @@ export function generateCandidates(input: NavigationEngineInput, criterionIdsByP
         navigationAction: { kind: node.state === 'underway' ? 'review' as const : 'next' as const,
           nodeId: node.nodeId, resourceKind: 'micro' as const, resourceId: path.id,
           reasonCode: node.state === 'underway' ? 'resume_required_micro' : 'begin_required_micro',
-          reason: node.state === 'underway' ? '继续或复习尚未完成的必修 Micro。' : '从该 Knowledge 的必修 Micro 开始。' },
+          reason: node.state === 'underway' ? '继续或复习还没完成的小练习。' : '先从这个要点的小练习开始。' },
       }));
   });
 }
@@ -65,7 +65,7 @@ export function recommend(input: NavigationEngineInput, states: Parameters<Recom
   if (selection.selectedAction && !candidates.includes(selection.selectedAction)) throw new Error('Policy selected an ineligible action');
   const safeBaseline = !selection.selectedAction && baseline.nextAction.resourceKind === 'micro'
     ? { ...baseline, nextAction: { kind: 'remediation' as const, resourceKind: 'course' as const,
-        nodeId: baseline.nextAction.nodeId, reasonCode: 'teaching_prerequisite_required', reason: '先完成当前学习内容的前置 Knowledge。' } }
+        nodeId: baseline.nextAction.nodeId, reasonCode: 'teaching_prerequisite_required', reason: '先完成当前学习内容的前置要点。' } }
     : baseline;
   return { baseline: safeBaseline, candidates, policy, selection };
 }

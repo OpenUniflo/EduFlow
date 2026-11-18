@@ -6,6 +6,18 @@ export const runStatusLabels: Record<string, string> = {
 };
 const ended = new Set(['success', 'failed', 'cancelled', 'continued']);
 
+export type ExecutionTone = 'ready' | 'running' | 'waiting' | 'failed' | 'cancelled' | 'neutral';
+
+/** One status colour for the read-only badge and the history banner. */
+export function executionTone(phase: string): ExecutionTone {
+  if (phase === 'failed' || phase === 'expired') return 'failed';
+  if (phase === 'waiting') return 'waiting';
+  if (phase === 'running' || phase === 'queued') return 'running';
+  if (phase === 'cancelled') return 'cancelled';
+  if (phase === 'success') return 'ready';
+  return 'neutral';
+}
+
 /** A lifecycle Thread being closed does not prove that its Run succeeded. */
 export function executionObservation(run: WorkflowRunV2 | null | undefined, candidate: WorkflowThreadV2 | null | undefined, historyExpired = false, observedRunId?: string | null) {
   const thread = candidate && (!run || candidate.currentRunId === run.runId) ? candidate : null;

@@ -4,8 +4,8 @@ import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ResourceReferenceRow } from "../domain/v2/types";
 import {
   canSaveModelDraft, credentialRequiredForConnection, draftModelsFor, filterProviderCards, isLocalProvider,
-  latestVisibleProviders, modelRowsFor, modelSelectionDirty, modelSourceLabel, modelUsageCount,
-  providerAddress, providerDisplayName, providerModelRefs, providerPublishRequest,
+  latestVisibleProviders, modelMissingFromProviderTest, modelSelectionDirty, modelUsageCount,
+  providerAddress, providerDisplayName, providerEditorModelRows, providerEditorModelSourceLabel, providerHistoricalModelRefs, providerModelRefs, providerPublishRequest,
   providerTestStatusLabel, providerTypeLabel, providerUsageCount, testModelsOf,
   type ProviderTestState,
 } from "./providerModel";
@@ -138,7 +138,9 @@ export function ProviderOverview({
       const current = providerModelRefs(entry);
       const draft = draftModelsFor(entry, drafts);
       const test = tests[entry.ref];
-      const rows = modelRowsFor(entry, draft, testModelsOf(test));
+      const historical = providerHistoricalModelRefs(entry, connections);
+      const testedModels = testModelsOf(test);
+      const rows = providerEditorModelRows(draft, historical, testedModels);
       const referenceState = references[entry.ref];
       const dirty = modelSelectionDirty(current, draft);
       const credentialRequired = credentialRequiredForConnection(entry) || entry.hasCredential;
@@ -171,12 +173,16 @@ export function ProviderOverview({
         <p className="wf-resource-provider-meta">{credentialLabel(entry)} · {usage} · {providerTestStatusLabel(test)}</p>
         <table className="wf-resource-table wf-resource-provider-models">
           <thead><tr><th>模型</th><th>来源</th><th>引用节点</th><th>启用</th></tr></thead>
-          <tbody>{rows.map(model => <tr key={model} data-model={model}>
-            <td><strong>{model}</strong></td>
-            <td>{modelSourceLabel(entry, model, draft, testModelsOf(test))}</td>
-            <td>{referenceState?.loading ? "读取中…" : referenceState?.error ? "—" : `${modelUsageCount(referenceState?.rows ?? [], model)} 个节点`}</td>
-            <td><input type="checkbox" role="switch" data-model-ref={model} aria-label={`启用模型 ${model}`} checked={draft.includes(model)} disabled={Boolean(busyRef) || entry.disabled} onChange={event => toggleModel(entry, model, event.target.checked)} /></td>
-          </tr>)}</tbody>
+          <tbody>{rows.map(model => {
+            const lastTestModels = test?.result.ok ? test.result.models : undefined;
+            const missing = modelMissingFromProviderTest(model, draft, lastTestModels, Boolean(test?.result.ok));
+            return <tr key={model} data-model={model}>
+              <td><strong>{model}</strong></td>
+              <td>{providerEditorModelSourceLabel(model, draft, historical, testedModels)}{missing ? <small className="wf-resource-model-warning">上次测试未在供应商返回的模型列表中找到</small> : null}</td>
+              <td>{referenceState?.loading ? "读取中…" : referenceState?.error ? "—" : `${modelUsageCount(referenceState?.rows ?? [], model)} 个节点`}</td>
+              <td><input type="checkbox" role="switch" data-model-ref={model} aria-label={`启用模型 ${model}`} checked={draft.includes(model)} disabled={Boolean(busyRef) || entry.disabled} onChange={event => toggleModel(entry, model, event.target.checked)} /></td>
+            </tr>;
+          })}</tbody>
         </table>
         {!rows.length ? <p className="wf-resource-empty">还没有启用的模型。点击「编辑」添加模型。</p> : null}
         {test ? <ResourceTestPanel result={test.result} /> : null}

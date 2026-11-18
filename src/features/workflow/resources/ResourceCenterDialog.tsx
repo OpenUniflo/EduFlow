@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEve
 import { Braces, MoreHorizontal, Pencil, Plus, Search, Server, Sparkles, Wrench, X } from "lucide-react";
 import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
 import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
-import type { ConnectionTestResult, JsonValue, WorkflowConfiguration, WorkflowTool } from "../domain/v2/types";
+import type { ConnectionTestResult, JsonValue, ResourceReferenceRow, WorkflowConfiguration, WorkflowTool } from "../domain/v2/types";
 import { useExtensions, type FunctionVersion } from "../editor/v2/FunctionExecutionFields";
-import { latestConnectionsOfType, resourceCounts, groupCatalogByRef } from "./resourceModel";
+import { latestConnectionsOfType, modelRefsOf, platformApiTools, resourceCounts, groupCatalogByRef, type CatalogConnection } from "./resourceModel";
 import { ResourceTestPanel } from "./ResourceTestPanel";
+import { ResourceReferences } from "./ResourceReferences";
+import { McpResource } from "./McpResource";
 import { apiDisplayUrl } from "./apiResourceModel";
+import { providerModelSummary } from "./providerModel";
 import { ResourceEditor, type ResourceEditorTarget } from "./ResourceEditor";
+import { ResourceDeleteDialog, type ResourceDeleteTarget } from "./ResourceDeleteDialog";
 import { VariableTable } from "./VariableTable";
 import { RESOURCE_SECTIONS, resourceSectionMeta, type ResourceCenterProps, type ResourceSection } from "./resourceTypes";
 import "./resourceCenter.css";
@@ -20,6 +24,14 @@ const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disa
 type Feedback = { ok: boolean; text: string } | null;
 type TestView = { key: string; result: ConnectionTestResult };
 type MenuKey = string | null;
+type DeleteView = { target: ResourceDeleteTarget };
+type ProviderDeleteState = {
+  entry: CatalogConnection;
+  loading: boolean;
+  error: string;
+  references: ResourceReferenceRow[];
+  confirmed: boolean;
+};
 
 function sectionIcon(section: ResourceSection) {
   if (section === "providers") return <Sparkles size={17}/>;
@@ -32,7 +44,6 @@ function sectionIcon(section: ResourceSection) {
 function editorForSection(section: ResourceSection): ResourceEditorTarget | null {
   if (section === "providers") return { kind: "provider", mode: "create" };
   if (section === "apis") return { kind: "api", mode: "create" };
-  if (section === "mcp") return { kind: "mcp", mode: "create" };
   if (section === "functions") return { kind: "function", mode: "create" };
   return null;
 }
@@ -41,7 +52,7 @@ function functionName(entry: FunctionVersion): string {
   return String(entry.name ?? entry.ref);
 }
 
-export function ResourceCenterDialog({ open, environmentRef, initialSection, intent, onClose, onOpenReference, onResourcesChanged }: ResourceCenterProps) {
+export function ResourceCenterDialog({ open, environmentRef, environmentLoading, environmentError, onRetryEnvironment, initialSection, initialMcpTab, focusMcpRef, notice, intent, onClose, onOpenReference, onResourcesChanged }: ResourceCenterProps) {
   const { data, error: extensionsError, refresh: refreshExtensions } = useExtensions(open && environmentRef ? environmentRef : undefined);
   const [section, setSection] = useState<ResourceSection>(() => intent?.section ?? initialSection ?? "providers");
   const [configuration, setConfiguration] = useState<WorkflowConfiguration | null>(null);
@@ -55,8 +66,11 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
   const [tests, setTests] = useState<Record<string, ConnectionTestResult>>({});
   const [busyKey, setBusyKey] = useState("");
   const [menuOpen, setMenuOpen] = useState<MenuKey>(null);
+  const [deleteView, setDeleteView] = useState<DeleteView | null>(null);
+  const [providerDelete, setProviderDelete] = useState<ProviderDeleteState | null>(null);
   const [tools, setTools] = useState<WorkflowTool[]>([]);
   const panel = useRef<HTMLElement>(null);
+  const intentOpenedRef = useRef("");
 
   useEffect(() => {
     if (!open) return;
@@ -92,16 +106,28 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
   }, [open]);
 
   useEffect(() => {
-    if (!open || !intent || intent.kind !== "create") return;
+    if (!open || !intent || intent.kind !== "create" || !environmentRef || !data) return;
+    const key = `${intent.section}:${environmentRef}`;
+    if (intentOpenedRef.current === key) return;
+    intentOpenedRef.current = key;
     const next = editorForSection(intent.section);
     if (next) { setEditor(next); setEditorKey(current => current + 1); }
     // The intent stays visible until the user closes the editor or center.
-  }, [open, intent?.section]);
+  }, [open, intent?.section, environmentRef, data]);
+
+  useEffect(() => {
+    if (!open) intentOpenedRef.current = "";
+  }, [open]);
 
   function reloadConfiguration() { setConfigurationGeneration(current => current + 1); }
   function handleResourcesChanged() { refreshExtensions(); reloadConfiguration(); onResourcesChanged?.(); }
 
-  function openEditor(target: ResourceEditorTarget) { setEditor(target); setEditorKey(current => current + 1); setMenuOpen(null); setFeedback(null); }
+  function openEditor(target: ResourceEditorTarget) {
+    // Never open an editor before the environment and its catalog are ready:
+    // it would show a service error for data that is merely still loading.
+    if (!environmentRef || !data) return;
+    setEditor(target); setEditorKey(current => current + 1); setMenuOpen(null); setFeedback(null);
+  }
 
   async function testConnection(entry: { ref: string; version: number; sideEffect?: string }) {
     const key = `${entry.ref}@${entry.version}`;
@@ -115,22 +141,97 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
     setBusyKey(`${ref}@${version}`); setFeedback(null); setMenuOpen(null);
     try {
       await workflowApiV2.extension(environmentRef, { action: "disable", kind, ref, version });
-      setFeedback({ ok: true, text: `已停用「${label}」v${version}；仍引用它的节点会提示版本不可用。` });
+      setFeedback({ ok: true, text: kind === "connection"
+        ? `已停用「${label}」并撤销它的全部版本；测试不可用，仍引用它的节点会提示连接不可用。可随时恢复连接。`
+        : `已停用「${label}」v${version}；仍引用它的节点会提示版本不可用。` });
       handleResourcesChanged();
     } catch (reason) { setFeedback({ ok: false, text: workflowErrorMessage(reason) }); }
     finally { setBusyKey(""); }
   }
 
+  async function restoreConnection(entry: CatalogConnection) {
+    setBusyKey(`restore:${entry.ref}`); setFeedback(null); setMenuOpen(null);
+    try {
+      await workflowApiV2.extension(environmentRef, {
+        action: "restore", kind: "connection", ref: entry.ref, version: entry.version + 1,
+      });
+      setFeedback({ ok: true, text: `已恢复「${String(entry.content.name ?? entry.ref)}」为 v${entry.version + 1}；旧版本绑定仍保持停用，请在工作流节点中改选新版本并重新测试。` });
+      handleResourcesChanged();
+    } catch (reason) { setFeedback({ ok: false, text: workflowErrorMessage(reason) }); }
+    finally { setBusyKey(""); }
+  }
+
+  async function inspectBeforeDelete(entry: CatalogConnection) {
+    setMenuOpen(null); setFeedback(null);
+    setProviderDelete({ entry, loading: true, error: "", references: [], confirmed: false });
+    try {
+      const result = await workflowApiV2.extensionReferences(entry.ref, environmentRef);
+      setProviderDelete(current => current && current.entry.ref === entry.ref
+        ? { ...current, loading: false, references: result.items }
+        : current);
+    } catch (reason) {
+      setProviderDelete(current => current && current.entry.ref === entry.ref
+        ? { ...current, loading: false, error: workflowErrorMessage(reason) }
+        : current);
+    }
+  }
+
+  async function retryDeleteImpact() {
+    if (!providerDelete) return;
+    await inspectBeforeDelete(providerDelete.entry);
+  }
+
+  async function deleteProvider() {
+    const target = providerDelete;
+    if (!target || target.loading || target.error || target.references.length || !target.confirmed) return;
+    const name = String(target.entry.content.name ?? target.entry.ref);
+    setBusyKey(`delete:${target.entry.ref}`);
+    try {
+      await workflowApiV2.extension(environmentRef, {
+        action: "delete", kind: "connection", ref: target.entry.ref, version: target.entry.version,
+      });
+      setProviderDelete(null);
+      setFeedback({ ok: true, text: `已删除「${name}」及其全部版本和托管凭据；稳定标识 ${target.entry.ref} 不再可用。` });
+      handleResourcesChanged();
+    } catch (reason) {
+      const text = workflowErrorMessage(reason);
+      setProviderDelete(current => current ? { ...current, error: text } : current);
+      // A concurrent Workflow may have added a reference after the first scan.
+      // Refresh the impact list so the user gets a concrete way forward.
+      try {
+        const result = await workflowApiV2.extensionReferences(target.entry.ref, environmentRef);
+        setProviderDelete(current => current ? { ...current, references: result.items } : current);
+      } catch { /* keep the server error; deletion stays disabled */ }
+    } finally { setBusyKey(""); }
+  }
+
   if (!open) return null;
 
+  const mcpDiscovery = useMemo(() => {
+    const values: Record<string, string[]> = {};
+    for (const connector of data?.environment?.connectors ?? []) {
+      if (!connector.connectionRef || !Array.isArray(connector.discoveredToolNames)) continue;
+      values[connector.connectionRef] = [...connector.discoveredToolNames];
+    }
+    return values;
+  }, [data?.environment?.connectors]);
   const meta = resourceSectionMeta(section);
-  const counts = resourceCounts({ connections: data?.connections, functions: data?.functions, variables: configuration?.variables });
+  const resourcesReady = Boolean(environmentRef) && Boolean(data) && !extensionsError;
+  const newDisabledReason = !environmentRef ? "正在准备资源环境…" : !data ? "正在读取资源目录…" : extensionsError ? "资源目录加载失败，请先重试。" : "";
+  const counts = resourceCounts({ connections: data?.connections, functions: data?.functions, variables: configuration?.variables, tools });
   const countFor = (id: ResourceSection): number | undefined => id === "variables" ? counts.variables : data ? counts[id] : undefined;
   const query = search.trim().toLowerCase();
   const matches = (values: (string | undefined)[]) => !query || values.some(value => String(value ?? "").toLowerCase().includes(query));
 
   function sectionBody(): ReactNode {
-    if (!environmentRef) return <p role="alert">工作流服务暂时不可用，暂时无法读取资源。</p>;
+    // Keep an already mounted resource body during a catalog refresh. Replacing
+    // it with the loading row unmounts McpResource and loses tab/search/feedback.
+    if (environmentLoading && (!environmentRef || !data)) return <p className="wf-resource-loading" role="status" data-resource-state="loading">正在连接工作流服务…</p>;
+    if (environmentError && (!environmentRef || !data)) return <div className="wf-resource-conflict" role="alert" data-resource-state="error"><p>{environmentError}</p>{onRetryEnvironment ? <button type="button" onClick={onRetryEnvironment}>重试连接</button> : null}</div>;
+    if (!environmentRef) return <div className="wf-resource-center-empty" role="status" data-resource-state="empty">
+      <p>工作流服务已连接，但还没有可用环境。请先在工作流中创建环境，然后重试。</p>
+      {onRetryEnvironment ? <button type="button" onClick={onRetryEnvironment}>刷新环境</button> : null}
+    </div>;
     if (extensionsError && section !== "variables") return <p role="alert">资源目录暂时无法读取：{extensionsError}<button type="button" onClick={refreshExtensions}>重试</button></p>;
     if (section === "variables") return <VariableTable configuration={configuration} loading={configurationLoading || (!configuration && !configurationError)} loadError={configurationError} onReloadConfiguration={reloadConfiguration} create={intent?.section === "variables"} onCreated={intent?.section === "variables" ? intent.onCreated : undefined} onConfigurationSaved={setConfiguration} onResourcesChanged={handleResourcesChanged} onOpenReference={onOpenReference}/>;
     if (!data) return <p role="status">正在读取资源…</p>;
@@ -139,14 +240,26 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
       return <>
         {providers.map(entry => {
           const name = String(entry.content.name ?? entry.ref);
-          const models = Array.isArray(entry.content.modelRefs) ? entry.content.modelRefs.map(String) : [];
+          const models = modelRefsOf(entry.content);
           const key = `${entry.ref}@${entry.version}`;
-          return <article className="wf-resource-center-row" key={key}>
+          return <article className="wf-resource-center-row" data-provider-ref={entry.ref} key={key}>
             <span className="wf-resource-center-icon is-model" aria-hidden="true"><Sparkles size={17}/></span>
-            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong></div><div className="wf-resource-center-meta">{models.length} 个模型{models[0] ? ` · ${models[0]} 已启用` : ""}</div><div className="wf-resource-center-sub">v{entry.version} · {entry.hasCredential ? "已配置凭据" : "无凭据"}</div></div>
-            <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "provider", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
-            <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || entry.disabled} onClick={() => void testConnection({ ref: entry.ref, version: entry.version })}>{busyKey === key ? "测试中…" : "测试"}</button>
-            <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button></div></details>
+            <div className="wf-resource-center-copy">
+              <div className="wf-resource-center-title"><strong>{name}</strong>{entry.disabled ? <span className="wf-resource-badge is-disabled">已停用</span> : null}</div>
+              <div className="wf-resource-center-meta">{providerModelSummary(models)}</div>
+              <div className="wf-resource-center-sub">v{entry.version} · {entry.hasCredential ? "已配置加密凭据" : "无凭据"} {entry.disabled ? "· 测试不可用；恢复连接后可重新测试" : ""}</div>
+              {entry.disabled ? <p className="wf-resource-disabled-note" role="status">连接已停用，所有历史版本都不会在运行时使用。恢复会创建新版本并沿用已保存的凭据，随后请重新测试。</p> : null}
+            </div>
+            <div className="wf-resource-center-actions">
+              <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title={entry.disabled ? "先恢复连接再编辑" : "编辑显示名称、模型或地址"} disabled={Boolean(busyKey) || entry.disabled} onClick={() => openEditor({ kind: "provider", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
+              <button type="button" className="wf-resource-center-test" title={entry.disabled ? "连接已停用；恢复后再测试" : undefined} disabled={Boolean(busyKey) || entry.disabled} onClick={() => void testConnection({ ref: entry.ref, version: entry.version })}>{busyKey === key ? "测试中…" : "测试"}</button>
+              <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel">
+                {entry.disabled
+                  ? <button type="button" data-provider-action="restore" disabled={busyKey === `restore:${entry.ref}`} onClick={() => void restoreConnection(entry)}>恢复连接</button>
+                  : <button type="button" data-provider-action="disable" disabled={busyKey === key} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button>}
+                <button type="button" className="is-danger" data-provider-action="delete" disabled={Boolean(busyKey)} onClick={() => void inspectBeforeDelete(entry)}>删除供应商…</button>
+              </div></details>
+            </div>
             {tests[key] ? <ResourceTestPanel result={tests[key]}/> : null}
           </article>;
         })}
@@ -155,48 +268,50 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
     }
     if (section === "apis") {
       const apis = latestConnectionsOfType(data.connections.filter(entry => matches([String(entry.content.name ?? entry.ref), entry.ref, String(entry.content.baseUrl ?? "")])), "http");
-      const platformTools = tools.filter(tool => (tool.origin ?? "environment") !== "user" && !tool.connectionRef && (tool.ref === "hn_search" || /hacker news/i.test(tool.name)) && matches([tool.name, tool.ref]));
+      const platformTools = platformApiTools(tools).filter(tool => matches([tool.name, tool.ref]));
       return <>
-        {platformTools.map(tool => <article className="wf-resource-center-row" key={tool.ref}>
-          <span className="wf-resource-center-icon is-api" aria-hidden="true"><Server size={17}/></span>
-          <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{tool.ref === "hn_search" ? "Hacker News 搜索" : tool.name}</strong><span className="wf-resource-panel-badge is-platform">平台提供</span></div><div className="wf-resource-center-url"><span className="wf-resource-center-method">GET</span><code>hn.algolia.com/api/v1/search</code></div><div className="wf-resource-center-sub">4 个参数 · 平台提供的连接，编辑后保存为你的副本</div></div>
-          <button type="button" className="wf-resource-center-iconbtn" aria-label="编辑 Hacker News 搜索" title="编辑" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}><Pencil size={15}/></button>
-          <button type="button" className="wf-resource-center-test" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}>测试</button>
-          <details className="wf-resource-menu"><summary aria-label={`更多操作 ${tool.name}`}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled>平台连接不可停用</button></div></details>
-        </article>)}
+        {platformTools.map(tool => {
+          const paramCount = tool.inputSchema && typeof tool.inputSchema === "object" && tool.inputSchema.properties && typeof tool.inputSchema.properties === "object" && !Array.isArray(tool.inputSchema.properties) ? Object.keys(tool.inputSchema.properties).length : 0;
+          return <article className="wf-resource-center-row" key={tool.ref}>
+            <span className="wf-resource-center-icon is-api" aria-hidden="true"><Server size={17}/></span>
+            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{tool.name || tool.ref}</strong><span className="wf-resource-panel-badge is-platform">平台提供</span></div><div className="wf-resource-center-url"><span className="wf-resource-center-method">API</span><code>{tool.ref}</code></div><div className="wf-resource-center-sub">{paramCount} 个参数 · {tool.description || "平台提供的连接，编辑后保存为你的副本"}</div></div>
+            <div className="wf-resource-center-actions">
+              <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${tool.name || tool.ref}`} title="编辑" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}><Pencil size={15}/></button>
+              <button type="button" className="wf-resource-center-test" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}>测试</button>
+              <details className="wf-resource-menu"><summary aria-label={`更多操作 ${tool.name || tool.ref}`}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled>平台连接不可停用</button></div></details>
+            </div>
+          </article>;
+        })}
         {apis.map(entry => {
           const name = String(entry.content.name ?? entry.ref);
           const key = `${entry.ref}@${entry.version}`;
           return <article className="wf-resource-center-row" key={key}>
             <span className="wf-resource-center-icon is-api" aria-hidden="true"><Server size={17}/></span>
-            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong></div><div className="wf-resource-center-url"><span className="wf-resource-center-method">{String(entry.content.method ?? "GET")}</span><code>{apiDisplayUrl(entry.content).replace(/^[A-Z]+ /, "").replace(/ · \d+ 个参数$/, "")}</code></div><div className="wf-resource-center-sub">{apiDisplayUrl(entry.content).match(/· (\d+) 个参数/)?.[1] ?? "0"} 个参数 · v{entry.version}</div></div>
-            <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "api", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
-            <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || entry.disabled} onClick={() => openEditor({ kind: "api", mode: "edit", ref: entry.ref })}>测试</button>
-            <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button></div></details>
+            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong><span className="wf-resource-panel-badge is-mine">我创建的</span></div><div className="wf-resource-center-url"><span className="wf-resource-center-method">{String(entry.content.method ?? "GET")}</span><code>{apiDisplayUrl(entry.content).replace(/^[A-Z]+ /, "").replace(/ · \d+ 个参数$/, "")}</code></div><div className="wf-resource-center-sub">{apiDisplayUrl(entry.content).match(/· (\d+) 个参数/)?.[1] ?? "0"} 个参数 · v{entry.version}</div></div>
+            <div className="wf-resource-center-actions">
+              <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "api", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
+              <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || entry.disabled} onClick={() => openEditor({ kind: "api", mode: "edit", ref: entry.ref })}>测试</button>
+              <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button><button type="button" className="is-danger" data-resource-action="delete" disabled={Boolean(busyKey)} onClick={() => { setMenuOpen(null); setFeedback(null); setDeleteView({ target: { kind: "connection", ref: entry.ref, version: entry.version, name, noun: "API 连接", versions: data.connections.filter(item => item.ref === entry.ref).length, hasCredential: entry.hasCredential } }); }}>永久删除…</button></div></details>
+            </div>
             {tests[key] ? <ResourceTestPanel result={tests[key]}/> : null}
           </article>;
         })}
         {!apis.length && !platformTools.length ? <EmptyRow text={query ? "没有匹配的 API 连接。" : "还没有 API 连接。点右上角「新建 API」创建。"}/> : null}
       </>;
     }
-    if (section === "mcp") {
-      const services = latestConnectionsOfType(data.connections.filter(entry => matches([String(entry.content.name ?? entry.ref), String(entry.content.url ?? "")])), "mcp-http");
-      return <>
-        {services.map(entry => {
-          const name = String(entry.content.name ?? entry.ref);
-          const key = `${entry.ref}@${entry.version}`;
-          return <article className="wf-resource-center-row" key={key}>
-            <span className="wf-resource-center-icon is-mcp" aria-hidden="true"><Server size={17}/></span>
-            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong></div><div className="wf-resource-center-meta">{String(entry.content.url ?? "")}</div><div className="wf-resource-center-sub">v{entry.version} · {entry.hasCredential ? "已配置凭据" : "无凭据"}</div></div>
-            <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "mcp", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
-            <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || entry.disabled} onClick={() => void testConnection({ ref: entry.ref, version: entry.version })}>{busyKey === key ? "测试中…" : "测试"}</button>
-            <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button></div></details>
-            {tests[key] ? <ResourceTestPanel result={tests[key]}/> : null}
-          </article>;
-        })}
-        {!services.length ? <EmptyRow text={query ? "没有匹配的 MCP 服务。" : "还没有 MCP 服务连接。"}/> : null}
-      </>;
-    }
+    if (section === "mcp") return <McpResource
+      environmentRef={environmentRef}
+      connections={data.connections}
+      tools={tools}
+      discovery={mcpDiscovery}
+      create={intent?.section === "mcp"}
+      initialTab={initialMcpTab}
+      focusRef={focusMcpRef}
+      notice={notice}
+      onCreated={intent?.section === "mcp" ? intent.onCreated : undefined}
+      onResourcesChanged={handleResourcesChanged}
+      onOpenReference={onOpenReference}
+    />;
     const groups = groupCatalogByRef(data.functions).filter(group => matches([group.ref, functionName(group.latest)]));
     return <>
       {groups.map(group => {
@@ -206,9 +321,11 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
         return <article className="wf-resource-center-row" key={key}>
           <span className="wf-resource-center-icon is-fn" aria-hidden="true"><Wrench size={17}/></span>
           <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong></div><div className="wf-resource-center-meta">{String(entry.language ?? "python") === "javascript" ? "JavaScript" : "Python"} · {entry.purpose === "handler" ? "错误处理函数" : "节点函数"} · v{entry.version}</div><div className="wf-resource-center-sub">{entry.disabled ? "已停用" : "可用"}</div></div>
-          <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "function", mode: "edit", ref: entry.ref, version: entry.version })}><Pencil size={15}/></button>
-          <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || Boolean(entry.disabled)} onClick={() => openEditor({ kind: "function", mode: "edit", ref: entry.ref, version: entry.version })}>测试</button>
-          <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("function", entry.ref, entry.version, name)}>停用此函数</button></div></details>
+          <div className="wf-resource-center-actions">
+            <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "function", mode: "edit", ref: entry.ref, version: entry.version })}><Pencil size={15}/></button>
+            <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || Boolean(entry.disabled)} onClick={() => openEditor({ kind: "function", mode: "edit", ref: entry.ref, version: entry.version })}>测试</button>
+            <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("function", entry.ref, entry.version, name)}>停用此函数</button><button type="button" className="is-danger" data-resource-action="delete" disabled={Boolean(busyKey)} onClick={() => { setMenuOpen(null); setFeedback(null); setDeleteView({ target: { kind: "function", ref: entry.ref, version: entry.version, name, noun: "函数", versions: data.functions.filter(item => item.ref === entry.ref).length } }); }}>永久删除…</button></div></details>
+          </div>
         </article>;
       })}
       {!groups.length ? <EmptyRow text={query ? "没有匹配的函数。" : "还没有已发布的函数。可从函数节点或右上角新建。"}/> : null}
@@ -217,6 +334,8 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
 
   function handleBackdrop(event: MouseEvent<HTMLDivElement>) { if (event.target === event.currentTarget) onClose(); }
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    // A native nested dialog owns Escape and its own focus trap.
+    if (panel.current?.querySelector("dialog[open]")) return;
     if (event.key === "Escape") { event.stopPropagation(); if (editor) { setEditor(null); return; } onClose(); return; }
     if (event.key !== "Tab" || !panel.current || typeof document === "undefined") return;
     const focusable = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
@@ -241,11 +360,10 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
         <div className="wf-resource-content">
           <div className="wf-resource-center-toolbar">
             <div><h3>{meta.label}</h3><p>{meta.hint}</p></div>
-            <label className="wf-resource-center-search"><Search size={13}/><input aria-label="搜索资源" placeholder="搜索名称或地址…" value={search} onChange={event => setSearch(event.target.value)}/></label>
-            {showNew && section !== "providers" ? <button type="button" className="primary wf-resource-center-new" onClick={() => openEditor(editorForSection(section)!)}><Plus size={12}/>{section === "apis" ? "新建 API" : "新建"}</button> : null}
-            {showNew && section === "providers" ? <button type="button" className="primary wf-resource-center-new" onClick={() => openEditor({ kind: "provider", mode: "create" })}><Plus size={12}/>新建模型供应商</button> : null}
-            {section === "functions" ? <button type="button" className="primary wf-resource-center-new" onClick={() => openEditor({ kind: "function", mode: "create" })}><Plus size={12}/>新建函数</button> : null}
-            {section === "mcp" ? <button type="button" className="primary wf-resource-center-new" onClick={() => openEditor({ kind: "mcp", mode: "create" })}><Plus size={12}/>新建 MCP 服务</button> : null}
+            {section !== "mcp" ? <label className="wf-resource-center-search"><Search size={13}/><input aria-label="搜索资源" placeholder="搜索名称或地址…" value={search} onChange={event => setSearch(event.target.value)}/></label> : null}
+            {showNew && section !== "providers" ? <button type="button" className="primary wf-resource-center-new" disabled={!resourcesReady || environmentLoading} title={newDisabledReason || (environmentLoading ? "正在准备资源环境…" : undefined)} onClick={() => openEditor(editorForSection(section)!)}><Plus size={12}/>{section === "apis" ? "新建 API" : "新建"}</button> : null}
+            {showNew && section === "providers" ? <button type="button" className="primary wf-resource-center-new" disabled={!resourcesReady || environmentLoading} title={newDisabledReason || (environmentLoading ? "正在准备资源环境…" : undefined)} onClick={() => openEditor({ kind: "provider", mode: "create" })}><Plus size={12}/>新建模型供应商</button> : null}
+            {section === "functions" ? <button type="button" className="primary wf-resource-center-new" disabled={!resourcesReady || environmentLoading} title={newDisabledReason || (environmentLoading ? "正在准备资源环境…" : undefined)} onClick={() => openEditor({ kind: "function", mode: "create" })}><Plus size={12}/>新建函数</button> : null}
           </div>
           {intent?.section === section ? <p className="wf-resource-intent">正在为节点新建资源：创建成功后自动回填，悬窗保持打开直到你关闭。</p> : null}
           {feedback ? <p className={feedback.ok ? "wf-resource-feedback" : "wf-resource-feedback is-error"} role={feedback.ok ? "status" : "alert"}>{feedback.text}</p> : null}
@@ -253,7 +371,60 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
         </div>
       </div>
     </section>
-    {editor ? <ResourceEditor key={`${editorKey}:${editor.kind}:${editor.mode}`} environmentRef={environmentRef} target={editor} onClose={() => setEditor(null)} onSaved={(ref, version, content) => { refreshExtensions(); reloadConfiguration(); onResourcesChanged?.(); if (intent?.section === section) intent.onCreated(ref, version, content); }} /> : null}
+    {providerDelete ? (() => {
+      const name = String(providerDelete.entry.content.name ?? providerDelete.entry.ref);
+      const versions = data?.connections.filter(entry => entry.ref === providerDelete.entry.ref).length ?? 1;
+      const workflowCount = new Set(providerDelete.references.map(row => row.workflowId)).size;
+      const blocked = providerDelete.loading || Boolean(providerDelete.error) || providerDelete.references.length > 0;
+      const deleting = busyKey === `delete:${providerDelete.entry.ref}`;
+      return <>
+        <div className="wf-resource-modal-backdrop" aria-hidden="true" onMouseDown={event => { if (event.target === event.currentTarget && !deleting) setProviderDelete(null); }} />
+        <section className="wf-resource-modal wf-provider-delete" role="dialog" aria-modal="true" aria-labelledby="wf-provider-delete-title" aria-describedby="wf-provider-delete-desc"
+          onKeyDown={event => { if (event.key === "Escape" && !deleting) { event.stopPropagation(); setProviderDelete(null); } }}>
+          <header className="wf-resource-modal-header">
+            <div><h3 id="wf-provider-delete-title">删除模型供应商</h3><p id="wf-provider-delete-desc">先核对引用；有引用的供应商不会被删除，也不会破坏现有工作流。</p></div>
+            <button type="button" className="wf-resource-close" aria-label="关闭删除确认" disabled={deleting} onClick={() => setProviderDelete(null)}>关闭</button>
+          </header>
+          <div className="wf-resource-modal-body">
+            <dl className="wf-provider-delete-facts">
+              <div><dt>显示名称</dt><dd>{name}</dd></div>
+              <div><dt>稳定标识</dt><dd><code>{providerDelete.entry.ref}</code></dd></div>
+              <div><dt>版本</dt><dd>{versions} 个（最新 v{providerDelete.entry.version}）</dd></div>
+              <div><dt>凭据</dt><dd>{providerDelete.entry.hasCredential ? "将删除托管凭据" : "无托管凭据"}</dd></div>
+            </dl>
+            {providerDelete.loading ? <p role="status">正在检查工作流引用…</p> : null}
+            {providerDelete.error ? <div className="wf-resource-conflict" role="alert"><p>{providerDelete.error}</p><button type="button" onClick={() => void retryDeleteImpact()}>重新检查引用</button></div> : null}
+            <p className="wf-field-note">仍有排队、运行中或等待回应的运行使用此连接时，删除会被拒绝；请先等待结束或取消运行。</p>
+            {!providerDelete.loading && !providerDelete.error ? (providerDelete.references.length
+              ? <div className="wf-resource-conflict" role="alert">
+                  <p><strong>不能删除：仍被引用。</strong>这个供应商被 {workflowCount} 个工作流中的 {providerDelete.references.length} 个节点引用。请先在这些工作流中替换或移除供应商，然后重新检查。</p>
+                  <ResourceReferences rows={providerDelete.references} onOpen={row => { setProviderDelete(null); onOpenReference?.(row); }} />
+                </div>
+              : <div className="wf-provider-delete-clear" role="status">
+                  <strong>未发现当前工作流引用。</strong>
+                  <p>删除会移除全部 {versions} 个版本{providerDelete.entry.hasCredential ? "及托管凭据" : ""}，且无法撤销。稳定标识 <code>{providerDelete.entry.ref}</code> 不再可用。</p>
+                  <label className="wf-resource-checkbox"><input type="checkbox" checked={providerDelete.confirmed} onChange={event => setProviderDelete(current => current ? { ...current, confirmed: event.target.checked } : current)} />我确认删除该供应商及其全部版本，并理解引用会失效。</label>
+                </div>) : null}
+          </div>
+          <footer className="wf-resource-modal-footer">
+            <span>{blocked ? "引用检查未通过，删除按钮保持禁用。" : "服务端会在删除前再次检查引用和版本。"}</span>
+            <div className="wf-resource-actions">
+              <button type="button" disabled={deleting} onClick={() => setProviderDelete(null)}>取消</button>
+              <button type="button" className="danger" data-provider-action="confirm-delete" disabled={blocked || deleting || !providerDelete.confirmed} onClick={() => void deleteProvider()}>{deleting ? "正在删除…" : "永久删除"}</button>
+            </div>
+          </footer>
+        </section>
+      </>;
+    })() : null}
+    {deleteView ? <ResourceDeleteDialog
+      key={`${deleteView.target.kind}:${deleteView.target.ref}`}
+      environmentRef={environmentRef}
+      target={deleteView.target}
+      onClose={() => setDeleteView(null)}
+      onDeleted={message => { setDeleteView(null); setFeedback({ ok: true, text: message }); handleResourcesChanged(); }}
+      onOpenReference={row => { setDeleteView(null); onOpenReference?.(row); }}
+    /> : null}
+    {editor ? <ResourceEditor key={`${editorKey}:${editor.kind}:${editor.mode}`} environmentRef={environmentRef} target={editor} onClose={() => setEditor(null)} onSaved={(ref, version, content) => { refreshExtensions(); reloadConfiguration(); onResourcesChanged?.(); setFeedback({ ok: true, text: `已保存「${String(content?.name ?? ref)}」v${version}。` }); if (intent?.section === section) intent.onCreated(ref, version, content); }} /> : null}
   </>;
 }
 

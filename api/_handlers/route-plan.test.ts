@@ -73,13 +73,13 @@ describe('authoritative V2 route intent API', () => {
     expect(mocks.persist.mock.calls[0].slice(5,8)).toEqual([base, 'restore', old]);
     expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A', 'S', 'T']);
   });
-  it('does not recreate an unacquired ancestor from legacy node-only history', async () => {
+  it('restores a legacy node-only Include when it is now a factual root', async () => {
     const historical = { constraints: { includeNodeIds: ['S'], excludeNodeIds: [] } };
     mocks.read.mockResolvedValue(historical);
     const r = await invoke({ action: 'restore', baseVersionId: base, versionId: old });
-    expect(r.status).toBe(422);
-    expect(r.result.error.details.conflicts).toContainEqual(expect.objectContaining({kind:'include_outside_model',nodeId:'S'}));
-    expect(mocks.persist).not.toHaveBeenCalled();
+    expect(r.status).toBe(200);
+    expect(mocks.persist).toHaveBeenCalled();
+    expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toContain('S');
     expect(historical.constraints).toEqual({ includeNodeIds: ['S'], excludeNodeIds: [] });
   });
 
@@ -216,7 +216,7 @@ it('permits an independent Edge before an active Run but rejects a new unfinishe
 it('current-scope Preview cannot turn a model-external historical Include into an invisible action blocker',async()=>{
  const snapshot={...historicalSnapshot(),selectedNodeIds:['A','S','T'],orderedNodeIds:['S','A','T']};
  const saved=structuredClone(snapshot);
- mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A'],enablesEdges:[{id:'S>A',source:'S',target:'A',relation:'enables',strength:.8}]}});
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A'],prerequisiteEdges:[...data.input.prerequisiteEdges,{id:'missing>S',source:'missing',target:'S',strength:'hard'}],enablesEdges:[{id:'S>A',source:'S',target:'A',relation:'enables',strength:.8}]}});
  mocks.active.mockResolvedValue({id:base,constraints:{includeNodeIds:['S'],excludeNodeIds:[]},snapshot});
  const intent={scopeMode:'current',includeNodeIds:['S'],excludeNodeIds:[],selectedEdgeIds:['A>T'],actionChoices:[{edgeId:'A>T',actionId:old}]};
  const result=await invoke({action:'preview',...intent});

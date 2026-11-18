@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { MockSession } from '@/features/auth/types';
 import { GlobalAssistantSurface } from '@/features/assistant/AssistantSurfaceContext';
+import { GlobalObjectHost } from '@/features/assistant/GlobalObjectHost';
 import { EvidenceWorkspaceProvider, useEvidenceWorkspace } from '@/features/evidence/EvidenceWorkspace';
 import type { EvidenceProposal } from '@/features/evidence/evidenceClient';
 import { buildProjectCapabilityModel } from '@/features/course/capability/projectCapability';
@@ -9,7 +10,7 @@ import { applicationServices, refreshLearnerState } from '@/app/services/applica
 
 function EvidenceAssistant({session,children}:{session:MockSession;children:ReactNode}) {
  const evidence=useEvidenceWorkspace()!;
- return <GlobalAssistantSurface surfaceHost={evidence.surfaceHost} foreground={evidence.foreground?{contextLabel:"更新我的能力",context:{workspace:"learning",experienceMode:"learn",presentation:"evidence-workspace",userRole:session.role,capabilities:session.capabilities,courseId:evidence.foreground.courseId,evidenceSourceId:evidence.foreground.sourceId,diagnosisRunId:evidence.foreground.runId}}:undefined} session={session} onUpdateCapabilities={evidence.open}>{children}</GlobalAssistantSurface>;
+ return <GlobalObjectHost session={session}><GlobalAssistantSurface surfaceHost={evidence.surfaceHost} foreground={evidence.foreground?{contextLabel:"更新我的能力",context:{workspace:"learning",experienceMode:"learn",presentation:"evidence-workspace",userRole:session.role,capabilities:session.capabilities,courseId:evidence.foreground.courseId,evidenceSourceId:evidence.foreground.sourceId,diagnosisRunId:evidence.foreground.runId}}:undefined} session={session} onUpdateCapabilities={evidence.open}>{children}</GlobalAssistantSurface></GlobalObjectHost>;
 }
 export function CapabilityEvidenceBoundary({session,children}:{session:MockSession;children:ReactNode}) {
  const graph=()=>applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId));

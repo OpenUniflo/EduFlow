@@ -32,7 +32,9 @@ describe('foreground Assistant presentation identity',()=>{
  it('creation is not a course identity; real course fallback remains scoped',()=>{
   expect(fallbackAssistantContext('/courses/create').courseId).toBeUndefined();
   expect(fallbackAssistantContext('/courses/course/assignments/task').courseId).toBe('course');
-  expect(fallbackAssistantContext('/messages').workspace).toBe('messages');
+  expect(fallbackAssistantContext('/messages').workspace).toBe('learning');
+  expect(fallbackAssistantContext('/archive').workspace).toBe('explore');
+  expect(fallbackAssistantContext('/works').workspace).toBe('canvas');
  });
  it('round-trips distinct evidence, diagnosis, action-run and route identities',()=>{
   const context={workspace:'learning',experienceMode:'learn',presentation:'evidence-workspace',evidenceSourceId:'source',diagnosisRunId:'diagnosis',actionRunId:'execution',routeVersionId:'version',edgeId:'fact'};

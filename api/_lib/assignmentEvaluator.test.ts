@@ -14,6 +14,9 @@ describe("Assignment evaluator", () => {
     expect(evaluateAssignmentResponse(traceAssignment, { kind: "trace", selectedStepId: "broken" }).outcome).toBe("passed");
     expect(evaluateAssignmentResponse(traceAssignment, { kind: "trace", selectedStepId: "later" }).outcome).toBe("failed");
   });
+  it("records a unified file/link submission on a legacy trace as open review", () => {
+    expect(evaluateAssignmentResponse(traceAssignment, { kind: "code", code: "run-0412.log" })).toMatchObject({ outcome: "pending", evaluatorKind: "manual" });
+  });
   it("records open responses as pending manual review", () => {
     expect(evaluateAssignmentResponse({ mode: "instruction", experience: { type: "answer" } }, { kind: "answer", text: "evidence" })).toMatchObject({ outcome: "pending", evaluatorKind: "manual" });
   });

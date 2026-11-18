@@ -60,10 +60,184 @@ export type CourseLayout = {
   height: number;
 };
 
-type CourseLayoutBasis = {
+export type CourseLayoutBasis = {
   macro: ChapterMacroLayout[];
   locals: Map<string, ChapterLocalLayout>;
 };
+
+export type CoursePlaneChapter = {
+  id: string;
+  title: string;
+  order: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type CoursePlaneNode = {
+  id: string;
+  chapterId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type CoursePlane = {
+  nodes: Map<string, CoursePlaneNode>;
+  chapters: CoursePlaneChapter[];
+  width: number;
+  height: number;
+};
+
+/**
+ * Flatten the existing ELK course projection onto the Archive's front plane.
+ * Chapter macros and each chapter's local Knowledge coordinates both come from
+ * `getCourseLayoutBasis`; this function only adds the two offsets and centres
+ * the result. It never runs another layout algorithm.
+ */
+export function projectCoursePlane(
+  basis: CourseLayoutBasis,
+  chapters: readonly { id: string; title: string; order: number }[]
+): CoursePlane {
+  const chapterById = new Map(chapters.map((chapter) => [chapter.id, chapter] as const));
+  const nodes = new Map<string, CoursePlaneNode>();
+  const planeChapters: CoursePlaneChapter[] = [];
+  const expanded = new Set(chapters.map((chapter) => chapter.id));
+  const chapterPositions = composeChapterPositions(basis, expanded);
+  basis.macro
+    .slice()
+    .sort((left, right) => left.layer - right.layer || left.orderInLayer - right.orderInLayer || left.chapterId.localeCompare(right.chapterId))
+    .forEach((macro) => {
+      const chapter = chapterById.get(macro.chapterId);
+      const local = basis.locals.get(macro.chapterId);
+      const position = chapterPositions.get(macro.chapterId);
+      if (!chapter || !local || !position) return;
+      planeChapters.push({
+        id: chapter.id,
+        title: chapter.title,
+        order: chapter.order,
+        x: position.x,
+        y: position.y,
+        width: position.width,
+        height: position.height
+      });
+      local.nodes.forEach((node) => {
+        const id = node.nodeId.replace(/^knowledge:/, "");
+        nodes.set(id, {
+          id,
+          chapterId: chapter.id,
+          x: position.x + node.x,
+          y: position.y + node.y,
+          width: node.width,
+          height: node.height
+        });
+      });
+    });
+  if (!planeChapters.length) return { nodes, chapters: [], width: 1, height: 1 };
+  const minX = Math.min(...planeChapters.map((chapter) => chapter.x));
+  const minY = Math.min(...planeChapters.map((chapter) => chapter.y));
+  const maxX = Math.max(...planeChapters.map((chapter) => chapter.x + chapter.width));
+  const maxY = Math.max(...planeChapters.map((chapter) => chapter.y + chapter.height));
+  nodes.forEach((node) => { node.x -= minX; node.y -= minY; });
+  planeChapters.forEach((chapter) => { chapter.x -= minX; chapter.y -= minY; });
+  return { nodes, chapters: planeChapters, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+
+/** The Archive course plane renders each Knowledge as a fixed world-space card. */
+export const PLANE_CARD_WIDTH = 176;
+export const PLANE_CARD_HEIGHT = 40;
+export const PLANE_CHAPTER_HEADER = 56;
+export const PLANE_CHAPTER_PADDING_X = 10;
+export const PLANE_CHAPTER_PADDING_BOTTOM = 10;
+export const PLANE_CHAPTER_GAP = 0;
+/**
+ * Compact plane pitch: card width + 20 keeps six columns inside the camera's
+ * readable range (the edge columns are slightly farther away than the centre),
+ * and card height + 16 keeps every row readable. This is deliberately tighter
+ * than the course page tree, which has room for practice cards.
+ */
+export const PLANE_CARD_GAP = 16;
+
+export type PlaneChapterLayout = {
+  chapterId: string;
+  width: number;
+  height: number;
+  nodes: Array<{ nodeId: string; x: number; y: number; width: number; height: number }>;
+};
+
+const planeLayeredOptions = {
+  "org.eclipse.elk.algorithm": "layered",
+  "org.eclipse.elk.direction": "DOWN",
+  "org.eclipse.elk.edgeRouting": "ORTHOGONAL",
+  "org.eclipse.elk.layered.layering.strategy": "NETWORK_SIMPLEX",
+  "org.eclipse.elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+  "org.eclipse.elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+  "org.eclipse.elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "org.eclipse.elk.spacing.nodeNode": String(PLANE_CARD_GAP),
+  "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": String(PLANE_CARD_GAP),
+  "org.eclipse.elk.spacing.edgeNode": "18",
+  "org.eclipse.elk.layered.spacing.edgeNodeBetweenLayers": "18"
+};
+
+/**
+ * Lay out one chapter of the Archive course plane. The ELK input node size is
+ * exactly the rendered card's world footprint, so the layout reserves room for
+ * the card itself and same-plane cards cannot overlap. Chapters are composed
+ * into columns by the caller.
+ */
+export async function buildPlaneChapterLayout(input: {
+  chapterId: string;
+  nodes: readonly { id: string; lesson: number }[];
+  edges: readonly { id: string; source: string; target: string; relation: string }[];
+}): Promise<PlaneChapterLayout> {
+  const nodes = input.nodes.slice().sort((left, right) => left.lesson - right.lesson || left.id.localeCompare(right.id));
+  const ids = new Set(nodes.map((node) => node.id));
+  const edges = input.edges.filter((edge) => edge.relation !== "related" && ids.has(edge.source) && ids.has(edge.target));
+  const graph: ElkNode = {
+    id: `plane:${input.chapterId}`,
+    children: nodes.map((node) => ({ id: `knowledge:${node.id}`, width: PLANE_CARD_WIDTH, height: PLANE_CARD_HEIGHT })),
+    edges: edges.map((edge) => ({ id: edge.id, sources: [`knowledge:${edge.source}`], targets: [`knowledge:${edge.target}`] })),
+    layoutOptions: {
+      ...planeLayeredOptions,
+      "org.eclipse.elk.padding": `[top=${PLANE_CHAPTER_HEADER},left=${PLANE_CHAPTER_PADDING_X},bottom=${PLANE_CHAPTER_PADDING_BOTTOM},right=${PLANE_CHAPTER_PADDING_X}]`
+    }
+  };
+  const result = await elk.layout(graph);
+  // ELK gives a dependency-aware vertical order. Compact each chapter into a
+  // single column of full-size cards with the tight plane pitch: six columns
+  // must stay close enough for the camera to keep card names readable. Every
+  // reserved slot is still exactly one card footprint, so cards cannot overlap.
+  const ordered = (result.children ?? []).slice().sort((left, right) => (left.y ?? 0) - (right.y ?? 0) || (left.x ?? 0) - (right.x ?? 0) || left.id.localeCompare(right.id));
+  const planeNodes = ordered.map((node, index) => ({
+    nodeId: node.id.replace(/^knowledge:/, ""),
+    x: PLANE_CHAPTER_PADDING_X,
+    y: PLANE_CHAPTER_HEADER + index * (PLANE_CARD_HEIGHT + PLANE_CARD_GAP),
+    width: PLANE_CARD_WIDTH,
+    height: PLANE_CARD_HEIGHT
+  }));
+  return {
+    chapterId: input.chapterId,
+    width: PLANE_CARD_WIDTH + PLANE_CHAPTER_PADDING_X * 2,
+    height: PLANE_CHAPTER_HEADER + planeNodes.length * PLANE_CARD_HEIGHT + Math.max(0, planeNodes.length - 1) * PLANE_CARD_GAP + PLANE_CHAPTER_PADDING_BOTTOM,
+    nodes: planeNodes
+  };
+}
+
+const planeBasisPromises = new Map<string, Promise<PlaneChapterLayout[]>>();
+
+export function getCoursePlaneBasis(graphData: CourseGraphData) {
+  const key = `${getCourseLayoutCacheKey(graphData.courseId, graphData.revision)}:plane`;
+  const current = planeBasisPromises.get(key) ?? Promise.all(graphData.chapters.map((chapter) => buildPlaneChapterLayout({
+    chapterId: chapter.id,
+    nodes: graphData.knowledgeNodes.filter((node) => node.chapterId === chapter.id),
+    edges: graphData.knowledgeEdges
+  })));
+  planeBasisPromises.set(key, current);
+  return current;
+}
 
 const elk = new ELK();
 const basisPromises = new Map<string, Promise<CourseLayoutBasis>>();
@@ -213,8 +387,13 @@ export function getCourseLayoutBasis(graphData: CourseGraphData) {
 }
 
 export function clearCourseLayoutCache(courseId?: string) {
-  if (!courseId) return basisPromises.clear();
+  if (!courseId) {
+    basisPromises.clear();
+    planeBasisPromises.clear();
+    return;
+  }
   Array.from(basisPromises.keys()).filter((key) => key.startsWith(`${courseId}:`)).forEach((key) => basisPromises.delete(key));
+  Array.from(planeBasisPromises.keys()).filter((key) => key.startsWith(`${courseId}:`)).forEach((key) => planeBasisPromises.delete(key));
 }
 
 function composeChapterPositions(basis: CourseLayoutBasis, expandedIds: Set<string>) {
@@ -264,6 +443,10 @@ function composeChapterPositions(basis: CourseLayoutBasis, expandedIds: Set<stri
   const offsetY = minY < GRAPH_PADDING ? GRAPH_PADDING - minY : 0;
   positions.forEach((position, id) => positions.set(id, { ...position, x: position.x + offsetX, y: position.y + offsetY }));
   return positions;
+}
+
+export function composeCourseChapterPositions(basis: CourseLayoutBasis, expandedIds: ReadonlySet<string>) {
+  return composeChapterPositions(basis, new Set(expandedIds));
 }
 
 export async function layoutCourseGraph(graphData: CourseGraphData, projection: CourseGraphProjection): Promise<CourseLayout> {

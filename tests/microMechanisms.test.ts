@@ -1,15 +1,16 @@
 import { resolveMicroResumeStep } from "@/features/learning/micro/microLearning";
 import { describe, expect, it, vi } from "vitest";
-import { microV2References } from "@/demo/learning/microV2References";
+import { syntheticFlow, syntheticMicroPaths, syntheticSimulation, syntheticTransformation } from "./fixtures/micro";
 import { isNativeMicroInteractionCorrect, validateNativeMicroInteraction } from "@/shared/learning/nativeMicroInteraction";
-import { scheduleTimelineTick, mechanismMessage, flowAdvance, mechanismFeedback, simulationTrajectory, timelineReducer, transformationCells, transformationEvents, type FlowDefinition, type SimulationDefinition, type TransformationDefinition } from "@/shared/learning/microMechanisms";
-const interactions = microV2References.flatMap((path) => path.units.flatMap((unit) => unit.steps.flatMap((step) => step.interaction ? [step.interaction] : [])));
-const flow = interactions.find((item) => item.type === "flow-execution") as FlowDefinition;
-const simulation = interactions.find((item) => item.type === "simulation") as SimulationDefinition;
-const matrix = interactions.find((item) => item.type === "data-transform" && item.corpus.length===3) as TransformationDefinition;
+import { scheduleTimelineTick, mechanismMessage, flowAdvance, flowStepLimit, mechanismFeedback, simulationTrajectory, timelineReducer, transformationCells, transformationEvents, type FlowDefinition, type SimulationDefinition, type TransformationDefinition } from "@/shared/learning/microMechanisms";
+
+const interactions = syntheticMicroPaths.flatMap((path) => path.units.flatMap((unit) => unit.steps.flatMap((step) => step.interaction ? [step.interaction] : [])));
+const flow = syntheticFlow as FlowDefinition;
+const simulation = syntheticSimulation as SimulationDefinition;
+const matrix = syntheticTransformation as TransformationDefinition;
 
 describe("Micro V2 instructional definitions", () => {
-  it.each(microV2References)("$knowledgeId teaches before practice, has feedback and a summary", (path) => {
+  it.each(syntheticMicroPaths)("$knowledgeId teaches before practice, has feedback and a summary", (path) => {
     const steps = path.units.flatMap((unit) => unit.steps);
     expect(steps[0].kind).toBe("explanation");
     expect(steps[steps.length - 1].kind).toBe("summary");
@@ -23,11 +24,13 @@ describe("Micro V2 instructional definitions", () => {
 });
 describe("causal execution and grading", () => {
   it("fails at the missing result connection and requires actual complete replay", () => {
+    expect(flowStepLimit(flow, ["request", "call"])).toBe(3);
+    expect(flowStepLimit(flow, flow.correctEdgeIds)).toBe(flow.events.length);
     expect(flowAdvance(flow, ["request","call"], 3).error).toContain("回传");
     expect(flowAdvance(flow, flow.correctEdgeIds, 3).executed).toBe(4);
     expect(mechanismFeedback(flow, {kind:"flow",edgeIds:flow.correctEdgeIds,executed:2}).correct).toBe(false);
     expect(mechanismFeedback(flow, {kind:"flow",edgeIds:flow.correctEdgeIds,executed:5}).correct).toBe(true);
-    expect(mechanismFeedback({...flow,mode:"challenge"}, {kind:"flow",edgeIds:[...flow.correctEdgeIds,"shortcut"],executed:5}).message).toContain("工具直接结束");
+    expect(mechanismFeedback({...flow,mode:"challenge"}, {kind:"flow",edgeIds:[...flow.correctEdgeIds,"shortcut"],executed:5}).message).toContain("shortcut");
     expect(mechanismFeedback(flow, {kind:"flow",edgeIds:[...flow.correctEdgeIds,"request"],executed:5}).correct).toBe(false);
   });
   it("computes gradient, update and loss rather than testing an eta interval", () => {
@@ -46,13 +49,13 @@ describe("causal execution and grading", () => {
   });
   it("derives directional neighbor events without crossing sentences", () => {
     const events=transformationEvents(matrix), cells=transformationCells(matrix,events.length);
-    expect(events).toHaveLength(14);
-    expect(cells[0*6+1]).toBe(2);
-    expect(cells[1*6+0]).toBe(2);
-    expect(cells[0*6+2]).toBe(0);
-    expect(cells[5*6+4]).toBe(1);
-    expect(mechanismFeedback(matrix,{kind:"transformation",cells,executed:14}).correct).toBe(true);
-    expect(mechanismFeedback(matrix,{kind:"transformation",cells:cells.map(()=>0),executed:14}).correct).toBe(false);
+    expect(events).toHaveLength(8);
+    expect(cells[0*3+1]).toBe(2);
+    expect(cells[1*3+0]).toBe(2);
+    expect(cells[0*3+2]).toBe(0);
+    expect(cells[2*3+1]).toBe(2);
+    expect(mechanismFeedback(matrix,{kind:"transformation",cells,executed:8}).correct).toBe(true);
+    expect(mechanismFeedback(matrix,{kind:"transformation",cells:cells.map(()=>0),executed:8}).correct).toBe(false);
     expect(transformationCells(matrix,0).every((value)=>value===0)).toBe(true);
   });
   it("bounds rapid steps, pauses, resets, and cannot play after completion", () => {
@@ -78,7 +81,7 @@ it("cancels scheduled callbacks on Pause, Reset, or unmount; does not leave late
   } finally {vi.useRealTimers();}
 });
 
-it("resumes revised in-progress content at the earliest new teaching step without resetting completed identities",()=>{const unit=microV2References[0].units[0];const completed=["aiad-rt01-trace"];const progress={unitId:unit.id,pathId:unit.pathId,status:"in_progress" as const,completedStepIds:completed,currentStepId:"aiad-rt01-structure",updatedAt:"2026-09-05"};expect(resolveMicroResumeStep(unit,progress,progress.currentStepId)?.id).toBe("aiad-rt01-explain");expect(progress.completedStepIds).toEqual(completed);});
+it("resumes revised in-progress content at the earliest new teaching step without resetting completed identities",()=>{const unit=syntheticMicroPaths[0].units[0];const completed=[unit.steps[1].id];const progress={unitId:unit.id,pathId:unit.pathId,status:"in_progress" as const,completedStepIds:completed,currentStepId:unit.steps[2].id,updatedAt:"2026-09-05"};expect(resolveMicroResumeStep(unit,progress,progress.currentStepId)?.id).toBe(unit.steps[0].id);expect(progress.completedStepIds).toEqual(completed);});
 
 it("returns factual Flow/Simulation/Transformation reasons independently of teaching copy",()=>{
   expect(mechanismFeedback(flow,{kind:"flow",edgeIds:["request","call","answer"],executed:3})).toMatchObject({correct:false,reason:"missing-required-edge",edgeId:"result",executed:3});

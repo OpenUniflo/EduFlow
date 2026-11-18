@@ -31,7 +31,11 @@ describe('Assignment API guard before all mutations', () => {
   beforeEach(() => {
     writes=[]; tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],curriculum_coverages:[{course_id:'course',node_id:'node'}],user_knowledge_states:[{user_id:'learner',node_id:'node',status:'learned'}]};
     mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});
-    mocks.server.mockReturnValue({from:query,rpc:vi.fn(()=>{writes.push('rpc');throw Error('Unexpected submission');})});
+    mocks.server.mockReturnValue({from:query,rpc:vi.fn((name:string)=>{
+      if(name==='start_assignment_learning_state'){writes.push('rpc:start_assignment_learning_state');return Promise.resolve({data:[],error:null});}
+      if(name==='transition_route_action_v3'){writes.push('rpc:transition_route_action_v3');return Promise.resolve({data:{id:'run'},error:null});}
+      throw Error('Unexpected submission');
+    })});
   });
   it.each(['not_started','started','needs_revision'])('allows ready %s', async status => {
     tables.user_assignment_states=[{user_id:'learner',course_id:'course',assignment_id:'task',status}];
@@ -75,7 +79,7 @@ describe('Assignment API guard before all mutations', () => {
     expect(writes).toEqual([]);
     expect((await call('submit-assignment', { actionRunId: 'other', idempotencyKey: 'saved-key', response: { kind: 'answer', text: 'Response' } })).status).toBe(409);
   });
-  it('starts a verified Action target without practicing writes or resetting accepted aggregate', async () => {
+  it('raises a verified Action target to practicing without resetting the accepted aggregate', async () => {
     tables.user_knowledge_states = [];
     tables.knowledge_nodes = [{ id: 'node', status: 'active' }];
     tables.user_assignment_states = [{ user_id: 'learner', course_id: 'course', assignment_id: 'task', status: 'accepted' }];
@@ -84,17 +88,42 @@ describe('Assignment API guard before all mutations', () => {
     mocks.server.mockReturnValue({ from: query, rpc });
     expect((await call('start-assignment', { actionRunId: 'run' })).status).toBe(200);
     expect(rpc).toHaveBeenCalledWith('transition_route_action_v3', { p_user_id: 'learner', p_run_id: 'run', p_operation: 'start',p_expected_version_id:'version' });
+    expect(rpc).toHaveBeenCalledWith('start_assignment_learning_state', { p_user_id: 'learner', p_course_id: 'course', p_assignment_id: 'task' });
     expect(writes).not.toContain('user_knowledge_states');
     expect(writes).not.toContain('user_assignment_states');
     expect(tables.user_assignment_states[0].status).toBe('accepted');
   });
-  it('uses verified execution reachability for additional Assignment coverage without writing UKS',async()=>{
+  it('uses verified execution reachability for additional Assignment coverage and still raises practicing through the policy',async()=>{
     tables.assignment_coverages.push({course_id:'course',assignment_id:'task',node_id:'B'});
     tables.knowledge_nodes=[{id:'node',status:'active'},{id:'B',status:'active'}];tables.user_knowledge_states=[];
     mocks.actionRun.mockResolvedValue({id:'run',status:'in_progress',execution_snapshot:{targetId:'node'},executionReachableNodeIds:['B']});
-    mocks.server.mockReturnValue({from:query,rpc:vi.fn(async()=>({data:{id:'run'},error:null}))});
+    const rpc=vi.fn(async()=>({data:{id:'run'},error:null}));
+    mocks.server.mockReturnValue({from:query,rpc});
     expect((await call('start-assignment',{actionRunId:'run'})).status).toBe(200);
     expect(tables.user_knowledge_states).toEqual([]);expect(writes).not.toContain('user_knowledge_states');
+    expect(rpc).toHaveBeenCalledWith('start_assignment_learning_state',{p_user_id:'learner',p_course_id:'course',p_assignment_id:'task'});
+  });
+  it('records an AI-addressed pending result and ignores browser-supplied outcome fields', async () => {
+    writes=[];
+    tables={courses:[{id:'course',lifecycle:'published'}],
+      course_assignments:[{id:'task',course_id:'course',mode:'instruction',experience:{type:'answer'},acceptance_criteria:['有证据']}],
+      assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],
+      curriculum_coverages:[{course_id:'course',node_id:'node'}],
+      user_knowledge_states:[{user_id:'learner',node_id:'node',status:'learned'}],
+      user_assignment_states:[{user_id:'learner',course_id:'course',assignment_id:'task',status:'started'}],
+      performance_results:[{id:'result',outcome:'pending',feedback:{code:'ai_evaluation_pending',requestedEvaluator:'ai'},evaluator_kind:'ai'}]};
+    mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});
+    const rpc=vi.fn(async (name:string,args:Row)=>name==='record_conversation_assignment_attempt'
+      ? {data:[{attempt_id:'attempt',result_id:'result',outcome:'pending',duplicate:false}],error:null,args}
+      : {data:[],error:null,args});
+    mocks.server.mockReturnValue({from:query,rpc});
+    const result=await call('submit-assignment',{idempotencyKey:'abcdefgh',evaluator:'ai',outcome:'passed',accepted:true,
+      feedback:{code:'ai_evaluation_passed'},response:{kind:'answer',text:'只写了一半'}});
+    expect(result).toMatchObject({status:200,body:{outcome:'pending',accepted:false}});
+    const args=(rpc.mock.calls.find(call=>call[0]==='record_conversation_assignment_attempt')?.[1]??{}) as Row;
+    expect(args).toMatchObject({p_outcome:'pending',p_evaluator_kind:'ai',p_feedback:{code:'ai_evaluation_pending',requestedEvaluator:'ai'}});
+    expect(args.p_response).not.toHaveProperty('outcome');
+    expect(args.p_response).not.toHaveProperty('accepted');
   });
   it('does not waive other covered Knowledge readiness for an Action target', async () => {
     tables.assignment_coverages.push({ course_id: 'course', assignment_id: 'task', node_id: 'other' });
@@ -114,7 +143,7 @@ it.each(['failed','pending','passed'])('a completed %s ActionRun does not report
 });
 it('explicitly repeats the latest standalone attempt without a fake Run or capability write',async()=>{
   writes=[];tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],curriculum_coverages:[{course_id:'course',node_id:'node'}],user_knowledge_states:[{user_id:'learner',node_id:'node',status:'learned'}],user_assignment_states:[{user_id:'learner',course_id:'course',assignment_id:'task',status:'accepted'}],learning_attempts:[{id:'old',user_id:'learner',course_id:'course',assignment_id:'task',action_run_id:null}]};
-  mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query});
+  mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query,rpc:vi.fn(async()=>({data:[],error:null}))});
   expect(await call('start-assignment',{repeatAttemptId:'old'})).toMatchObject({status:200,body:{status:'started'}});
   expect(writes).toEqual(['user_course_states','user_assignment_states']);expect(tables.learning_attempts[0].id).toBe('old');
   expect((await call('start-assignment',{repeatAttemptId:'foreign'})).status).toBe(409);
@@ -124,4 +153,45 @@ it('opening Material records activity membership without writing formal capabili
  writes=[];tables={courses:[{id:'course',lifecycle:'published'}],knowledge_nodes:[{id:'node',status:'active'}],curriculum_coverages:[{course_id:'course',node_id:'node'}],materials:[{id:'material',course_id:'course'}],material_knowledge_coverages:[{course_id:'course',material_id:'material',node_id:'node'}]};
  mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query});
  expect((await call('start-material',{materialId:'material',nodeId:'node'})).status).toBe(200);expect(writes).toEqual(['user_course_states']);
+});
+
+describe('Assignment Attempt withdrawal endpoint', () => {
+  beforeEach(() => {
+    writes=[];
+    tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],user_assignment_states:[{user_id:'learner',course_id:'course',assignment_id:'task',status:'needs_revision'}]};
+    mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});
+  });
+  it('rejects another learner\'s Attempt before calling the withdrawal RPC', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'someone-else',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn();
+    mocks.server.mockReturnValue({from:query,rpc});
+    const result=await call('withdraw-attempt',{attemptId:'attempt',source:'panel'});
+    expect(result.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it('validates the learner, source and Attempt server-side and delegates the transaction', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn(async(name:string,args:Row)=>name==='withdraw_learning_attempt'
+      ? {data:[{attempt_id:'attempt',course_id:'course',assignment_id:'task',already_withdrawn:false,restored_status:'started'}],error:null,args}
+      : {data:null,error:null});
+    mocks.server.mockReturnValue({from:query,rpc});
+    const result=await call('withdraw-attempt',{attemptId:'attempt',source:'panel'});
+    expect(result).toMatchObject({status:200,body:{withdrawn:true,alreadyWithdrawn:false,restoredStatus:'started'}});
+    expect(rpc).toHaveBeenCalledWith('withdraw_learning_attempt',{p_user_id:'learner',p_attempt_id:'attempt',p_source:'panel'});
+    expect(writes).toEqual([]);
+  });
+  it('is idempotent for the same Attempt and never withdraws twice', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn(async()=>({data:[{attempt_id:'attempt',course_id:'course',assignment_id:'task',already_withdrawn:true,restored_status:null}],error:null}));
+    mocks.server.mockReturnValue({from:query,rpc});
+    expect(await call('withdraw-attempt',{attemptId:'attempt',source:'assistant'})).toMatchObject({status:200,body:{alreadyWithdrawn:true}});
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('rejects an unknown withdrawal source', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn();
+    mocks.server.mockReturnValue({from:query,rpc});
+    expect((await call('withdraw-attempt',{attemptId:'attempt',source:'browser'})).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });

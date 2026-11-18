@@ -1,0 +1,197 @@
+import { ArrowRight, BookOpen, ChevronRight, Lock, X } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import type { ArchiveCourse, ArchiveEdge, ArchiveModel, ArchiveNode } from "../model/atlasModel";
+import { anchoredPopoverPosition, type PopoverAnchor } from "../model/anchoredPopover";
+import { PreviewBadge } from "@/shared/ui/PreviewBadge";
+import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
+
+export function ArchiveLevelChip({ level, onSelect }: { level: number; onSelect(level: 0 | 1 | 2): void }) {
+  return (
+    <div className="ef-atlas-level ef-ui-glass ef-ui-glass--regular" role="group" aria-label="地图显示层级">
+      {["领域", "主题", "知识"].map((label, index) => <button key={label} type="button" className={index === level ? "is-on" : ""} aria-pressed={index === level} onClick={() => onSelect(index as 0 | 1 | 2)}>{label}</button>)}
+    </div>
+  );
+}
+
+const COURSE_STATE_LABEL: Record<ArchiveCourse["state"], string> = {
+  active: "在学",
+  draft: "草稿",
+  recommended: "可加入",
+  published: "已发布"
+};
+
+/** The always-reachable Course entry: existing Courses only, never a fake row. */
+export function ArchiveCourseMini({ model, anchor, onClose, onFocusCourse, onOpenCourse }: {
+  model: ArchiveModel;
+  anchor: PopoverAnchor;
+  onClose(): void;
+  onFocusCourse(courseId: string): void;
+  onOpenCourse(courseId: string): void;
+}) {
+  const panelRef = useRef<HTMLElement>(null);
+  const [position, setPosition] = useState(() => anchoredPopoverPosition(
+    anchor,
+    { width: 348, height: 460 },
+    { width: typeof window === "undefined" ? 1440 : window.innerWidth, height: typeof window === "undefined" ? 900 : window.innerHeight }
+  ));
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const reposition = () => {
+      const rect = panel.getBoundingClientRect();
+      setPosition(anchoredPopoverPosition(
+        anchor,
+        { width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight }
+      ));
+    };
+    reposition();
+    window.addEventListener("resize", reposition);
+    return () => window.removeEventListener("resize", reposition);
+  }, [anchor]);
+  return (
+    <section ref={panelRef} className="ef-archive-course-mini ef-atlas-courses" aria-label="课程入口" style={{ left: position.left, top: position.top }}>
+      <header><span><BookOpen size={13} aria-hidden />课程</span><button type="button" onClick={onClose}>收起</button></header>
+      {model.courses.map((course) => (
+        <div key={course.id} className="ef-archive-course-mini-row">
+          <button type="button" className="ef-archive-course-mini-main" onClick={() => onFocusCourse(course.id)} title={`在星图中查看 ${course.title}`}>
+            <b>{course.title}</b>
+            <small>{COURSE_STATE_LABEL[course.state]} · {course.nextLabel}</small>
+          </button>
+          <em>{course.progress}%</em>
+          <button type="button" className="ef-archive-course-mini-go ef-atlas-course-enter" onClick={() => onOpenCourse(course.id)} aria-label={`进入课程 ${course.title}`}>进入<ArrowRight size={12} aria-hidden /></button>
+        </div>
+      ))}
+      {!model.courses.length ? <p className="ef-archive-muted">还没有可进入的课程。</p> : null}
+    </section>
+  );
+}
+
+export function ArchiveCourseFocusBar({ course, learned, leftInset = 0, onOpen }: {
+  course: ArchiveCourse;
+  learned: number;
+  leftInset?: number;
+  onOpen: (origin?: DOMRect) => void;
+}) {
+  return (
+    <div
+      className="ef-atlas-coursebar ef-ui-glass ef-ui-glass--regular"
+      role="status"
+      aria-label="课程聚焦"
+      style={{ left: `calc(50% + ${Math.round(leftInset / 2)}px)`, maxWidth: `calc(100% - ${leftInset + 32}px)` }}
+    >
+      <div className="ef-atlas-coursebar-title">
+        <span className="ef-atlas-coursebar-mark" aria-hidden>{course.title.slice(0, 1)}</span>
+        <span><b>{course.title}</b><small>点空白处返回星图 · 右键平移 · 适配全图看全部</small></span>
+      </div>
+      <div className="ef-atlas-coursebar-progress">
+        <span className="ef-atlas-progress-track" aria-hidden><i style={{ width: `${Math.max(0, Math.min(100, course.progress))}%` }} /></span>
+        <small>{learned} / {course.knowledgeCount} 已学 · {course.progress}%</small>
+      </div>
+      <button type="button" className="ef-atlas-primary" onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())}>进入课程<ArrowRight size={14} aria-hidden /></button>
+    </div>
+  );
+}
+
+export function ArchiveDraftFocusBar({ title, knowledgeCount, weeks, leftInset = 0 }: { title: string; knowledgeCount: number; weeks: number; leftInset?: number }) {
+  return (
+    <div
+      className="ef-atlas-coursebar ef-atlas-draftbar ef-ui-glass ef-ui-glass--regular"
+      role="status"
+      aria-label="课程创建草稿"
+      style={{ left: `calc(50% + ${Math.round(leftInset / 2)}px)`, maxWidth: `calc(100% - ${leftInset + 32}px)` }}
+    >
+      <div className="ef-atlas-coursebar-title">
+        <span className="ef-atlas-coursebar-mark" aria-hidden><BookOpen size={16} /></span>
+        <span><b>{title}</b><small>课程创建简报 · 草稿未创建</small></span>
+      </div>
+      <div className="ef-atlas-draft-meta">
+        <span>知识点范围 <b>{knowledgeCount}</b></span>
+        <span>预计 <b>{weeks}</b> 周</span>
+      </div>
+      <span className="ef-atlas-draft-hint">点空白处返回星图</span>
+    </div>
+  );
+}
+
+const RELATION_LABEL: Record<string, string> = { prerequisite: "前置", enables: "使能", related: "相关" };
+
+export function ArchiveNodePanel({ node, model, edges, topicName, learners, onClose, onSelectNode, onOpenCourse, focusedCourseId, onOpenFocusCourse }: {
+  node: ArchiveNode;
+  model: ArchiveModel;
+  edges: readonly ArchiveEdge[];
+  topicName: string;
+  learners: readonly { name: string; color: string; has: boolean }[];
+  onClose: () => void;
+  onSelectNode: (id: string) => void;
+  onOpenCourse: (courseId: string, origin?: DOMRect) => void;
+  focusedCourseId?: string | null;
+  onOpenFocusCourse?: (knowledgeId: string) => void;
+}) {
+  const neighbours = edges
+    .filter((edge) => edge.source === node.id || edge.target === node.id)
+    .flatMap((edge) => {
+      const otherId = edge.source === node.id ? edge.target : edge.source;
+      const other = model.nodeById.get(otherId);
+      return other ? [{ node: other, relation: edge.relation, direction: edge.source === node.id ? "out" : "in" }] : [];
+    })
+    .sort((left, right) => left.relation.localeCompare(right.relation) || left.node.title.localeCompare(right.node.title))
+    .slice(0, 8);
+  const status = node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope);
+  return (
+    <aside className="ef-atlas-detail ef-ui-glass ef-ui-glass--regular" data-floating-panel aria-label={`${node.title} 知识详情`}>
+      <header>
+        <div>
+          <span className="ef-atlas-detail-kicker"><i style={{ background: node.color }} aria-hidden />{node.domainTitle}<em>·</em>{topicName}</span>
+          <h2>{node.title}</h2>
+        </div>
+        <button type="button" className="ef-atlas-icon-btn" onClick={onClose} aria-label="关闭知识详情"><X size={15} aria-hidden /></button>
+      </header>
+      <div className="ef-atlas-detail-badges">
+        <span className={`ef-atlas-status status-${node.status}`}>{node.isMine ? `我的知识 · ${status}` : knowledgeScopeLabelFor(node.scope)}</span>
+        {node.isMine ? <span>{knowledgeScopeLabelFor(node.scope)}</span> : null}
+      </div>
+      <p className="ef-atlas-detail-description">{node.description}</p>
+      {learners.length ? (
+        <section>
+          <h3>谁已学 <PreviewBadge /></h3>
+          <div className="ef-atlas-learners">
+            {learners.map((learner) => <span key={learner.name} className={learner.has ? "is-yes" : ""}><i style={{ background: learner.color }} aria-hidden />{learner.name}<em>{learner.has ? "已学" : "未学"}</em></span>)}
+          </div>
+        </section>
+      ) : null}
+      {neighbours.length ? (
+        <section>
+          <h3>相邻知识点 · {neighbours.length}</h3>
+          <div>
+            {neighbours.map((item) => (
+              <button type="button" key={`${item.node.id}:${item.relation}`} onClick={() => onSelectNode(item.node.id)}>
+                <span style={{ background: item.node.color }} aria-hidden />
+                {item.node.title}
+                <em>{RELATION_LABEL[item.relation] ?? item.relation}{item.direction === "in" ? " · 指向" : " · 指向外"}</em>
+                <ChevronRight size={12} aria-hidden />
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {node.courseContexts.length ? (
+        <section>
+          <h3>出现在课程</h3>
+          <div>
+            {node.courseContexts.slice(0, 4).map((context) => (
+              <button type="button" key={context.courseId} onClick={(event) => onOpenCourse(context.courseId, event.currentTarget.getBoundingClientRect())}>
+                <BookOpen size={12} aria-hidden />{context.courseTitle}<ArrowRight size={12} aria-hidden />
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      <footer>
+        {focusedCourseId && onOpenFocusCourse
+          ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onOpenFocusCourse(node.id)}>在课程中打开<ArrowRight size={13} aria-hidden /></button>
+          : <span><Lock size={11} aria-hidden />查看不会改变学习状态</span>}
+      </footer>
+    </aside>
+  );
+}

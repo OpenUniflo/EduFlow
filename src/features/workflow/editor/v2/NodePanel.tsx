@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { Bot, Braces, Check, Code2, Combine, Copy, Crosshair, GitBranch, GitFork, Hammer, Info, Maximize2, MoreHorizontal, Play, Route, Send, Trash2, X, Boxes } from "lucide-react";
+import { Bot, Braces, Check, ChevronRight, Code2, Combine, Copy, Crosshair, GitBranch, GitFork, Hammer, Info, Maximize2, MoreHorizontal, Play, Route, Send, Trash2, X, Boxes } from "lucide-react";
 import type { WorkflowNodeV2 } from "../../domain/v2/types";
+import { workflowReferenceInNode } from "../../domain/v2/workflowReferences";
 import "./nodePanel.css";
 
 /**
@@ -35,6 +36,8 @@ export type NodePanelProps = {
   onExpandDebug?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  /** A subgraph node exposes its own canvas as a full-width panel action. */
+  subgraphNav?: { label: string; description: string; onClick: () => void };
 };
 
 const typeLabels: Record<string, string> = {
@@ -126,9 +129,9 @@ export function NodePanelSections({ sections }: { sections: NodePanelSection[] }
 }
 
 export function NodePanel(props: NodePanelProps) {
-  const { node, readOnly, activeTab, onTabChange, showRunData, runData, sections, onRename, onClose, onLocate, onExpandDebug, onDuplicate, onDelete } = props;
+  const { node, readOnly, activeTab, onTabChange, showRunData, runData, sections, onRename, onClose, onLocate, onExpandDebug, onDuplicate, onDelete, subgraphNav } = props;
   const Icon = typeIcons[node.type as keyof typeof typeIcons] ?? Boxes;
-  const label = nodePanelTypeLabel(node.type);
+  const label = workflowReferenceInNode(node) ? "调用工作流" : nodePanelTypeLabel(node.type);
   const [infoOpen, setInfoOpen] = useState(false);
 
   return (
@@ -161,6 +164,13 @@ export function NodePanel(props: NodePanelProps) {
           <button type="button" className="wf-nodepanel-action" aria-label="关闭节点面板" title="关闭" onClick={onClose}><X size={16} /></button>
         </div>
       </header>
+      {subgraphNav ? <div className="wf-nodepanel-subgraph">
+        <button type="button" className="wf-nodepanel-subgraph-enter" onClick={subgraphNav.onClick}>
+          <span className="wf-nodepanel-subgraph-icon" aria-hidden="true"><Boxes size={17} /></span>
+          <span className="wf-nodepanel-subgraph-copy"><strong>{subgraphNav.label}</strong><small>{subgraphNav.description}</small></span>
+          <ChevronRight className="wf-nodepanel-subgraph-chevron" size={16} aria-hidden="true" />
+        </button>
+      </div> : null}
       {showRunData ? (
         <div className="wf-nodepanel-tabs" role="tablist" aria-label="节点面板视图">
           <button type="button" role="tab" id="wf-nodepanel-tab-config" aria-controls="wf-nodepanel-panel-config" aria-selected={activeTab === "config"} className={activeTab === "config" ? "active" : ""} onClick={() => onTabChange("config")}>配置</button>

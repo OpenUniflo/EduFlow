@@ -1,0 +1,102 @@
+/* N50 404. Design tokens and shared glass primitives only. */
+.ef-nf {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-16);
+  padding: var(--sp-32);
+  text-align: center;
+}
+
+.ef-nf-code {
+  color: var(--brand-ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: .2em;
+}
+
+.ef-nf h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+  font-weight: var(--fw-700);
+}
+
+.ef-nf p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-nf-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+}
+
+.ef-nf-search {
+  display: flex;
+  width: min(420px, 100%);
+  min-height: 44px;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-16);
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--glass-regular);
+  color: var(--muted);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  text-align: left;
+}
+
+.ef-nf-search > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.ef-nf-search > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--muted);
+}
+
+.ef-nf-search kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 2px var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-nf-search:hover {
+  color: var(--ink-2);
+  background: var(--glass-regular-hover);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ef-nf-search {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+body[data-page="not-found"] .course-design-assistant {
+  display: none;
+}

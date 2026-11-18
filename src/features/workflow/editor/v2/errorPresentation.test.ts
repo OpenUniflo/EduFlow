@@ -24,6 +24,12 @@ describe("execution error presentation", () => {
     expect(state?.actions[0].hint).toBe("field");
     expect(state?.technical).toContain("INVALID_STATE_UPDATE");
   });
+  it("explains a text response that is not strict UTF-8 text", () => {
+    const card = presentExecutionError({ code: "TOOL_RESPONSE_ENCODING_INVALID", message: "HTTP text response is not valid UTF-8", reason: "provider_error", tool: "O*NET", host: "www.onetonline.org" });
+    expect(card?.title).toBe("工具响应格式不符");
+    expect(card?.message).toContain("text/* UTF-8");
+    expect(card?.actions[0].hint).toBe("tool-settings");
+  });
   it("keeps tool identity readable", () => {
     const card = presentExecutionError({ code: "HTTP_TOOL_FAILED", message: "HTTP tool returned status 401", reason: "auth_failed", provider: "Hacker News 搜索", tool: "Hacker News 搜索", host: "hn.algolia.com", httpStatus: 401 });
     expect(card?.title).toBe("工具请求失败");

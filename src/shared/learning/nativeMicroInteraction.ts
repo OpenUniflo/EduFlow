@@ -47,6 +47,44 @@ function validateInteraction(interaction: NativeMicroInteraction): string[] {
   return valid ? [] : ["Matrix/Tensor Explorer requires bounded dimensions and challenge targets."];
 }
 
+export type ChoiceOptionState = {
+  optionIndex: number;
+  selected: boolean;
+  correct: boolean;
+  /** idle until a submitted answer exists; then correct / incorrect feedback. */
+  state: "idle" | "correct" | "incorrect";
+};
+
+/**
+ * Option markers are revealed only after a submitted answer (success or retry),
+ * so selecting an option never leaks the correct answer. The grading rule itself
+ * remains `isNativeMicroInteractionCorrect`.
+ */
+export function nativeChoiceOptionStates(
+  interaction: NativeMicroInteraction,
+  answer: unknown,
+  revealed: boolean
+): ChoiceOptionState[] | null {
+  if (!revealed) return null;
+  if (interaction.type === "choice") {
+    const selectedIndex = typeof answer === "string" ? interaction.options.indexOf(answer) : -1;
+    return interaction.options.map((_, optionIndex) => {
+      const selected = optionIndex === selectedIndex;
+      const correct = optionIndex === interaction.correctIndex;
+      return { optionIndex, selected, correct, state: correct ? "correct" : selected ? "incorrect" : "idle" };
+    });
+  }
+  if (interaction.type === "multiple-choice") {
+    const selectedIndexes = Array.isArray(answer) && answer.every((item) => typeof item === "number") ? new Set(answer as number[]) : new Set<number>();
+    return interaction.options.map((_, optionIndex) => {
+      const selected = selectedIndexes.has(optionIndex);
+      const correct = interaction.correctIndexes.includes(optionIndex);
+      return { optionIndex, selected, correct, state: correct ? "correct" : selected ? "incorrect" : "idle" };
+    });
+  }
+  return null;
+}
+
 export function isNativeMicroInteractionCorrect(interaction: NativeMicroInteraction, answer: unknown) {
   if (validateNativeMicroInteraction(interaction).length) return false;
   if (interaction.type === "flow-execution" || interaction.type === "simulation" || interaction.type === "data-transform") return mechanismFeedback(interaction, answer).correct;

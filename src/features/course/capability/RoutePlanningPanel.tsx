@@ -2,17 +2,23 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { KnowledgeEdge } from '@/features/knowledge/types';
 import type { RouteConflict, RouteConstraints } from '@/shared/learning/routePlanning';
+import { routeConflictCopy } from './routeConflictCopy';
 import type { RouteVersion } from '@/shared/learning/routeVersion';
 import { compareRouteActionOptions, isNodeScope, executionEdgeIds, sameActionScope, type CapabilityActionScope, type RouteActionOption, type RouteExecutionIssue, type RouteExecutionStep, type RouteActionChoice } from '@/shared/learning/routeExecution';
 import { routeDiff } from '@/shared/learning/routeDiff';
 import { relationLabel } from '@/shared/learning/routePresentation';
 import type { useRoutePlanning } from './useRoutePlanning';
 export function RouteConflicts({ conflicts, title, locate, undo, exclude }: { conflicts: RouteConflict[]; title(id: string): string; locate?(id:string):void; undo?(id:string):void; exclude?(id:string):void }) {
-  return <div className="route-conflicts" role="alert">{conflicts.map((conflict, index) => <p key={index}>
-    <strong>{conflict.rootNodeId ? `${conflict.rootKind === 'include' ? '无法加入' : '目标当前不可达'}：${title(conflict.rootNodeId)}` : '知识前置关系存在循环'}</strong><br/>
-    {conflict.kind === 'include_exclude' ? '同一能力不能同时加入和排除。' : conflict.kind === 'include_outside_model' ? '该能力不在当前项目能力模型中。' : conflict.kind === 'target_without_acquired_path' ? '当前已掌握能力没有通向此目标的有效路径；可排除此目标，或先学习必要的入口能力。' : conflict.kind === 'excluded_hard_prerequisite' ? `${title(conflict.nodeId!)} 是必须前置，但被当前路线排除。` : conflict.kind === 'hard_prerequisite_outside_path' ? `${title(conflict.rootNodeId!)} 需要的前置关系 ${title(conflict.nodeId!)} → ${title(conflict.rootNodeId!)} 不属于当前有效目标路径；请撤销 ${title(conflict.rootNodeId!)} 的加入或选择其他支路，不能绕过这个前置条件。` : conflict.kind === 'unavailable_hard_prerequisite' ? `${title(conflict.nodeId!)} 是必须前置，但当前不可用；可排除受影响目标，或联系课程维护者修复。` : '请联系课程维护者修正真实前置关系后再规划。'}
-    {locate&&conflict.nodeId?<button onClick={()=>locate(conflict.nodeId!)}>定位能力</button>:null}{undo&&conflict.nodeId&&conflict.constraint!=='knowledge_graph'?<button onClick={()=>undo(conflict.nodeId!)}>移除此项约束</button>:null}
-  {exclude&&conflict.rootNodeId?<button onClick={()=>exclude(conflict.rootNodeId!)}>排除此目标</button>:null}</p>)}</div>;
+  return <div className="route-conflicts" role="alert">{conflicts.map((conflict, index) => {
+    const copy = routeConflictCopy(conflict, title);
+    return <p key={index}>
+      <strong>{copy.heading}</strong><br/>
+      {copy.reason}
+      {locate && copy.locateNodeId ? <button onClick={() => locate(copy.locateNodeId!)}>定位能力</button> : null}
+      {undo && copy.removeNodeId ? <button onClick={() => undo(copy.removeNodeId!)}>移除此项约束</button> : null}
+      {exclude && copy.excludeTargetNodeId ? <button onClick={() => exclude(copy.excludeTargetNodeId!)}>排除此目标</button> : null}
+    </p>;
+  })}</div>;
 }
 export function HistoricalRoute({ version, current, actionTitles={} }: { version: RouteVersion; current?: RouteVersion|null; actionTitles?:Record<string,string>; restore?:()=>void; disabled?:boolean }) {
   const diff=current?routeDiff(current.snapshot,version.snapshot):null;
@@ -110,5 +116,5 @@ export function RoutePlanningPanel({ control:c,title,relations=[],edgeId,node,on
 }
 
 function ScopeActionChoices({scope,options,chosen,catalog,control:c,selected,satisfied=false}:{scope:CapabilityActionScope;options:RouteActionOption[];chosen:RouteActionChoice[];catalog:RouteActionOption[];control:ReturnType<typeof useRoutePlanning>;selected:boolean;satisfied?:boolean}) {
-  return <><fieldset data-planning-edge={scope.edgeId} data-planning-node={scope.nodeId}><legend>选择行动 · 可多选，仅更新草稿</legend>{options.map((option,index)=><label className="route-action-choice" key={option.actionId}><input type="checkbox" checked={chosen.some(choice=>choice.actionId===option.actionId)} disabled={c.busy||!selected||!option.planningAvailable&&!chosen.some(choice=>choice.actionId===option.actionId)} onChange={()=>c.chooseAction(scope,option.actionId)}/><span><strong>{option.title}{index===0&&option.planningAvailable?' · 推荐':''}</strong><small>{option.type==='micro_learning'?'微学习':'业务实践'} · {option.estimatedMinutes} 分钟 · 规划成本 {option.weight}</small><small>{option.availableNow?'当前可执行':option.planningAvailable?'可规划，执行时核验局部顺序与能力条件':'资源不可用'}</small>{option.reasons.length?<small>{option.reasons.join('；')}</small>:null}</span></label>)}{!options.length?<p>当前能力或关系没有可用行动。资源不足不会移除能力模型；请联系课程维护者或调整路线。</p>:null}</fieldset><section className="route-action-order" aria-label="已选执行顺序"><h4>已选执行顺序</h4>{chosen.length?<ol>{chosen.map((choice,index)=><li key={choice.actionId}><span>{catalog.find(option=>option.actionId===choice.actionId)?.title??'所选行动已失效'}</span><button aria-label={`上移行动 ${index+1}`} disabled={c.busy||index===0} onClick={()=>c.moveAction(scope,choice.actionId,-1)}>↑</button><button aria-label={`下移行动 ${index+1}`} disabled={c.busy||index===chosen.length-1} onClick={()=>c.moveAction(scope,choice.actionId,1)}>↓</button><button aria-label={`移除行动 ${index+1}`} disabled={c.busy} onClick={()=>c.chooseAction(scope,choice.actionId)}>移除</button></li>)}</ol>:<p>{satisfied?'能力已满足，可跳过或选择补充执行。':selected?'至少选择一个行动，才可采用可执行路线。':'加入正式路线后选择行动。'}</p>}</section></>;
+  return <><fieldset data-planning-edge={scope.edgeId} data-planning-node={scope.nodeId}><legend>选择行动 · 可多选，仅更新草稿</legend>{options.map((option,index)=><label className="route-action-choice" key={option.actionId}><input type="checkbox" checked={chosen.some(choice=>choice.actionId===option.actionId)} disabled={c.busy||!selected||!option.planningAvailable&&!chosen.some(choice=>choice.actionId===option.actionId)} onChange={()=>c.chooseAction(scope,option.actionId)}/><span><strong>{option.title}{index===0&&option.planningAvailable?' · 推荐':''}</strong><small>{option.type==='micro_learning'?'小练习':'业务实践'} · {option.estimatedMinutes} 分钟 · 规划成本 {option.weight}</small><small>{option.availableNow?'当前可执行':option.planningAvailable?'可规划，执行时核验局部顺序与能力条件':'资源不可用'}</small>{option.reasons.length?<small>{option.reasons.join('；')}</small>:null}</span></label>)}{!options.length?<p>当前能力或关系没有可用行动。资源不足不会移除能力模型；请联系课程维护者或调整路线。</p>:null}</fieldset><section className="route-action-order" aria-label="已选执行顺序"><h4>已选执行顺序</h4>{chosen.length?<ol>{chosen.map((choice,index)=><li key={choice.actionId}><span>{catalog.find(option=>option.actionId===choice.actionId)?.title??'所选行动已失效'}</span><button aria-label={`上移行动 ${index+1}`} disabled={c.busy||index===0} onClick={()=>c.moveAction(scope,choice.actionId,-1)}>↑</button><button aria-label={`下移行动 ${index+1}`} disabled={c.busy||index===chosen.length-1} onClick={()=>c.moveAction(scope,choice.actionId,1)}>↓</button><button aria-label={`移除行动 ${index+1}`} disabled={c.busy} onClick={()=>c.chooseAction(scope,choice.actionId)}>移除</button></li>)}</ol>:<p>{satisfied?'能力已满足，可跳过或选择补充执行。':selected?'至少选择一个行动，才可采用可执行路线。':'加入正式路线后选择行动。'}</p>}</section></>;
 }

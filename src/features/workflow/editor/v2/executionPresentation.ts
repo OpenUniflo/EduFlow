@@ -1,6 +1,6 @@
 import { nodeAuthoring } from "../../domain/v2/authoring";
 import type { JsonValue, WorkflowDefinitionV2, WorkflowEventV2, WorkflowNodeV2, WorkflowStepV2 } from "../../domain/v2/types";
-export const executionStatus: Record<string, string> = { queued: "排队中", running: "执行中", waiting: "等待填写", success: "成功", completed: "已完成", failed: "失败", cancelled: "已取消", interrupted:"执行中断", prepared:"结果已暂存", continued:"已继续" };
+export const executionStatus: Record<string, string> = { unknown: "证据不足", queued: "排队中", running: "执行中", waiting: "等待填写", success: "成功", completed: "已完成", failed: "失败", cancelled: "已取消", interrupted:"执行中断", prepared:"结果已暂存", continued:"已继续" };
 const MAX_SUMMARY = 140;
 const objectValue = (value: JsonValue | undefined): Record<string, JsonValue> | undefined => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 function compact(value: string, max = MAX_SUMMARY): string {

@@ -50,14 +50,16 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   const progress=formal ? routeExecutionProgress({userId,courseId,steps:formal,runs,acquiredNodeIds:routeData.input.currentNodeIds,facts:edges,selectedNodeIds:version?.snapshot.selectedNodeIds,selectedPrerequisiteEdges:version?.snapshot.prerequisiteEdges}) : null;
   const reachable=new Set(progress?.reachableNodeIds??routeData.input.currentNodeIds);
   if(progress && (!retainedScope || !runs.some(run=>run.status==='completed'&&run.edge_id===action.edge_id&&(run.node_id??null)===(action.node_id??null)&&run.action_id===actionId)) && !progress.availableStepIndexes.some(index=>runMatchesStep({edge_id:action.edge_id,node_id:action.node_id,action_id:actionId},formal![index]))) throw new ApiError(409,'route_step_not_available','该行动尚未进入可执行前沿；请先完成同一关系的前序行动或形成起点能力。已完成行动请使用再次执行。');
-  if (!formal && hasUnmetHardPrerequisite(targetId,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
+  // Hard incoming facts remain AND gates for a retained formal route too; the
+  // execution frontier only knows the chosen Step source, not every sibling.
+  if (hasUnmetHardPrerequisite(targetId,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
   const cost = evaluateAction(action, { sourceId, acquiredIds: new Set(routeData.input.currentNodeIds), routeExecutionReachableIds:reachable, binding: binding ?? undefined });
   if (!cost.available) throw new ApiError(422, 'action_conditions_unmet', cost.reasons.filter(reason => reason.code !== 'time' && reason.code !== 'difficulty').map(reason => reason.message).join('；'));
   let microPathId: string | null = null;
   if (action.type === 'micro_learning') {
     const paths = await availableMicroPaths(client, courseId);
     const path = paths.find(path => path.id === binding?.micro_path_id && path.knowledge_id === targetId);
-    if (!path) throw new ApiError(422, 'action_micro_unavailable', '该能力尚无已发布的微学习内容，请选择其他行动。');
+    if (!path) throw new ApiError(422, 'action_micro_unavailable', '该能力尚无已发布的小练习内容，请选择其他行动。');
     // Existing Micro authority owns teaching eligibility; never initialize a route from Action execution.
     if (!await readActiveVersion(client, userId, courseId)) throw new ApiError(409, 'route_not_initialized', '请先打开课程路线。');
     if(formal) { /* Formal Action authority already validated the exact Step and local order. */ }
@@ -82,7 +84,7 @@ export async function requireActionMicroEligibility(client: SupabaseClient, user
   if(runId) {
     const result=await client.from('edge_action_runs').select('*').eq('id',runId).eq('user_id',userId).eq('course_id',courseId).maybeSingle();
     const run=dataOrThrow(result.data,result.error,'Micro Action eligibility') as ActionRun|null;
-    if(!run || run.execution_snapshot.targetId!==nodeId || !['selected','in_progress','completed'].includes(run.status)) throw new ApiError(404,'micro_action_unavailable','微学习执行上下文不可用。');
+    if(!run || run.execution_snapshot.targetId!==nodeId || !['selected','in_progress','completed'].includes(run.status)) throw new ApiError(404,'micro_action_unavailable','小练习执行上下文不可用。');
     if(run.status!=='completed') await requireActionExecution(client,userId,courseId,run.action_id,run.status==='in_progress'||run.execution_snapshot.repeatedFromRunId?true:undefined);
     const version=await readActiveVersion(client,userId,courseId);
     if(version?.snapshot.executionSteps!==undefined) return {...version.snapshot,activeVersionId:version.id};

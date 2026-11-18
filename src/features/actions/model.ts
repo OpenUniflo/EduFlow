@@ -66,7 +66,7 @@ export function evaluateAction(action: EdgeAction, input: {
   let available = true;
   const block = (code: ActionReason['code'], message: string) => { available = false; reasons.push({ code, message, cost: 0 }); };
   if (input.executionAvailable === false) block('executor_unavailable', '尚未配置可执行内容，或执行条件未满足');
-  if (action.type === 'micro_learning' && input.microAvailable === false) block('micro_unavailable', '微学习尚未就绪：需已发布内容、有效课程路线及必需前置能力');
+  if (action.type === 'micro_learning' && input.microAvailable === false) block('micro_unavailable', '小练习尚未就绪：需已发布内容、有效课程路线及必需前置能力');
   if (action.status !== 'active') block('archived', '行动模板已归档');
   if (input.binding && (input.binding.action_id !== action.id || !input.binding.available)) block('binding_unavailable', '项目资源绑定不可用');
   for (const id of [...new Set(action.required_capability_ids)].sort()) {

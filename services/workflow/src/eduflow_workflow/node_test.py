@@ -1,6 +1,7 @@
 """Isolated node invocation. Reuses execution/authorization, never creates a formal Run."""
 import asyncio
 import copy
+import os
 import uuid
 from .contracts import ExecutionError, validate_value
 from .compiler import compile_definition
@@ -16,15 +17,20 @@ class TestStorage:
 
 async def test_node(body,registry):
     from .registry import requested_variable_environment
-    env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
+    from .references import resolve_definition_references
+    variable_environment_id=requested_variable_environment(body)
+    env=registry.environment(body["environmentRef"],body["ownerId"],variable_environment_id)
     definition=copy.deepcopy(body["definition"])
     selected=next((node for node in definition["nodes"] if node["id"]==body["nodeId"]),None)
     if not selected: raise ExecutionError("NODE_NOT_FOUND","Node does not exist")
     if selected["type"].startswith("control.") or selected["type"] in ("core.subgraph","core.memory"): raise ExecutionError("NODE_TEST_REQUIRES_RUN","Run the workflow to test control flow and subgraphs")
     if selected["type"] in ("core.start","core.end"): raise ExecutionError("NODE_TEST_UNAVAILABLE","Test a processing node")
     if selected["config"].get("authoring",{}).get("interrupt"): raise ExecutionError("NODE_TEST_REQUIRES_RUN","Run the workflow to respond to a node interrupt")
+    from .storage import Storage
+    storage=Storage(os.environ["WORKFLOW_DATABASE_URL"]) if os.environ.get("WORKFLOW_DATABASE_URL") else None
+    await resolve_definition_references(storage,registry,body["ownerId"],definition,env["ref"],variable_environment_id)
     refs=([selected["config"]["toolRef"]] if selected["type"]=="core.tool" else selected["config"].get("allowedToolRefs",[]))
-    if any(tool["ref"] in refs and tool.get("sideEffect")=="write" for tool in env["tools"]) and body.get("confirmExternalEffect") is not True:
+    if any(tool["ref"] in refs and tool.get("sideEffect") in ("write","unknown") for tool in env["tools"]) and body.get("confirmExternalEffect") is not True:
         raise ExecutionError("EXTERNAL_EFFECT_CONFIRMATION_REQUIRED","Confirm possible external changes before testing","policy")
     start={"id":"test-start-"+str(uuid.uuid4()),"label":"Test start","type":"core.start","typeVersion":1,"config":{},"inputs":{},"writes":{}}
     end={**start,"id":"test-end-"+str(uuid.uuid4()),"type":"core.end"}

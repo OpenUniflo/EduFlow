@@ -133,7 +133,7 @@ type EditorDocument = {
 };
 ```
 
-JsonValue 只允许 JSON 可序列化值，拒绝 NaN、Infinity、循环引用。JsonSchema 采用 JSON Schema 2020-12 的受限子集：type、properties、required、additionalProperties、items、enum、const、数值/长度边界及本地 $defs/$ref。M1 不支持远程引用、任意正则、隐式类型转换；未知关键字不能被静默忽略。title/description/default/$schema 为允许的注解，default 不自动应用；type 可用基础类型或包含 null 的类型数组。顶层 Input/State/Output 都为 object，绑定表的键是其顶层字段名，不是路径。编译时检测递归引用并拒绝 M1 不支持的递归 Schema。TS 与 Python 使用成熟验证库并共享一致性样例。
+JsonValue 只允许 JSON 可序列化值，拒绝 NaN、Infinity、循环引用。JsonSchema 采用 JSON Schema 2020-12 的受限子集：type、anyOf、properties、required、additionalProperties、items、enum、const、数值/长度边界及本地 $defs/$ref。M1 不支持远程引用、任意正则、隐式类型转换；未知关键字不能被静默忽略。title/description/default/examples/$schema 为允许的注解，default 与 examples 不参与执行、不自动应用；type 可用基础类型或包含 null 的类型数组。顶层 Input/State/Output 都为 object，绑定表的键是其顶层字段名，不是路径。编译时检测递归引用并拒绝 M1 不支持的递归 Schema。TS 与 Python 使用成熟验证库并共享一致性样例。
 
 M1 Binding 有意不支持跨节点历史输出路径。节点结果通过显式 writes 写入 State，再由下游读取，避免循环内“取哪一次输出”的歧义。单次输出保留在 Step 中供调试。writes 值为空 JSON Pointer 时表示完整节点输出。State 顶层写入替换/合并规则见第 5 节。
 

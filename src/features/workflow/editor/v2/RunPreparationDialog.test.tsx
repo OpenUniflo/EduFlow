@@ -98,3 +98,14 @@ it("shows the reused-run revision notice and the fields that still need input", 
   expect(html).toContain("敏感字段，需要重新填写");
   expect(html).toContain("HN 上怎么评价 htmx？");
 });
+
+it("keeps one close action: 取消 before a run and 关闭 after one exists", () => {
+  const schema = { type: "object" as const, properties: { comment: { type: "string" as const } }, additionalProperties: false };
+  const before = renderToStaticMarkup(createElement(RunPreparationDialog, { ...base, schema, value: {} }));
+  expect((before.match(/>取消<\/button>/g) ?? []).length).toBe(1);
+  expect(before).not.toContain('aria-label="关闭运行"');
+
+  const after = renderToStaticMarkup(createElement(RunPreparationDialog, { ...base, schema, value: {}, hasRun: true }));
+  expect((after.match(/>关闭<\/button>/g) ?? []).length).toBe(1);
+  expect(after).not.toContain(">取消</button>");
+});

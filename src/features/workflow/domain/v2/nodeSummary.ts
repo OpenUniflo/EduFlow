@@ -15,6 +15,10 @@ export type NodeCardSummaryContext = {
   modelName?: string;
   /** Output field count for nodes whose outputs are derived by the editor. */
   outputCount?: number;
+  /** Fixed Workflow reference target name (independent Workflow, not an embedded copy). */
+  referenceName?: string;
+  /** Exact fixed revision carried by the reference node. */
+  referenceRevision?: number;
 };
 
 export type NodeCardSummary = { text: string; mono: boolean };
@@ -100,6 +104,11 @@ export function nodeCardSummary(node: WorkflowNodeV2, context: NodeCardSummaryCo
     case "core.function":
       return { text: `${languageLabel(node.config.language)} · ${context.outputCount ?? functionOutputCount(node)} 个输出`, mono: false };
     case "core.subgraph": {
+      if (node.config.graph === undefined && objectValue(node.config.workflowRef)) {
+        const name = context.referenceName?.trim();
+        const revision = context.referenceRevision ?? Number(objectValue(node.config.workflowRef)?.revision ?? 0);
+        return { text: `${name ? `调用 ${name}` : "调用工作流"}${revision ? ` · 版本 ${revision}` : ""}`, mono: false };
+      }
       const graph = objectValue(node.config.graph);
       const count = Array.isArray(graph?.nodes) ? graph.nodes.length : 0;
       return { text: count ? `子图 · ${count} 个节点` : "子图", mono: false };

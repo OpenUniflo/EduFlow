@@ -43,6 +43,22 @@ it("renames a still-default parameter to the picked field name but preserves a m
   expect(applyDeclaredBinding({ value: literal(""), topics: literal("") }, "value", { source: "state", pointer: "/summary/topics", onMissing: { mode: "error" } }).name).toBe("topics_2");
 });
 
+it("shows Schema defaults and can name the target Workflow as the source", () => {
+  const html = renderToStaticMarkup(createElement(NodeParamsTable, {
+    mode: "schema",
+    inputs: {},
+    onChangeInputs: vi.fn(),
+    paramSchema: { type: "object", properties: { count: { type: "integer", default: 2 } }, additionalProperties: false },
+    startInputSchema: { type: "object", properties: {} },
+    stateSchema: { type: "object" },
+    paramSourceLabel: "目标工作流",
+    showSourceAction: false,
+  }));
+  expect(html).toContain("默认 2");
+  expect(html).toContain("参数由目标工作流定义");
+  expect(html).not.toContain("编辑工具");
+});
+
 it("renders fixed values as read-only controls when the table is read-only", () => {
   const html = renderToStaticMarkup(createElement(NodeParamsTable, {
     mode: "declared",

@@ -2,8 +2,16 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createUserSupabase } from "./_lib/supabase.js";
 import { ApiError, handleApi, json } from "./_lib/http.js";
 import { handleWorkflowV2 } from "./_lib/workflowV2.js";
+import { handleMcpOAuthCallback } from "./_lib/mcpAuth.js";
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
+  // The OAuth redirect is a browser navigation and therefore has no bearer token.
+  // Its opaque state resolves the owning user server-side; every other resource
+  // still requires a validated session below.
+  if (request.method === "GET" && request.query.resource === "mcp-auth" && request.query.op === "callback") {
+    await handleMcpOAuthCallback(request, response);
+    return;
+  }
   const { client, user } = await createUserSupabase(request);
   try { if (await handleWorkflowV2(request, response, user.id, client)) return; }
   catch (error) {

@@ -1,8 +1,10 @@
-# 新版 UI：AGENTS.md 规则修改稿（待审）
+# 新版 UI：AGENTS.md 规则修改稿（已合入）
 
 日期：2026-10-29 · 状态：**已于 2026-10-30 合入** `AGENTS.md` 与 `docs/rules/*.md`（本文件保留为决策记录）
 
-依据：第 58 版设计稿「EduFlow 新版设计」与 2026-10-29 的产品决定。下面每一条给出**原规则**、**修改后规则（拟合入 AGENTS.md 的英文条文）**和**理由**。未列出的规则保持不变。
+> 2026-10-31 更新：第 1 条（档案）与第 2 条中「技能树 / 实训树 / 能力模型」的呈现方式已被 [`DESKTOP_MIGRATION_PLAN.md`](DESKTOP_MIGRATION_PLAN.md) §10 取代（以人为中心与课程平面两种布局、地图式分层、课程页「课程树 / 路线」两个视图）。现行规则以 `AGENTS.md` 与 `docs/rules/` 为准。
+
+依据：当时的第 58 版设计稿「EduFlow 新版设计」（最新版地址见 [`DESKTOP_MIGRATION_PLAN.md`](DESKTOP_MIGRATION_PLAN.md) §0）与 2026-10-29 的产品决定。下面每一条给出**原规则**、**修改后规则（拟合入 AGENTS.md 的英文条文）**和**理由**。未列出的规则保持不变。
 
 ---
 
@@ -51,7 +53,7 @@
 
 **涉及章节**：Anonymous Viewing and Progressive Auth
 
-**修改后（新增例外条款）**：
+**修改后（新增匿名可访问的分享功能）**：
 
 - A learner MAY create a revocable share link for an explicit subset of their own learner state (progress summary, route; works optionally). Anyone with the link, including anonymous viewers, MAY read exactly that subset.
 - Shared reads go through a dedicated server endpoint that resolves the link token; `anon` RLS on learner tables stays closed. Scores, failed attempts, conversations, drafts and unsubmitted work are never shareable.
@@ -78,7 +80,7 @@
 **新增条款**：
 
 - A feature whose backend is not available MAY ship as a Feature Preview: the real UI and interactions, fed by a fixed sample dataset.
-- Sample datasets live under `src/demo` and are injected by the `src/app` composition root through the same contracts as real repositories; Feature code MUST NOT import `src/demo`.
+- Sample datasets live under `src/demo/preview/` and are injected by the `src/app` composition root through the same contracts as real repositories; Feature code MUST NOT import `src/demo`.
 - Preview regions MUST carry a visible "预览 · 示例数据" marker, use obviously sample identities, never mix with the user's real data, and never write durable state. Interaction state is page-ephemeral.
 - Replacing a preview with the real backend MUST only swap the injected source.
 

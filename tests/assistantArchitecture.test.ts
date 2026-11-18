@@ -4,13 +4,20 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("Global Assistant architecture", () => {
-  it("uses AI SDK Core for streaming and bounded multi-step tools", () => {
+  it("streams AI SDK UI message parts from one bounded answer loop", () => {
     const source = read("api/assistant.ts");
     expect(source).toContain("streamText");
-    expect(source).toContain("stepCountIs(4)");
-    expect(source).toContain("result.consumeStream()");
+    expect(source).toContain("stepCountIs(TOOL_LOOP_MAX_STEPS)");
+    expect(source).toContain("prepareStep");
+    expect(source).toContain('toolChoice: "none"');
+    expect(source).toContain("TOOL_LOOP_MAX_STEPS = 10");
+    expect(source).toContain("Independent read-only lookups belong in the same step");
+    expect(source).toContain("toUIMessageStream");
+    expect(source).toContain("pipeUIMessageStreamToResponse");
+    expect(source).toContain("createDisplayCardTool");
+    expect(source).toContain("createProtocolGuardTransform");
     expect(source).toContain("createAssistantTools");
-    expect(source).not.toMatch(/while\s*\(|for\s*\([^)]*tool/);
+    expect(source).not.toContain("pipeTextStreamToResponse");
   });
 
   it("authenticates server-side and persists user-owned sessions with RLS", () => {
@@ -23,18 +30,70 @@ describe("Global Assistant architecture", () => {
     expect(migration).toContain("auth.uid()");
   });
 
-  it("persists structured timeline content under the existing message RLS", () => {
-    const migration = read("supabase/migrations/20260827180000_assistant_structured_timeline.sql");
+  it("persists ordered parts and forward-migrates legacy structured content", () => {
+    const migration = read("supabase/migrations/20261107120000_assistant_timeline_parts.sql");
     const source = read("api/assistant.ts");
-    expect(migration).toContain("add column structured_content jsonb");
+    expect(migration).toContain("add column if not exists parts jsonb");
+    expect(migration).toContain("add column if not exists dedupe_key text");
+    expect(migration).toContain("assistant_session_id");
+    expect(source).toContain("timelineParts(row)");
+    expect(source).toContain("persistedParts(");
     expect(source).toContain("planningMessageId");
     expect(source).toContain('body.action === "refine-goal"');
     expect(source).toContain('body.action === "prepare-course-brief"');
     expect(source).not.toContain('body.action === "create-personal-course"');
   });
 
-  it("keeps Next Action authority outside the LLM", () => {
-    expect(read("api/assistant.ts")).toContain("There is no authoritative Navigation Engine");
+  it("guards protocol text while streaming and never persists it", () => {
+    const source = read("api/assistant.ts");
+    const guard = read("api/_lib/streamProtocolGuard.ts");
+    expect(guard).toContain("createProtocolGuardTransform");
+    expect(guard).toContain("protocolLeakInProgress");
+    expect(source).toContain("hasAssistantProtocolLeak(text)");
+    expect(source).toContain("persistedParts");
+    expect(read("supabase/migrations/20261105233000_assistant_message_invalid_reason.sql")).toContain("invalid_reason");
+  });
+
+  it("keeps Next Action authority outside the LLM while exposing the deterministic decision", () => {
+    const source = read("api/assistant.ts");
+    expect(source).toContain("EduFlow has a server-owned Navigation Engine");
+    expect(source).not.toContain("There is no authoritative Navigation Engine");
+    expect(read("api/_lib/plugins/navigation.ts")).toContain("getNavigationDecision");
+    expect(read("api/_lib/assistantData.ts")).toContain("readNavigationDecision(client, user.id, resolvedCourseId)");
+    expect(read("api/_handlers/navigation.ts")).toContain("readNavigationDecision(client, user.id, courseId)");
+  });
+
+  it("requires learner-facing Chinese display names without internal identifiers", () => {
+    const source = read("api/assistant.ts");
+    expect(source).toContain("Learner-facing prose must be natural Simplified Chinese");
+    expect(source).toContain("Never print tool or function names");
+    expect(source).toContain("Micro = 小练习");
+    expect(source).toContain("Cards are part of the answer, never page state");
+    expect(source).not.toContain("at most 3 cards");
+    expect(source).toContain("no fixed per-answer card count");
+    expect(source).toContain("Answer first");
+    expect(source).toContain("Do not interrogate");
+    expect(source).toContain("Do not persist");
+    expect(source).toContain("Always leave an exit");
+  });
+
+  it("uses @ai-sdk/react useChat and message.parts, with no hand-written stream reader", () => {
+    const runtime = read("src/features/assistant/AssistantRuntimeContext.tsx");
+    const client = read("src/features/assistant/assistantClient.ts");
+    expect(runtime).toContain("useChat");
+    expect(runtime).toContain("chatMessages");
+    expect(runtime).toContain("DefaultChatTransport");
+    expect(client).not.toContain("getReader()");
+    expect(client).not.toContain("TextDecoder");
+    expect(read("src/features/assistant/components/AssistantTimeline.tsx")).toContain("message.parts");
+  });
+
+  it("renders Markdown without raw HTML", () => {
+    const markdown = read("src/features/assistant/cards/AssistantMarkdown.tsx");
+    expect(markdown).toContain("react-markdown");
+    expect(markdown).toContain("remark-gfm");
+    expect(markdown).toContain("skipHtml");
+    expect(markdown).not.toContain('from "rehype-raw"');
   });
 
   it("uses one physical Assistant entrypoint and the shared full-chat route", () => {
@@ -42,8 +101,20 @@ describe("Global Assistant architecture", () => {
     expect(read("build/local-api-vite-plugin.ts")).toContain('["/api/assistant", assistantHandler]');
   });
 
-  it("records the active session as soon as streaming response headers arrive", () => {
-    expect(read("src/features/assistant/assistantClient.ts")).toContain("onSession?.(sessionId)");
+  it("records the active session from the response header without a manual stream parser", () => {
+    expect(read("src/features/assistant/AssistantRuntimeContext.tsx")).toContain("X-Assistant-Session-Id");
     expect(read("src/features/assistant/AssistantRuntimeContext.tsx")).toContain("window.localStorage.setItem(storageKey, sessionId)");
+  });
+
+  it("retires operation messages and keeps learning mutations out of the timeline", () => {
+    const source = read("api/assistant.ts");
+    const timeline = read("api/_lib/assistantTimeline.ts");
+    const evaluation = read("api/_lib/assignmentAiEvaluation.ts");
+    const runtime = read("src/features/assistant/AssistantRuntimeContext.tsx");
+    expect(source).toContain("assistant_action_records_retired");
+    expect(timeline).not.toContain("recordButtonAction");
+    expect(timeline).not.toContain("recordEvaluationTimeline");
+    expect(evaluation).not.toContain("recordEvaluationTimeline");
+    expect(runtime).not.toContain("recordAction");
   });
 });

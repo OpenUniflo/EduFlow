@@ -81,6 +81,29 @@ describe("Workflow request failures", () => {
     expect(rejection.details).toBe(details); expect(rejection.message).toBe("Internal English detail");
   });
 
+  it("sends the selected environment with a definition save", async () => {
+    request.mockResolvedValueOnce({ workflowId: "workflow", revision: 2, editorRevision: 2 });
+    await new WorkflowApiV2().save({ workflowId: "workflow" } as never, {} as never, 1, 1, "local");
+    expect(request.mock.calls[0][0]).toContain("resource=definitions");
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ definition: { workflowId: "workflow" }, editor: {}, baseRevision: 1, baseEditorRevision: 1, environmentRef: "local" });
+  });
+
+  it("gives deleted connections and active-run deletion a recoverable next step", () => {
+    expect(workflowErrorMessage(new ApiRequestError("CONNECTION_UNAVAILABLE", "gone", 409))).toContain("刷新资源");
+    expect(workflowErrorMessage(new ApiRequestError("CONNECTION_BUSY", "busy", 409))).toContain("等待运行结束或取消运行");
+    expect(workflowErrorMessage(new ApiRequestError("INVALID_CONNECTION_REFERENCE", "bad", 400))).toContain("重新选择连接");
+    expect(workflowErrorMessage(new ApiRequestError("INVALID_CONNECTION_REFERENCE", "bad", 400))).toContain("打开原工作流");
+  });
+
+  it("keeps catalog row overflow distinct from shared discovery quota", () => {
+    const payload = workflowErrorMessage(new ApiRequestError("CATALOG_PAYLOAD_TOO_LARGE", "row", 422));
+    const quota = workflowErrorMessage(new ApiRequestError("CATALOG_QUOTA_EXCEEDED", "quota", 422));
+    expect(payload).toContain("完整定义超过单条发现目录容量");
+    expect(payload).toContain("减少允许工具");
+    expect(quota).toContain("连接数量已满");
+    expect(quota).not.toContain("完整定义");
+  });
+
   it("distinguishes a save revision conflict from an Assignment state conflict", () => {
     expect(workflowErrorMessage(new ApiRequestError("REVISION_CONFLICT", "Conflict", 409))).toContain("保存冲突");
     const message = workflowErrorMessage(new ApiRequestError("ASSIGNMENT_STATE_CONFLICT", "Conflict", 409));
@@ -96,14 +119,20 @@ describe("Resource center reference and test requests (M3)", () => {
     request.mockResolvedValueOnce({ items });
     const result = await new WorkflowApiV2().extensionReferences("price_service", "local-env");
     expect(result).toEqual({ items });
-    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&environmentRef=local-env");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&environmentRef=local-env&kind=connection");
     expect(request.mock.calls[0][1]).toBeUndefined();
   });
 
   it("omits the environment when none is supplied", async () => {
     request.mockResolvedValueOnce({ items: [] });
     await new WorkflowApiV2().extensionReferences("price_service");
-    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&kind=connection");
+  });
+
+  it("queries function references with the function kind", async () => {
+    request.mockResolvedValueOnce({ items: [] });
+    await new WorkflowApiV2().extensionReferences("cleanup", "local-env", "function");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=cleanup&environmentRef=local-env&kind=function");
   });
 
   it("queries variable references without a Workflow identity", async () => {
@@ -159,5 +188,32 @@ describe("Variable environment contract (M13)", () => {
     request.mockResolvedValueOnce(run);
     await expect(new WorkflowApiV2().run(run.runId)).resolves.toEqual(run);
     expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=runs&id=ca72a44b-7a80-47b1-a93b-451775c03ddb");
+  });
+});
+
+describe("Workflow relationship reads", () => {
+  beforeEach(() => request.mockReset());
+
+  it("reads the current incoming closure without substituting a target revision", async () => {
+    request.mockResolvedValueOnce({ workflowId: "workflow-id", mode: "current-closure", items: [] });
+    await expect(new WorkflowApiV2().referencedBy("workflow-id")).resolves.toMatchObject({ mode: "current-closure" });
+    expect(request).toHaveBeenCalledWith("/api/workflows?resource=definitions&id=workflow-id&op=referenced-by", { cache: "no-store" });
+  });
+
+  it("reads one exact source revision for outgoing pins and bypasses a stale cache", async () => {
+    request.mockResolvedValueOnce({ workflowId: "workflow-id", revision: 3, items: [] });
+    await expect(new WorkflowApiV2().references("workflow-id", 3)).resolves.toMatchObject({ revision: 3 });
+    expect(request).toHaveBeenCalledWith("/api/workflows?resource=definitions&id=workflow-id&op=references&revision=3", { cache: "no-store" });
+  });
+});
+
+describe("Run reference history request", () => {
+  beforeEach(() => request.mockReset());
+  it("requests the exact owner-scoped Run snapshot endpoint without caching", async () => {
+    request.mockResolvedValueOnce({ available: true, targets: [], environments: [] });
+    await new WorkflowApiV2().runReferences("ca72a44b-7a80-47b1-a93b-451775c03ddb");
+    const [path, init] = request.mock.calls[0];
+    expect(path).toBe("/api/workflows?resource=runs&id=ca72a44b-7a80-47b1-a93b-451775c03ddb&op=references");
+    expect(init).toMatchObject({ cache: "no-store" });
   });
 });

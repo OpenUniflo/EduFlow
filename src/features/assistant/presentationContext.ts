@@ -27,6 +27,6 @@ export function learningPresentationContext(view: 'today' | 'knowledge' | 'histo
 export function fallbackAssistantContext(pathname: string): AssistantContextSnapshot {
   const matched = /^\/courses\/([^/]+)/.exec(pathname)?.[1];
   const courseId = matched && matched !== 'create' ? decodeURIComponent(matched) : undefined;
-  const workspace = pathname.startsWith('/explore') ? 'explore' : pathname.startsWith('/courses') ? 'courses' : pathname.startsWith('/teaching') ? 'teaching' : pathname.startsWith('/workflows') ? 'canvas' : pathname.startsWith('/messages') ? 'messages' : 'learning';
+  const workspace = pathname.startsWith('/archive') ? 'explore' : pathname.startsWith('/courses') ? 'courses' : pathname.startsWith('/teaching') ? 'teaching' : pathname.startsWith('/works') ? 'canvas' : 'learning';
   return { workspace, experienceMode: 'learn', ...(courseId ? { courseId } : {}) };
 }

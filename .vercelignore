@@ -16,9 +16,12 @@ dist/
 /.acceptance/
 /output/
 /.playwright-cli/
+/.local-handoffs/
+/.tmp-preview/
 /.cache/
 /.pnpm-store/
 /.vercel_python_packages/
+/content-snapshots/
 
 # Python worker sources are part of the single edu-flow deployment: the compiler
 # and queue-consumer Functions use services/workflow/src/**. The Dockerfile and

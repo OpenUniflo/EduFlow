@@ -1,6 +1,7 @@
 import { createWorkflowV2 } from "./factory";
 import { definitionSchemaV2, jsonValueSchema, bindingSchema } from "./schema";
 import { z } from "zod";
+import { workflowReferenceIssue, workflowReferenceInNode } from "./workflowReferences";
 import type { EditorDocumentV2, JsonSchema, JsonValue, WorkflowDefinitionV2, WorkflowNodeV2 } from "./types";
 
 /** Frontend authoring contracts. These are saved drafts, never an executor registry. */
@@ -8,13 +9,27 @@ export const authoringNodeTypes = [
   { type: "core.progress", label: "过程进度", group: "执行节点" },
   { type: "core.memory", label: "长期记忆", group: "执行节点" },
   { type: "core.function", label: "函数", group: "执行节点" },
-  { type: "core.subgraph", label: "子图", group: "执行节点" },
+  { type: "core.subgraph", label: "调用工作流", group: "执行节点" },
   { type: "control.fork", label: "并行分支", group: "控制流" },
   { type: "control.join", label: "等待汇合", group: "控制流" },
   { type: "control.send", label: "动态分发 Send", group: "控制流" },
 ];
 export const nodeTypeLabel = (type: string) => authoringNodeTypes.find(item => item.type === type)?.label;
-export type NodeInteraction = { title: string; schema: JsonSchema; resumeWrites: Record<string, string> };
+const responseFactSchema = z.object({ label: z.string().min(1), path: z.string().startsWith("/"), link: z.boolean().optional() });
+const interactionPresentationSchema = z.object({
+  choices: z.object({
+    field: z.string().min(1),
+    label: z.string().min(1),
+    source: z.string().startsWith("/"),
+    value: z.string().startsWith("/"),
+    title: z.string().startsWith("/"),
+    facts: z.array(responseFactSchema).max(6),
+  }).optional(),
+  summary: z.array(responseFactSchema).max(10).optional(),
+  checklist: z.object({ fields: z.array(z.string().min(1)).max(12), onlyMissing: z.boolean().optional() }).optional(),
+});
+export type InteractionPresentation = z.infer<typeof interactionPresentationSchema>;
+export type NodeInteraction = { title: string; schema: JsonSchema; resumeWrites: Record<string, string>; presentation?: InteractionPresentation };
 /** Non-empty required response text must contain visible content; preserve valid text verbatim. */
 export function interactionResponseIssue(schema: JsonSchema, response: JsonValue): string | undefined {
   if(!response||typeof response!=="object"||Array.isArray(response))return undefined;
@@ -26,17 +41,38 @@ export function interactionResponseIssue(schema: JsonSchema, response: JsonValue
   return undefined;
 }
 export type NodeAuthoring = { interrupt?: NodeInteraction; retry?: { maxAttempts: number; intervalMs: number; backoffFactor?:number; maxIntervalMs?:number; retryOn?:string[] }; timeoutMs?: number; cache?: { ttlMs: number }; errorHandler?: { functionRef: string; functionVersion?:number }; overwrite?:string[]; defer?:boolean; command?: { enabled: boolean; destinations: string[]; graph?:"current"|"parent"; update?:Record<string, import("./types").Binding> } };
-const nodeAuthoringSchema = z.object({ interrupt:z.object({title:z.string(),schema:z.record(z.string(),jsonValueSchema),resumeWrites:z.record(z.string(),z.string())}), retry:z.object({maxAttempts:z.number().int().min(1).max(10),intervalMs:z.number().nonnegative(),backoffFactor:z.number().min(1).optional(),maxIntervalMs:z.number().nonnegative().optional(),retryOn:z.array(z.string()).optional()}).optional(), timeoutMs:z.number().positive().optional(),cache:z.object({ttlMs:z.number().positive()}).optional(),overwrite:z.array(z.string()).optional(),errorHandler:z.object({functionRef:z.string(),functionVersion:z.number().int().positive().optional()}).optional(),defer:z.boolean().optional(),command:z.object({enabled:z.boolean(),destinations:z.array(z.string()),graph:z.enum(["current","parent"]).optional(),update:z.record(z.string(),bindingSchema).optional()}).optional() }).partial().passthrough();
+const nodeAuthoringSchema = z.object({ interrupt:z.object({title:z.string(),schema:z.record(z.string(),jsonValueSchema),resumeWrites:z.record(z.string(),z.string()),presentation:interactionPresentationSchema.optional()}), retry:z.object({maxAttempts:z.number().int().min(1).max(10),intervalMs:z.number().nonnegative(),backoffFactor:z.number().min(1).optional(),maxIntervalMs:z.number().nonnegative().optional(),retryOn:z.array(z.string()).optional()}).optional(), timeoutMs:z.number().positive().optional(),cache:z.object({ttlMs:z.number().positive()}).optional(),overwrite:z.array(z.string()).optional(),errorHandler:z.object({functionRef:z.string(),functionVersion:z.number().int().positive().optional()}).optional(),defer:z.boolean().optional(),command:z.object({enabled:z.boolean(),destinations:z.array(z.string()),graph:z.enum(["current","parent"]).optional(),update:z.record(z.string(),bindingSchema).optional()}).optional() }).partial().passthrough();
 export function nodeAuthoring(node: WorkflowNodeV2): NodeAuthoring { const result=nodeAuthoringSchema.safeParse(node.config.authoring??{});return result.success?result.data as NodeAuthoring:{}; }
+/**
+ * Parsed nested graphs are cached by the immutable `config.graph` value they
+ * came from. Callers invoke `graphInNode` while rendering (directly and through
+ * `graphAtPath`), so parsing on every call would return a fresh definition
+ * object each time and make otherwise unchanged subgraph scopes look changed to
+ * React. The cached value is safe because authoring updates replace the graph
+ * object instead of mutating it in place.
+ */
+const parsedSubgraphs = new WeakMap<object, WorkflowDefinitionV2>();
 export function graphInNode(node: WorkflowNodeV2): WorkflowDefinitionV2 | undefined {
   if (node.type !== "core.subgraph") return undefined;
-  const result = definitionSchemaV2.safeParse(node.config.graph);
-  return result.success ? result.data as WorkflowDefinitionV2 : undefined;
+  const raw = node.config.graph;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const cached = parsedSubgraphs.get(raw);
+  if (cached) return cached;
+  const result = definitionSchemaV2.safeParse(raw);
+  if (!result.success) return undefined;
+  const parsed = result.data as WorkflowDefinitionV2;
+  parsedSubgraphs.set(raw, parsed);
+  return parsed;
 }
 export function graphAtPath(root: WorkflowDefinitionV2, path: string[]): WorkflowDefinitionV2 {
   let graph = root;
   for (const id of path) { const node = graph.nodes.find(node => node.id === id); const child = node && graphInNode(node); if (!child) throw new Error("子图不存在，请返回上层画布。"); graph = child; }
   return graph;
+}
+/** Resolve one node by its execution graph path without inventing a fallback scope. */
+export function nodeAtGraphPath(root: WorkflowDefinitionV2, path: readonly string[] | undefined, nodeId: string): WorkflowNodeV2 | undefined {
+  try { const graph = graphAtPath(root, Array.isArray(path) ? [...path] : []); return graph.nodes.find(node => node.id === nodeId); }
+  catch { return undefined; }
 }
 export function replaceGraph(root: WorkflowDefinitionV2, path: string[], next: WorkflowDefinitionV2): WorkflowDefinitionV2 {
   if (!path.length) return next;
@@ -151,7 +187,12 @@ export function authoringDiagnostics(graph: WorkflowDefinitionV2, prefix = "主�
       const target = interaction.resumeWrites[field];
       if (!target || !Object.prototype.hasOwnProperty.call(graph.state.schema.properties ?? {}, target)) issues.push(`${prefix} / ${node.label}：回应字段 ${field} 需要映射到已声明的 State 字段`);
     }
-    if (node.type === "core.subgraph") { const child = graphInNode(node); if (child) issues.push(...authoringDiagnostics(child, `${prefix} / ${node.label}`)); else issues.push(`${prefix} / ${node.label}：子图定义无效`); }
+    if (node.type === "core.subgraph") {
+      const referenceIssue = workflowReferenceIssue(node);
+      const reference = workflowReferenceInNode(node);
+      if (referenceIssue) issues.push(`${prefix} / ${node.label}：${referenceIssue}`);
+      else if (!reference) { const child = graphInNode(node); if (child) issues.push(...authoringDiagnostics(child, `${prefix} / ${node.label}`)); else issues.push(`${prefix} / ${node.label}：子图定义无效`); }
+    }
     if (node.type === "control.send" && !ids.has(String(node.config.target))) issues.push(`${prefix} / ${node.label}：请选择分发目标`);
     if (node.type === "control.join" && (!Array.isArray(node.config.waitFor) || !node.config.waitFor.length)) issues.push(`${prefix} / ${node.label}：请选择等待的前驱`);
   }

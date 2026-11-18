@@ -12,7 +12,7 @@ import pytest
 from eduflow_workflow import extensions, tools
 from eduflow_workflow.compiler import compile_definition, validate_structure
 from eduflow_workflow.contracts import ExecutionError
-from eduflow_workflow.extensions import fetch_model_ids, hydrate_connections, http_test_preview, parse_model_ids, validate_connection
+from eduflow_workflow.extensions import fetch_model_ids, hydrate_connections, http_test_preview, parse_model_ids, reusable_secret_ref, validate_connection
 from eduflow_workflow.registry import NODE_DESCRIPTORS, OPERATIONS, Registry
 from eduflow_workflow.runtime import RunExecution
 from test_contracts import sample
@@ -159,6 +159,24 @@ async def test_deepseek_models_use_the_shared_pattern_with_the_official_base_url
         await validate_connection({'type': 'deepseek', 'modelRefs': ['bad model']}, 'synthetic-key', {})
     with pytest.raises(ExecutionError):
         await validate_connection({'type': 'deepseek', 'modelRefs': ['deepseek-chat']}, '', {})
+
+
+def test_saved_provider_key_is_reused_only_for_the_same_target():
+    rows = [
+        {'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'baseUrl': 'https://models.example/v1', 'secretRef': 'vault:one'}},
+        {'kind': 'connection', 'ref': 'models', 'version': 2, 'disabled': False, 'content': {'type': 'openai-compatible', 'baseUrl': 'https://models.example/v1', 'secretRef': 'vault:two'}},
+    ]
+    assert reusable_secret_ref(rows, 'models', {'type': 'openai-compatible', 'baseUrl': 'https://models.example/v1/'}) == 'vault:two'
+    assert reusable_secret_ref(rows, 'models', {'type': 'openai-compatible', 'baseUrl': 'https://other.example/v1'}) is None
+    assert reusable_secret_ref(rows, 'models', {'type': 'deepseek'}) is None
+    assert reusable_secret_ref([], 'models', {'type': 'deepseek'}) is None
+
+
+async def test_reused_credential_satisfies_remote_model_validation(local_fixtures, allow_destination):
+    content = await validate_connection(model_content(), '', local_env(), credential_reused=True)
+    assert content['type'] == 'openai-compatible'
+    with pytest.raises(ExecutionError):
+        await validate_connection(model_content(), '', local_env(), credential_reused=False)
 
 
 async def test_connection_grammar_is_a_closed_whitelist(local_fixtures):
@@ -337,7 +355,7 @@ async def test_model_adapter_routes_openai_compatible_provider(monkeypatch):
         calls.update(kwargs)
         return FakeModel(**kwargs)
 
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', fake_model)
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', fake_model)
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'baseUrl': 'https://models.example/v1', 'adapter': 'openai'}]
     adapter = run.model_adapter(llm_config())
@@ -352,18 +370,19 @@ async def test_model_adapter_routes_openai_compatible_provider(monkeypatch):
 
 
 async def test_model_adapter_routes_deepseek_by_default_and_never_constructs_openai(monkeypatch):
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', lambda **kwargs: pytest.fail('DeepSeek must not use the OpenAI adapter'))
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatDeepSeek', lambda **kwargs: FakeModel(**kwargs))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', lambda **kwargs: pytest.fail('DeepSeek must not use the OpenAI adapter'))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatDeepSeek', lambda **kwargs: FakeModel(**kwargs))
     monkeypatch.setenv('MODEL_CONNECTION_KEY', 'synthetic-model-key')
     run = execution()
-    run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['deepseek-flash'], 'secretRef': 'MODEL_CONNECTION_KEY'}]
+    run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['deepseek-flash'], 'secretRef': 'MODEL_CONNECTION_KEY', 'headers': {'x-opencode-session': 'eduflow-test', 'ignored': 3}}]
     adapter = run.model_adapter(llm_config(modelRef='deepseek-flash'))
     assert adapter.kwargs['api_key'] == 'synthetic-model-key'
     assert adapter.kwargs['api_base'] == 'https://api.deepseek.com'
+    assert adapter.kwargs['default_headers'] == {'x-opencode-session': 'eduflow-test'}
 
 
 async def test_openai_compatible_provider_binds_authorized_tools(monkeypatch):
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', lambda **kwargs: FakeModel(**kwargs))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', lambda **kwargs: FakeModel(**kwargs))
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'baseUrl': 'https://models.example/v1', 'adapter': 'openai'}]
     run.env['tools'] = [{'ref': 'f', 'name': 'trusted_identity', 'description': 'Echo', 'version': 1, 'adapter': 'function', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'}, 'available': True, 'sideEffect': 'none'}]
@@ -373,7 +392,7 @@ async def test_openai_compatible_provider_binds_authorized_tools(monkeypatch):
 
 
 async def test_thinking_remains_deepseek_only(monkeypatch):
-    monkeypatch.setattr('eduflow_workflow.runtime.ChatOpenAI', lambda **kwargs: pytest.fail('thinking must be rejected before the SDK is constructed'))
+    monkeypatch.setattr('eduflow_workflow.model_transport.ChatOpenAI', lambda **kwargs: pytest.fail('thinking must be rejected before the SDK is constructed'))
     run = execution()
     run.env['providers'] = [{'ref': 'provider', 'modelRefs': ['model-a'], 'baseUrl': 'https://models.example/v1', 'adapter': 'openai'}]
     with pytest.raises(ExecutionError) as caught:
@@ -437,6 +456,134 @@ def install_fake_storage(monkeypatch, rows):
     monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'postgresql://fixture')
 
 
+class PublishStorage:
+    def __init__(self, rows):
+        self.rows = rows
+        self.saved = None
+
+    async def call(self, name, *args):
+        if name == 'p4_catalog_read':
+            return copy.deepcopy(self.rows)
+        if name == 'p4_connection_save':
+            self.saved = args
+            return {'ok': True}
+        raise AssertionError(name)
+
+
+async def test_publish_reuses_the_saved_provider_secret_when_only_models_change(monkeypatch, local_fixtures, allow_destination):
+    rows = [{'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1', 'modelRefs': ['model-a'], 'secretRef': 'vault:one'}}]
+    storage = PublishStorage(rows)
+    monkeypatch.setattr(extensions, 'Storage', lambda url: storage)
+    monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'postgresql://fixture')
+    body = {'ownerId': 'a', 'environmentRef': 'local', 'action': 'publish', 'kind': 'connection', 'ref': 'models', 'version': 2, 'content': model_content(modelRefs=['model-a', 'model-b'])}
+    await extensions.catalog_operation(body, FakeRegistry(local_env()))
+    assert storage.saved is not None
+    content = storage.saved[4]
+    assert content['secretRef'] == 'vault:one'
+    assert content['modelRefs'] == ['model-a', 'model-b']
+    assert storage.saved[5] == ''
+
+
+class LifecycleStorage:
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls = []
+
+    async def call(self, name, *args):
+        if name == 'p4_catalog_read':
+            return copy.deepcopy(self.rows)
+        self.calls.append((name, args))
+        return {'ok': True}
+
+
+def install_lifecycle_storage(monkeypatch, rows):
+    storage = LifecycleStorage(rows)
+    monkeypatch.setattr(extensions, 'Storage', lambda url: storage)
+    monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'postgresql://fixture')
+    return storage
+
+
+def lifecycle_body(action, version, **extra):
+    return {'ownerId': 'a', 'environmentRef': 'local', 'action': action, 'kind': 'connection', 'ref': 'models', 'version': version, **extra}
+
+
+def provider_rows(disabled=False):
+    return [{'kind': 'connection', 'ref': 'models', 'version': 2, 'disabled': disabled, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1', 'modelRefs': ['model-a'], 'secretRef': 'vault:one'}}]
+
+
+async def test_rename_publishes_a_new_version_with_the_same_ref_and_secret(monkeypatch):
+    storage = install_lifecycle_storage(monkeypatch, provider_rows())
+    result = await extensions.catalog_operation(lifecycle_body('rename', 3, content={'name': '  Team Gateway  '}), FakeRegistry(local_env()))
+    assert result == {'ok': True}
+    name, args = storage.calls[0]
+    assert name == 'p4_catalog_save'
+    assert args == ('a', 'local', 'connection', 'models', 3, {
+        'type': 'openai-compatible', 'name': 'Team Gateway', 'baseUrl': 'https://models.example/v1',
+        'modelRefs': ['model-a'], 'secretRef': 'vault:one',
+    }, False)
+
+
+async def test_rename_rejects_stale_versions_disabled_connections_and_extra_fields(monkeypatch):
+    install_lifecycle_storage(monkeypatch, provider_rows())
+    with pytest.raises(ExecutionError) as stale:
+        await extensions.catalog_operation(lifecycle_body('rename', 2, content={'name': 'Nope'}), FakeRegistry(local_env()))
+    assert stale.value.code == 'CONNECTION_VERSION_CONFLICT'
+
+    install_lifecycle_storage(monkeypatch, provider_rows(disabled=True))
+    with pytest.raises(ExecutionError) as disabled:
+        await extensions.catalog_operation(lifecycle_body('rename', 3, content={'name': 'Nope'}), FakeRegistry(local_env()))
+    assert disabled.value.code == 'CONNECTION_DISABLED'
+
+    install_lifecycle_storage(monkeypatch, provider_rows())
+    with pytest.raises(ExecutionError) as extra:
+        await extensions.catalog_operation(lifecycle_body('rename', 3, content={'name': 'Nope', 'baseUrl': 'https://evil.example'}), FakeRegistry(local_env()))
+    assert extra.value.code == 'INVALID_CONNECTION'
+
+
+async def test_restore_creates_an_active_version_and_reuses_the_saved_credential(monkeypatch):
+    storage = install_lifecycle_storage(monkeypatch, provider_rows(disabled=True))
+    await extensions.catalog_operation(lifecycle_body('restore', 3), FakeRegistry(local_env()))
+    name, args = storage.calls[0]
+    assert name == 'p4_catalog_save'
+    assert args[4] == 3 and args[5]['secretRef'] == 'vault:one' and args[6] is False
+
+
+async def test_restore_requires_a_disabled_latest_version(monkeypatch):
+    install_lifecycle_storage(monkeypatch, provider_rows())
+    with pytest.raises(ExecutionError) as active:
+        await extensions.catalog_operation(lifecycle_body('restore', 3), FakeRegistry(local_env()))
+    assert active.value.code == 'CONNECTION_NOT_DISABLED'
+
+
+async def test_delete_checks_the_latest_version_then_delegates_physical_cleanup(monkeypatch):
+    storage = install_lifecycle_storage(monkeypatch, provider_rows())
+    await extensions.catalog_operation(lifecycle_body('delete', 2), FakeRegistry(local_env()))
+    assert storage.calls == [('p4_connection_delete', ('a', 'local', 'models', 2))]
+
+    with pytest.raises(ExecutionError) as stale:
+        await extensions.catalog_operation(lifecycle_body('delete', 1), FakeRegistry(local_env()))
+    assert stale.value.code == 'CONNECTION_VERSION_CONFLICT'
+
+
+async def test_function_delete_checks_the_latest_version_and_delegates_physical_cleanup(monkeypatch):
+    rows = [
+        {'kind': 'function', 'ref': 'cleanup', 'version': 1, 'disabled': False, 'content': {'name': 'Cleanup v1', 'language': 'python', 'code': 'def process(input, context): return {}'}},
+        {'kind': 'function', 'ref': 'cleanup', 'version': 3, 'disabled': True, 'content': {'name': 'Cleanup v3', 'language': 'javascript', 'code': 'function process(input, context) { return {}; }'}},
+    ]
+    storage = install_lifecycle_storage(monkeypatch, rows)
+    body = {'ownerId': 'a', 'environmentRef': 'local', 'action': 'delete', 'kind': 'function', 'ref': 'cleanup', 'version': 3}
+    assert await extensions.catalog_operation(body, FakeRegistry(local_env())) == {'ok': True}
+    assert storage.calls == [('p4_function_delete', ('a', 'local', 'cleanup', 3))]
+
+    with pytest.raises(ExecutionError) as stale:
+        await extensions.catalog_operation({**body, 'version': 2}, FakeRegistry(local_env()))
+    assert stale.value.code == 'FUNCTION_VERSION_CONFLICT'
+
+    with pytest.raises(ExecutionError) as missing:
+        await extensions.catalog_operation({**body, 'ref': 'absent'}, FakeRegistry(local_env()))
+    assert missing.value.code == 'FUNCTION_UNAVAILABLE'
+
+
 async def test_catalog_test_returns_the_unified_model_result(monkeypatch, local_fixtures):
     with local_http(lambda request, body: (200, json.dumps({'data': [{'id': 'z-model'}, {'id': 'a-model'}]}).encode(), {})) as base:
         rows = [{'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': base, 'modelRefs': ['a-model']}}]
@@ -472,16 +619,41 @@ async def test_catalog_test_returns_mcp_tool_names(monkeypatch):
     environment = local_env()
     hydrate_connections(environment, 'a', rows)
 
-    async def discover(registry, env, connector_ref):
+    async def discover(registry, env, connector_ref, include_all=False):
+        assert include_all is True
         return [{'name': 'echo', 'description': 'Echo tool'}, {'name': 'get-sum', 'description': 'Sum'}]
 
     monkeypatch.setattr(tools, 'discover', discover)
     result = await extensions.catalog_operation(catalog_body('mcp'), FakeRegistry(environment))
-    assert result['ok'] is True and result['tools'] == [{'name': 'echo', 'description': 'Echo tool'}, {'name': 'get-sum', 'description': 'Sum'}]
+    assert result['ok'] is True and result['tools'] == [
+        {'name': 'echo', 'description': 'Echo tool', 'allowed': True},
+        {'name': 'get-sum', 'description': 'Sum', 'allowed': False},
+    ]
     assert set(result) == {'ok', 'elapsedMs', 'tools'}
 
 
 # --- Generic API editor contract -----------------------------------------
+
+async def test_generic_http_connection_accepts_text_response_and_omits_default_json(local_fixtures):
+    with local_http(lambda request, body: (200, b'{}', {})) as base:
+        base_content = {
+            'type': 'http', 'name': 'O*NET wages', 'baseUrl': base, 'path': '/wages',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'},
+        }
+        text = await validate_connection({**base_content, 'settings': {'timeoutMs': 5000, 'responseFormat': 'text'}}, '', local_env())
+        default_json = await validate_connection({**base_content, 'settings': {'timeoutMs': 5000, 'responseFormat': 'json'}}, '', local_env())
+        with pytest.raises(ExecutionError) as invalid:
+            await validate_connection({**base_content, 'settings': {'responseFormat': 'html'}}, '', local_env())
+        with pytest.raises(ExecutionError) as result_path:
+            await validate_connection({**base_content, 'settings': {'responseFormat': 'text', 'resultPath': 'data'}}, '', local_env())
+        with pytest.raises(ExecutionError) as mapping_path:
+            await validate_connection({**base_content, 'settings': {'responseFormat': 'text'}, 'outputMap': [{'name': 'text', 'path': 'text', 'type': 'text'}]}, '', local_env())
+    assert text['settings'] == {'timeoutMs': 5000, 'responseFormat': 'text'}
+    assert default_json['settings'] == {'timeoutMs': 5000}
+    assert invalid.value.code == 'INVALID_CONNECTION'
+    assert result_path.value.code == 'INVALID_CONNECTION'
+    assert mapping_path.value.code == 'INVALID_CONNECTION'
+
 
 async def test_generic_http_connection_validates_params_headers_auth_and_output_map(local_fixtures):
     with local_http(lambda request, body: (200, b'{}', {})) as base:
@@ -573,20 +745,133 @@ async def test_invoke_generic_http_connection_sends_bearer_path_query_and_maps_o
     assert result == {'items': [{'title': 'A'}]}
 
 
+async def test_invoke_generic_http_text_connection_decodes_bom_and_maps_output(local_fixtures):
+    def handler(request, body):
+        return 200, '\ufeff<html><body>中文</body></html>'.encode('utf-8'), {'Content-Type': 'text/html; charset=UTF-8'}
+
+    with local_http(handler) as base:
+        environment = local_env()
+        content = {
+            'type': 'http', 'name': 'O*NET wages', 'baseUrl': base, 'path': '/wages',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'},
+            'settings': {'timeoutMs': 5000, 'responseFormat': 'text'},
+            'outputMap': [{'name': 'text', 'path': '', 'type': 'text'}],
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'wages', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:wages:1')
+        result = await tools.invoke_tool(tool, environment, {}, 5)
+    assert result == {'text': '<html><body>中文</body></html>'}
+
+
+async def test_invoke_generic_http_text_connection_can_return_a_string(local_fixtures):
+    with local_http(lambda request, body: (200, b'plain text', {'Content-Type': 'text/plain'})) as base:
+        environment = local_env()
+        content = {
+            'type': 'http', 'name': 'Text', 'baseUrl': base, 'path': '/text',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'string'},
+            'settings': {'responseFormat': 'text'}, 'outputMap': [],
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'text', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:text:1')
+        result = await tools.invoke_tool(tool, environment, {}, 5)
+    assert result == 'plain text'
+
+
+@pytest.mark.parametrize('payload,content_type,code', [
+    (b'<html>json not text</html>', 'application/json', 'TOOL_RESPONSE_NOT_TEXT'),
+    (b'<html>latin</html>', 'text/html; charset=iso-8859-1', 'TOOL_RESPONSE_CHARSET_UNSUPPORTED'),
+    (b'\xff\xfeinvalid', 'text/html; charset=UTF-8', 'TOOL_RESPONSE_ENCODING_INVALID'),
+])
+async def test_invoke_generic_http_text_connection_fails_strictly(local_fixtures, payload, content_type, code):
+    with local_http(lambda request, body: (200, payload, {'Content-Type': content_type})) as base:
+        environment = local_env()
+        content = {
+            'type': 'http', 'name': 'Text', 'baseUrl': base, 'path': '/text',
+            'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'string'},
+            'settings': {'responseFormat': 'text'}, 'outputMap': [],
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'text', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:text:1')
+        with pytest.raises(ExecutionError) as caught:
+            await tools.invoke_tool(tool, environment, {}, 5)
+    assert caught.value.code == code
+
+
+async def test_http_test_preview_applies_text_format_checks(local_fixtures):
+    with local_http(lambda request, body: (200, '\ufeff<html>预览</html>'.encode(), {'Content-Type': 'text/html; charset=UTF-8'})) as base:
+        result = await http_test_preview(http_tool(base, settings={'responseFormat': 'text'}), local_env(), {})
+    assert result == {'ok': True, 'status': 200, 'preview': '<html>预览</html>'}
+    with local_http(lambda request, body: (200, b'not text', {'Content-Type': 'application/json'})) as base:
+        with pytest.raises(ExecutionError) as caught:
+            await http_test_preview(http_tool(base, settings={'responseFormat': 'text'}), local_env(), {})
+    assert caught.value.code == 'TOOL_RESPONSE_NOT_TEXT'
+
+
 async def test_fetch_model_reply_returns_first_reply_text(local_fixtures):
     seen = {}
 
     def handler(request, body):
         seen['path'] = request.path
         seen['body'] = json.loads(body.decode())
-        return 200, json.dumps({'choices': [{'message': {'content': '连接可用。'}}]}).encode(), {}
+        return 200, json.dumps({'choices': [{'message': {'role': 'assistant', 'content': '连接可用。'}, 'finish_reason': 'stop'}]}).encode(), {}
 
     with local_http(handler) as base:
-        reply = await extensions.fetch_model_reply(base, None, 'deepseek-flash', '请确认连接。', local_env())
+        reply = await extensions.fetch_model_reply({'baseUrl': base, 'adapter': 'openai'}, 'deepseek-flash', '请确认连接。', local_env())
     assert reply == '连接可用。'
     assert seen['path'] == '/chat/completions'
     assert seen['body']['model'] == 'deepseek-flash'
     assert seen['body']['messages'] == [{'role': 'user', 'content': '请确认连接。'}]
+
+
+@pytest.mark.parametrize("headers, session", [
+    ({"Authorization": "forbidden"}, None),
+    ({"Host": "wrong.example"}, None),
+    ({"x-test": "one", "X-Test": "two"}, None),
+    ({"x-test": "line\r\nbreak"}, None),
+    ({"x-test": "one"}, "X-Test"),
+    ({}, "Cookie"),
+])
+async def test_model_connection_rejects_unsafe_or_colliding_headers(headers, session):
+    with pytest.raises(ExecutionError) as caught:
+        await validate_connection(model_content(headers=headers, sessionAffinityHeader=session), "test-key", local_env())
+    assert caught.value.code == "INVALID_CONNECTION"
+
+
+async def test_streaming_probe_and_runtime_share_fixed_and_session_headers(local_fixtures):
+    from eduflow_workflow.model_transport import model_request_headers
+
+    seen = []
+
+    def handler(request, body):
+        seen.append((request.headers['X-Project'], request.headers['X-Session'], json.loads(body)))
+        chunks = [
+            {'choices': [{'index': 0, 'delta': {'role':'assistant','content':'{"summary":'}, 'finish_reason': None}]},
+            {'choices': [{'index': 0, 'delta': {'content':'"ok"}'}, 'finish_reason': 'stop'}]},
+        ]
+        payload = ''.join('data: '+json.dumps({'id':'reply','created':1,'model':'model-a','object':'chat.completion.chunk',**chunk})+'\n\n' for chunk in chunks)+'data: [DONE]\n\n'
+        return 200, payload.encode(), {'Content-Type':'text/event-stream'}
+
+    with local_http(handler) as base:
+        c = await validate_connection(model_content(baseUrl=base,headers={'X-Project':'review'},sessionAffinityHeader='X-Session'), '', local_env())
+        assert c['headers'] == {'x-project':'review'}
+        env = local_env()
+        row = {'kind':'connection','ref':'team','version':1,'disabled':False,'content':c}
+        hydrate_connections(env, 'owner', [row])
+        provider = env['providers'][0]
+        for _ in range(2):
+            assert json.loads(await extensions.fetch_model_reply(provider,'model-a','JSON',env,structured=True)) == {'summary':'ok'}
+
+        run = execution()
+        run.env = env
+        run.run['thread_id'] = 'persistent-thread'
+        config = llm_config(providerRef=provider['ref'])
+        async with tools.model_http_client(base,env) as client:
+            chunks = [chunk async for chunk in run.model_adapter(config,client).astream('JSON',response_format={'type':'json_object'})]
+        assert ''.join(chunk.text for chunk in chunks) == '{"summary":"ok"}'
+        assert seen[2][1] == model_request_headers(provider,'persistent-thread')['x-session']
+        assert model_request_headers(provider,'persistent-thread') != model_request_headers(provider,'another-thread')
+    assert len({session for _,session,_ in seen}) == 3
+    assert all(project=='review' and payload['stream'] and payload['response_format']=={'type':'json_object'} for project,_,payload in seen)
 
 
 def test_builtin_hacker_news_search_uses_optional_words_without_typo_fallback():
@@ -596,3 +881,23 @@ def test_builtin_hacker_news_search_uses_optional_words_without_typo_fallback():
     assert 'typoTolerance=false' in hn['path']
     assert 'removeWordsIfNoResults' not in hn['path']
     assert 'hitsPerPage=5' in hn['path']
+
+
+def test_restored_connection_stays_on_its_new_version_and_does_not_revive_old_bindings():
+    """Restore is a new active version; old pinned versions remain disabled.
+
+    Workflows that still point at the disabled version are intentionally not
+    resurrected. They surface as unavailable until the author selects the new
+    version, which is then revalidated by the normal workflow save.
+    """
+    env = {'providers': [], 'tools': [], 'connectors': [], 'capabilityOrigins': {}}
+    hydrate_connections(env, 'a', [
+        {'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': True,
+         'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1',
+                     'modelRefs': ['model-a'], 'secretRef': 'vault:one'}},
+        {'kind': 'connection', 'ref': 'models', 'version': 2, 'disabled': False,
+         'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1',
+                     'modelRefs': ['model-a'], 'secretRef': 'vault:one'}},
+    ])
+    assert [provider['ref'] for provider in env['providers']] == ['p4:a:models:2']
+    assert 'p4:a:models:1' not in env['capabilityOrigins']

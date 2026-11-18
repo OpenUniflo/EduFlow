@@ -27,6 +27,19 @@ LLM_INPUTS = {"type":"object","properties":{"history":MESSAGES},"additionalPrope
 # shape stays open while the base items remain fixed.
 LLM_OUTPUT = {**obj({"messages":MESSAGES,"toolCalls":CALLS,"text":STRING}),"additionalProperties":True}
 
+# A subgraph node is either the legacy embedded graph or one fixed independent
+# Workflow reference. Both branches close their object, so a document carrying
+# both `graph` and `workflowRef` matches neither. Reference execution is
+# deliberately rejected at compile time until the parent-budget resolver lands.
+EMBEDDED_SUBGRAPH_CONFIG = obj({"graph":ANY_OBJ,"stateMode":{"enum":["independent","shared"]},"persistence":{"enum":["per-invocation","stateless","per-thread"]}},["graph"])
+REFERENCE_SUBGRAPH_CONFIG = obj({
+    "workflowRef": obj({"workflowId":{"type":"string","minLength":1,"maxLength":128},"revision":{"type":"integer","minimum":1}},["workflowId","revision"]),
+    "environmentRef": {"type":"string","minLength":1,"maxLength":160},
+    "stateMode": {"enum":["independent"]},
+    "persistence": {"enum":["per-invocation"]},
+},["workflowRef","environmentRef"])
+SUBGRAPH_CONFIG = {"anyOf":[EMBEDDED_SUBGRAPH_CONFIG,REFERENCE_SUBGRAPH_CONFIG]}
+
 def descriptor(kind, config, inputs=OBJ, output=OBJ, side_effect="none", outlets=None, version=1):
     return {"type":kind,"version":version,"configSchema":config,"inputSchema":inputs,"outputSchema":output,"outlets":["next"] if outlets is None else outlets,"sideEffect":side_effect,"requiredCapabilities":[]}
 
@@ -36,7 +49,7 @@ NODE_DESCRIPTORS = [
     descriptor("control.fork",obj({"branches":{"type":"array","items":STRING,"minItems":1}})),
     descriptor("control.join",obj({"waitFor":{"type":"array","items":STRING,"minItems":1},"strategy":{"enum":["all","any"]}})),
     descriptor("control.send",obj({"items":STRING,"target":STRING,"itemKey":STRING,"concurrency":{"type":"integer","minimum":1,"maximum":20}})),
-    descriptor("core.subgraph",obj({"graph":ANY_OBJ,"stateMode":{"enum":["independent","shared"]},"persistence":{"enum":["per-invocation","stateless","per-thread"]}},["graph"]),ANY_OBJ,ANY_OBJ),
+    descriptor("core.subgraph",SUBGRAPH_CONFIG,ANY_OBJ,ANY_OBJ),
     descriptor("core.function", obj({"implementation":{"enum":["registered","code"]},"functionRef":STRING,"functionVersion":{"type":"integer","minimum":1},"language":{"enum":["python","javascript"]},"code":STRING,"inputSchema":ANY_OBJ,"outputSchema":ANY_OBJ},["implementation"]),ANY_OBJ,ANY_OBJ),
     descriptor("core.start", OBJ), descriptor("core.end", OBJ, outlets=[]),
     descriptor("core.router", obj({"cases":{"type":"array","items":{"type":"object"}},"defaultOutlet":STRING,"defaultLabel":STRING,"mode":{"enum":["first","all"]}}, ["cases","defaultOutlet"]), output=obj({"outlet":{"type":["string","array"],"items":STRING}})),
@@ -62,7 +75,13 @@ BUILTIN_TOOLS = [
         "outputSchema": {"type": "object", "properties": {"hits": {"type": "array", "items": {"type": "object"}}}, "required": ["hits"]},
     },
 ]
+LOT_LIST = {"type":"array","items":ANY_OBJ}
 OPERATIONS = {
+    "ted.lotQuery": {"inputSchema":obj({"publicationNumber":STRING}),"outputSchema":obj({"query":STRING})},
+    "ted.normalizeLots": {"inputSchema":obj({"rows":LOT_LIST}),"outputSchema":obj({"lots":LOT_LIST})},
+    "ted.evaluateLot": {"inputSchema":obj({"lots":LOT_LIST,"lotId":STRING}),"outputSchema":obj({"lot":ANY_OBJ,"status":STRING})},
+    "core.reopenTextFields": {"inputSchema":obj({"values":ANY_OBJ,"fields":{"type":"array","items":STRING},"fieldMap":ANY_OBJ}),"outputSchema":obj({"values":ANY_OBJ})},
+
     "core.identity": {"inputSchema":obj({"value":{}}),"outputSchema":obj({"value":{}})},
     "core.add": {"inputSchema":obj({"left":{"type":"number"},"right":{"type":"number"}}),"outputSchema":obj({"value":{"type":"number"}})},
     "core.concat": {"inputSchema":obj({"values":{"type":"array","items":STRING},"separator":STRING},["values"]),"outputSchema":obj({"value":STRING})},
@@ -75,6 +94,23 @@ def transform(ref, arguments):
     if ref == "core.add": return {"value":arguments["left"]+arguments["right"]}
     if ref == "core.concat": return {"value":arguments.get("separator","").join(arguments["values"])}
     if ref == "core.message": return {"messages":[{"id":str(uuid.uuid4()),"role":arguments.get("role","user"),"content":[{"type":"text","text":arguments["text"]}]}]}
+    if ref == "ted.lotQuery":
+        from .ted_lots import lot_query
+        return {"query":lot_query(arguments["publicationNumber"])}
+    if ref == "ted.normalizeLots":
+        from .ted_lots import normalize_lots
+        return {"lots":normalize_lots(arguments["rows"])}
+    if ref == "ted.evaluateLot":
+        from .ted_lots import evaluate_lot
+        return evaluate_lot(arguments["lots"],arguments["lotId"])
+    if ref == "core.reopenTextFields":
+        values=arguments["values"]
+        field_map=arguments["fieldMap"]
+        if any(not isinstance(name,str) for name in field_map.values()) or any(field not in field_map for field in arguments["fields"]):
+            raise ExecutionError("UNKNOWN_REVIEW_FIELD", "Review item is not configured", "validation")
+        selected={field_map[field] for field in arguments["fields"]}
+        return {"values":{name:"" if name in selected else values.get(name, "")
+                          for name in field_map.values()}}
     raise ExecutionError("UNKNOWN_OPERATION","Unregistered operation")
 
 def restore_frozen_environment(env, frozen):
@@ -151,6 +187,7 @@ class Registry:
             file = os.environ.get("WORKFLOW_ENVIRONMENTS_FILE")
             configuration = json.loads(Path(file).read_text()) if file else json.loads(os.environ.get("WORKFLOW_ENVIRONMENTS_JSON", '{"environments":[]}'))
         self.environments = copy.deepcopy(configuration["environments"])
+        from .extensions import connector_cache_digest, is_catalog_placeholder
         catalog_file = os.environ.get("WORKFLOW_CATALOG_FILE")
         hosted = os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted'
         if hosted or catalog_file and Path(catalog_file).exists():
@@ -163,8 +200,11 @@ class Registry:
             for env in self.environments:
                 for connector in env.get("connectors",[]):
                     saved = catalog.get(env["ref"]+":"+connector["ref"])
-                    if saved and saved["connectorDigest"]==digest(connector):
-                        env["tools"]=[tool for tool in env.get("tools",[]) if tool.get("connectorRef")!=connector["ref"]]+saved["tools"]
+                    if saved and saved["connectorDigest"]==connector_cache_digest(connector):
+                        # Compact entries are names only and never executable.
+                        # Full descriptors from legacy and current caches remain unchanged.
+                        cached=[tool for tool in (saved.get("tools") or []) if not is_catalog_placeholder(tool)]
+                        env["tools"]=[tool for tool in env.get("tools",[]) if tool.get("connectorRef")!=connector["ref"]]+cached
         self.nodes = copy.deepcopy(NODE_DESCRIPTORS)
         self.operations = copy.deepcopy(OPERATIONS)
         for env in self.environments:
@@ -228,7 +268,7 @@ class Registry:
                 rows=connection.execute('select workflow_private.p4_catalog_read(%s::uuid,%s)',(owner,ref)).fetchone()[0]
                 for row in rows:
                     if row['kind']=='function': env['functions'].append({**row['content'],'ref':row['ref'],'version':row['version'],'disabled':row['disabled']})
-                from .extensions import hydrate_connections
+                from .extensions import connector_cache_digest, hydrate_connections, is_catalog_placeholder
                 hydrate_connections(env,owner,rows)
                 catalog_file=os.environ.get('WORKFLOW_CATALOG_FILE')
                 if os.environ.get('WORKFLOW_DEPLOYMENT_MODE')=='hosted' or catalog_file and Path(catalog_file).exists():
@@ -239,8 +279,15 @@ class Registry:
                         discovered=json.loads(Path(catalog_file).read_text())
                     for connector in env['connectors']:
                         saved=discovered.get(ref+':'+connector['ref'])
-                        if saved and saved['connectorDigest']==digest(connector):
-                            env['tools']=[t for t in env['tools'] if t.get('connectorRef')!=connector['ref']]+saved['tools']
+                        if saved and saved['connectorDigest']==connector_cache_digest(connector):
+                            # The cache contains the complete tools/list result. Only
+                            # explicitly allowed tools may enter execution/selection;
+                            # full names remain non-sensitive discovery metadata.
+                            # Compact placeholders contribute names only.
+                            all_tools=[tool for tool in (saved.get('tools') or []) if isinstance(tool,dict)]
+                            connector['discoveredToolNames']=list(dict.fromkeys(str(t.get('name','')) for t in all_tools if t.get('name')))
+                            allowed=set(connector.get('allowedToolNames') or [])
+                            env['tools']=[t for t in env['tools'] if t.get('connectorRef')!=connector['ref']]+[t for t in all_tools if t.get('name') in allowed and not is_catalog_placeholder(t)]
                 self.update(env)
         return env
     def snapshot(self, env):
@@ -253,11 +300,12 @@ class Registry:
         def meta(ref):
             value=origins.get(ref,{})
             return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"],"version":value["version"]} if "connectionRef" in value else {})}
-        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{"ref":p["ref"],"modelRefs":p["modelRefs"],"name":p.get("name",p["ref"]),**meta(p["ref"])} for p in env["providers"]],"connectors":[{"ref":c["ref"],"name":c.get("name",c["ref"]),"transport":c.get("transport","streamable-http"),**meta(c["ref"])} for c in env["connectors"] if c.get("fixture") is not True],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
+        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{"ref":p["ref"],"modelRefs":p["modelRefs"],"name":p.get("name",p["ref"]),**meta(p["ref"])} for p in env["providers"]],"connectors":[{"ref":c["ref"],"name":c.get("name",c["ref"]),"transport":c.get("transport","streamable-http"),**meta(c["ref"]),**({"discoveredToolNames":list(c["discoveredToolNames"])} if isinstance(c.get("discoveredToolNames"),list) else {})} for c in env["connectors"] if c.get("fixture") is not True],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
     def public_tools(self, env):
+        from .extensions import is_catalog_placeholder
         origins=env.get("capabilityOrigins",{})
         hidden=fixture_tool_refs()
-        def meta(ref):
-            value=origins.get(ref,{})
+        def meta(tool):
+            value=origins.get(tool.get("connectorRef") or tool["ref"],{})
             return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"]} if "connectionRef" in value else {})}
-        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool["ref"])} for tool in env["tools"] if not is_fixture_tool(tool,hidden)]
+        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","declaredReadOnly","declaredDestructive","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool)} for tool in env["tools"] if not is_fixture_tool(tool,hidden) and not is_catalog_placeholder(tool)]

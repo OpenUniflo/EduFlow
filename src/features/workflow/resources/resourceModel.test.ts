@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { JsonValue } from "../domain/v2/types";
 import {
   compareModelNames, groupCatalogByRef, latestConnectionsOfType, latestEntries, latestVersion,
-  mergeDiscoveredModels, parseModelList, resourceCounts, type CatalogConnection,
+  mergeDiscoveredModels, parseModelList, platformApiTools, resourceCounts, type CatalogConnection,
 } from "./resourceModel";
 
 const connection = (ref: string, version: number, content: Record<string, JsonValue>, extra: Partial<CatalogConnection> = {}): CatalogConnection => ({
@@ -85,6 +85,24 @@ describe("resourceCounts", () => {
   it("counts unique references per section", () => {
     expect(resourceCounts({ connections, functions: [{ ref: "f1", version: 1, language: "python" }, { ref: "f1", version: 2, language: "python" }, { ref: "f2", version: 1, language: "javascript" }], variables: [{ key: "A" }, { key: "B" }] }))
       .toEqual({ providers: 1, apis: 1, mcp: 1, functions: 2, variables: 2 });
+  });
+
+  it("deduplicates the same platform tool ref without hiding distinct same-name resources", () => {
+    const tools = [
+      { ref: "hn_search", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" } },
+      { ref: "hn_search", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" } },
+      { ref: "hn_search_copy", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" } },
+    ] as const;
+    expect(platformApiTools(tools).map(tool => tool.ref)).toEqual(["hn_search", "hn_search_copy"]);
+  });
+
+  it("counts platform API rows together with user HTTP connections", () => {
+    const tools = [
+      { ref: "hn_search", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" }, origin: "environment" as const },
+      { ref: "user_api", name: "User API", contractDigest: "d", inputSchema: { type: "object" }, origin: "user" as const, connectionRef: "price_api" },
+    ];
+    expect(platformApiTools(tools).map(tool => tool.ref)).toEqual(["hn_search"]);
+    expect(resourceCounts({ connections, tools }).apis).toBe(2);
   });
 
   it("leaves badges undefined until the matching catalog has loaded", () => {

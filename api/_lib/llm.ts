@@ -1,5 +1,21 @@
+import { createHash, randomUUID } from "node:crypto";
 import { readLlmEnvironment, type LlmEnvironment } from "./env.js";
 import type { StructuredGenerationClient, StructuredGenerationRequest, StructuredGenerationResult } from "../../src/features/knowledge/generation/types.js";
+
+/**
+ * Provider-agnostic request identity for OpenAI-compatible endpoints.
+ *
+ * opencode-go requires a stable per-conversation session id and a client
+ * User-Agent. The wire value is a truncated SHA-256 of the internal key so a
+ * database or Attempt identity never leaves the server.
+ */
+export function llmRequestHeaders(sessionKey: string): Record<string, string> {
+  const session = createHash("sha256").update(sessionKey).digest("hex").slice(0, 32);
+  return {
+    "x-opencode-session": session,
+    "User-Agent": "eduflow/1.0"
+  };
+}
 
 type DeepSeekResponse = {
   id?: unknown;
@@ -9,7 +25,12 @@ type DeepSeekResponse = {
 };
 
 export class OpenAICompatibleJsonGenerationClient implements StructuredGenerationClient {
-  constructor(private readonly config: LlmEnvironment, private readonly request: typeof fetch = fetch, private readonly timeoutMs = 60_000) {}
+  private readonly sessionKey: string;
+  constructor(private readonly config: LlmEnvironment, private readonly request: typeof fetch = fetch, private readonly timeoutMs = 60_000, sessionKey?: string) {
+    // No stable generation identity exists on the request today; one client
+    // instance keeps one stable session across its bounded retries.
+    this.sessionKey = sessionKey ?? randomUUID();
+  }
 
   async generateJson(input: StructuredGenerationRequest): Promise<StructuredGenerationResult> {
     const response = await this.requestWithTransientRetry(input);
@@ -50,9 +71,16 @@ export class OpenAICompatibleJsonGenerationClient implements StructuredGeneratio
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       let response: Response;
       try {
+        // Countable per-attempt evidence for the bounded acceptance run. No
+        // prompt, output, or credential is logged.
+        console.info(`llm_model_request stage=${input.stage} attempt=${attempt} model=${this.config.llmModel}`);
         response = await this.request(`${this.config.llmBaseUrl}/chat/completions`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${this.config.llmApiKey}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${this.config.llmApiKey}`,
+            "Content-Type": "application/json",
+            ...llmRequestHeaders(this.sessionKey)
+          },
           signal: controller.signal,
           body: JSON.stringify({
             model: this.config.llmModel,

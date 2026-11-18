@@ -97,7 +97,7 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
     if (!assignmentIds.has(coverage.assignmentId) || !courseNodeIds.has(coverage.nodeId)) fatal.push({ code: "broken-assignment-coverage", message: `Assignment 覆盖 ${coverage.id} 引用了无效 Assignment 或 Knowledge。` });
   });
   const assignmentOrders = editable.assignments.map((assignment) => assignment.order);
-  if (new Set(assignmentOrders).size !== assignmentOrders.length) fatal.push({ code: "duplicate-assignment-order", message: "Assignment 顺序必须在课程内唯一。" });
+  if (new Set(assignmentOrders).size !== assignmentOrders.length) fatal.push({ code: "duplicate-assignment-order", message: "Assignment 顺序必须在课程范围唯一。" });
   const assetAudit = auditCourseAssetCoverage(editable);
   if (assetAudit.assignments.missingKnowledgeCount) warnings.push({ code: "missing-assignment", message: `${assetAudit.assignments.missingKnowledgeCount} 个 Knowledge 尚无 Assignment 覆盖。` });
   if (assetAudit.materials.missingKnowledgeCount) warnings.push({ code: "missing-material", message: `${assetAudit.materials.missingKnowledgeCount} 个 Knowledge 尚无课件覆盖。` });

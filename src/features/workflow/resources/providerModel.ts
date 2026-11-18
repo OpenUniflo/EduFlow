@@ -26,6 +26,12 @@ export function providerModelRefs(entry: { content: Record<string, JsonValue> })
   return modelRefsOf(entry.content);
 }
 
+/** One truthful line for provider cards: enabled count and the enabled names. */
+export function providerModelSummary(models: readonly string[]): string {
+  if (!models.length) return "未启用模型";
+  return `已启用 ${models.length} 个模型 · ${models.join("、")}`;
+}
+
 export function providerTypeLabel(entry: { content: Record<string, JsonValue> }): string {
   return connectionTypeLabel(typeof entry.content.type === "string" ? entry.content.type : "");
 }
@@ -84,6 +90,26 @@ export function nextProviderVersion(entry: { version: number }): number {
 }
 
 /** A new version keeps unrelated fields but must apply the edited address/name/type, not the old content. */
+/**
+ * A provider edit may reuse its server-side managed credential only while the
+ * credential target (type + address) is unchanged. Model-list edits do not
+ * invalidate the key; changing the address does.
+ */
+export function providerCredentialRequiredOnSave(input: {
+  existing?: { content: Record<string, JsonValue>; hasCredential?: boolean } | null;
+  type: string;
+  baseUrl: string;
+  credential: string;
+}): boolean {
+  if (!credentialRequiredFor(input.type, input.baseUrl)) return false;
+  if (input.credential.trim()) return false;
+  const existing = input.existing;
+  if (!existing?.hasCredential) return true;
+  const existingType = typeof existing.content.type === "string" ? existing.content.type : "";
+  if (existingType !== input.type) return true;
+  return normalizeBaseUrl(providerAddress(existing)) !== normalizeBaseUrl(input.baseUrl);
+}
+
 export function providerPublishContent(
   entry: ProviderConnection,
   models: readonly string[],
@@ -262,4 +288,44 @@ export function probeConnectionRef(): string {
     ? crypto.randomUUID().replace(/-/g, "").slice(0, 12)
     : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   return `${PROBE_REF_PREFIX}${suffix}`;
+}
+
+/** Every model this provider ever enabled, newest and older versions alike. */
+export function providerHistoricalModelRefs(entry: ProviderConnection, connections: readonly ProviderConnection[]): string[] {
+  const seen = new Set<string>();
+  for (const version of connections.filter(item => item.ref === entry.ref)) {
+    for (const model of providerModelRefs(version)) seen.add(model);
+  }
+  return [...seen];
+}
+
+/** Editor rows keep models that were enabled before or returned by the last test. */
+export function providerEditorModelRows(
+  current: readonly string[],
+  historical: readonly string[],
+  discovered: readonly string[],
+): string[] {
+  return [...new Set([...current, ...historical, ...discovered])];
+}
+
+export function providerEditorModelSourceLabel(
+  model: string,
+  current: readonly string[],
+  historical: readonly string[],
+  discovered: readonly string[],
+): string {
+  if (current.includes(model)) return discovered.includes(model) ? "从供应商获取" : "已启用";
+  if (discovered.includes(model)) return "从供应商获取";
+  if (historical.includes(model)) return "曾启用";
+  return "可用";
+}
+
+/** True when an enabled model is absent from the last successful provider model list. */
+export function modelMissingFromProviderTest(
+  model: string,
+  enabled: readonly string[],
+  testModels: readonly string[] | undefined,
+  testOk: boolean,
+): boolean {
+  return Boolean(testOk && testModels && enabled.includes(model) && !testModels.includes(model));
 }

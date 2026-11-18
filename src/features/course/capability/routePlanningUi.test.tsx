@@ -111,3 +111,23 @@ it('shows model-external historical selections before Preview with an explicit d
  const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>id==='old'?'供应商筛选准则定义':id}/>);
  expect(html).toContain('当前模型外的历史选择');expect(html).toContain('供应商筛选准则定义');expect(html).toContain('按当前模型整理草稿');expect(html).toContain('正式路线在采用前保持原样');expect(html).not.toContain('定位下一项');
 });
+
+it('names each structural conflict object and offers the matching executable constraint action', () => {
+  const html = renderToStaticMarkup(<RouteConflicts
+    title={(id) => `知识${id}`}
+    locate={vi.fn()}
+    undo={vi.fn()}
+    exclude={vi.fn()}
+    conflicts={[
+      { kind: 'target_without_acquired_path', rootNodeId: 'T', rootKind: 'target', nodeId: 'T', constraint: 'knowledge_graph' },
+      { kind: 'excluded_hard_prerequisite', rootNodeId: 'X', rootKind: 'target', nodeId: 'M', constraint: 'exclude' },
+      { kind: 'unavailable_hard_prerequisite', rootNodeId: 'Y', rootKind: 'target', nodeId: 'N', constraint: 'knowledge_graph' }
+    ]}
+  />);
+  expect(html).toContain('目标当前不可达：知识T');
+  expect(html).toContain('目标当前不可达：知识X');
+  expect(html).toContain('知识M 是必须前置，但被当前路线排除');
+  expect(html).toContain('知识N 是必须前置，但当前不可用');
+  expect(html).toContain('排除此目标');
+  expect(html).toContain('移除此项约束');
+});

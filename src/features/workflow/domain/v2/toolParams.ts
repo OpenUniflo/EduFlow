@@ -1,4 +1,4 @@
-import type { Binding, JsonSchema, JsonValue } from "./types";
+import type { Binding, JsonSchema, JsonValue, WorkflowTool } from "./types";
 
 /** One editable row of a tool node's Schema-driven input table. */
 export type ToolParamRow = { name: string; title: string; description?: string; schema: JsonSchema; required: boolean; binding?: Binding };
@@ -84,4 +84,48 @@ export function reconcileToolInputs(
   const nextInputs: Record<string, Binding> = {};
   for (const [name, binding] of Object.entries(source)) if (!removed.includes(name)) nextInputs[name] = binding;
   return { inputs: nextInputs, added, removed, newlyRequired };
+}
+
+export type ToolContractRefresh = {
+  /** Node config with only `contractDigest` replaced; `toolRef` and every other key are preserved. */
+  config: Record<string, JsonValue>;
+  inputs: Record<string, Binding>;
+  removed: string[];
+  missingRequired: string[];
+};
+
+/**
+ * Refreshes a tool node's contract digest after the registered tool definition changed. Bindings
+ * whose names still exist stay untouched (variable sources, literal values and missing-value rules
+ * included); bindings for removed parameters are dropped; required parameters without a binding
+ * are reported so the node panel can ask for them instead of inventing a value.
+ */
+export function refreshToolContract(
+  { config, inputs, tool }: { config: Readonly<Record<string, JsonValue>>; inputs: Readonly<Record<string, Binding>>; tool: Pick<WorkflowTool, "contractDigest" | "inputSchema"> },
+): ToolContractRefresh {
+  const source = inputs && typeof inputs === "object" ? inputs : {};
+  const schema = tool.inputSchema;
+  const properties = propertySchemas(schema);
+  let nextInputs: Record<string, Binding>;
+  let removed: string[];
+  if (!schema || typeof schema !== "object" || Array.isArray(schema) || !properties) {
+    nextInputs = { ...source };
+    removed = [];
+  } else {
+    const names = Object.keys(properties);
+    removed = Object.keys(source).filter(name => !names.includes(name));
+    nextInputs = {};
+    for (const [name, binding] of Object.entries(source)) if (!removed.includes(name)) nextInputs[name] = binding;
+  }
+  const missingRequired = requiredNames(schema).filter(name => !Object.prototype.hasOwnProperty.call(nextInputs, name));
+  return { config: { ...config, contractDigest: tool.contractDigest }, inputs: nextInputs, removed, missingRequired };
+}
+
+/** Chinese feedback for a refresh result; an untouched wiring keeps the short confirmation. */
+export function toolContractRefreshMessage({ removed, missingRequired }: Pick<ToolContractRefresh, "removed" | "missingRequired">): string {
+  if (!removed.length && !missingRequired.length) return "已刷新，参数接线保持不变";
+  const parts: string[] = [];
+  if (removed.length) parts.push(`已移除参数：${removed.join("、")}。`);
+  if (missingRequired.length) parts.push(`需补充的必填参数：${missingRequired.join("、")}，请在参数表中接上。`);
+  return `已刷新。${parts.join("")}`;
 }

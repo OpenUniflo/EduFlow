@@ -1,0 +1,434 @@
+/* Cards are part of the assistant answer: every card spans the conversation
+   column and shares its left edge with text and event rows. */
+
+.ef-assistant-card-copy {
+  margin: 0;
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  color: var(--ink-2);
+}
+
+.ef-assistant-card-progress {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--line);
+  overflow: hidden;
+  margin: var(--sp-8) 0 0;
+}
+
+.ef-assistant-card-progress > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.ef-assistant-card-steps {
+  list-style: none;
+  margin: var(--sp-8) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-8);
+}
+
+.ef-assistant-card-steps li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: var(--sp-8);
+  align-items: start;
+}
+
+.ef-assistant-card-steps li > i {
+  width: 10px;
+  height: 10px;
+  margin: 5px 0 0 3px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+}
+
+.ef-assistant-card-steps li.is-now > i { background: var(--brand); border: 2px solid var(--brand-soft); }
+.ef-assistant-card-steps li.is-done > i { background: var(--target); }
+
+.ef-assistant-card-steps li span { display: grid; gap: 2px; min-width: 0; }
+.ef-assistant-card-steps li strong { font-size: var(--fs-13); line-height: var(--lh-13); font-weight: var(--fw-600); color: var(--ink); overflow-wrap: anywhere; }
+.ef-assistant-card-steps li small { font-size: var(--fs-12); line-height: var(--lh-12); color: var(--muted); }
+
+.ef-assistant-card-items {
+  list-style: none;
+  margin: var(--sp-8) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.ef-assistant-card-items li { display: flex; gap: var(--sp-8); align-items: baseline; padding: var(--sp-4) 0; border-bottom: 1px solid var(--line); }
+.ef-assistant-card-items li:last-child { border-bottom: 0; }
+.ef-assistant-card-items li span { display: grid; gap: 2px; }
+.ef-assistant-card-items li strong { font-size: var(--fs-13); line-height: var(--lh-13); color: var(--ink); font-weight: var(--fw-600); }
+.ef-assistant-card-items li small { font-size: var(--fs-12); line-height: var(--lh-12); color: var(--muted); }
+
+.ef-assistant-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  width: 100%;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  color: var(--muted);
+}
+
+.ef-assistant-card-foot > span { min-width: 0; overflow-wrap: anywhere; }
+.ef-assistant-card-foot .ef-ui-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: var(--sp-4); }
+
+.ef-assistant-card-choices { display: grid; gap: var(--sp-8); margin-top: var(--sp-8); }
+
+.ef-assistant-card-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  width: 100%;
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.ef-assistant-card-choice:hover { border-color: var(--line-strong); background: var(--brand-soft); }
+.ef-assistant-card-choice:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.ef-assistant-card-choice > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.ef-assistant-card-choice strong { font-size: var(--fs-13); line-height: var(--lh-13); font-weight: var(--fw-600); overflow-wrap: anywhere; }
+.ef-assistant-card-choice small { font-size: var(--fs-12); line-height: var(--lh-12); color: var(--muted); }
+
+/* Inline Micro card: one surface, expands in place, collapses when done. */
+.ef-assistant-micro {
+  display: grid;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+}
+
+.ef-assistant-micro.is-complete { gap: var(--sp-8); }
+
+.ef-assistant-micro-head {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: var(--sp-8);
+  align-items: start;
+}
+
+.ef-assistant-micro-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-8);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-assistant-micro-head h2 { margin: 2px 0 0; font-size: var(--fs-16); line-height: var(--lh-16); font-weight: var(--fw-600); color: var(--ink); }
+.ef-assistant-micro-head p { margin: var(--sp-4) 0 0; font-size: var(--fs-13); line-height: var(--lh-13); color: var(--ink-2); }
+.ef-assistant-micro-kicker { font-size: var(--fs-12); line-height: var(--lh-12); color: var(--muted); }
+.ef-assistant-micro-body { border-top: 1px solid var(--line); padding-top: var(--sp-12); }
+.ef-assistant-micro-body .ef-home-micro.is-inline { padding: 0; border: 0; background: transparent; }
+.ef-assistant-micro-body .ef-home-micro-card { width: 100%; max-width: none; align-self: stretch; padding: 0; border: 0; background: transparent; box-shadow: none; }
+
+@media (max-width: 1280px) {
+  .ef-assistant-card-foot { align-items: flex-start; }
+  .ef-assistant-micro-head { grid-template-columns: 28px minmax(0, 1fr); }
+  .ef-assistant-micro-head > .ef-ui-pill { grid-column: 2; justify-self: start; }
+}
+
+/* Answer cards are objects: opaque surface, border, radius and one shadow. */
+.ef-ui-conversation-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  overflow: clip;
+}
+.ef-assistant-card-actions { display: inline-flex; align-items: center; gap: var(--sp-8); flex-wrap: wrap; justify-content: flex-end; }
+.ef-assistant-micro { border: 0; background: transparent; padding: 0; }
+.ef-assistant-micro-body .ef-home-micro.is-inline { background: transparent; }
+
+/* Shared one-line completed card and secondary card controls. */
+.ef-card-compact {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: 52px;
+  padding: var(--sp-12) var(--sp-16);
+}
+.ef-card-compact-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--r-8);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+.ef-card-compact-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.ef-card-compact-copy.is-inline { display: flex; align-items: baseline; gap: var(--sp-8); }
+.ef-card-compact-copy.is-inline small { flex: 0 0 auto; font-size: var(--fs-14); line-height: var(--lh-14); white-space: nowrap; }
+.ef-card-compact-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-14); line-height: var(--lh-14); font-weight: var(--fw-600); color: var(--ink); }
+.ef-card-compact-copy small { color: var(--muted); font-size: var(--fs-12); line-height: var(--lh-12); }
+.ef-card-text-action {
+  border: 0;
+  padding: var(--sp-4);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ef-card-text-action:hover { color: var(--brand-ink); }
+.ef-card-icon {
+  display: grid;
+  place-items: center;
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ef-card-icon:hover { color: var(--ink); border-color: var(--line-strong); }
+.ef-card-icon:focus-visible, .ef-card-text-action:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* The expanded step grows with its content: no nested scroll container. */
+.ef-assistant-micro-frame { position: relative; scroll-margin-top: 104px; width: 100%; }
+.ef-assistant-card-frame { position: relative; width: 100%; }
+.ef-assistant-micro-body { min-height: 0; }
+.ef-assistant-micro-body .micro-card {
+  padding-bottom: 0;
+}
+.ef-assistant-micro-body .ef-home-micro .micro-card footer {
+  position: sticky;
+  bottom: var(--ef-composer-h, 112px);
+  z-index: 4;
+  margin-top: var(--sp-12);
+  padding: var(--sp-12) 0 var(--sp-8);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.ef-assistant-micro-body .micro-card footer .ef-micro-foot-gap { flex: 1; }
+/* Only the conversation removes the reserved feedback height; panels and the
+   immersive runner keep it. */
+.ef-assistant-micro-body .ef-home-micro .micro-feedback-slot { min-height: 0; }
+.ef-assistant-micro-body .ef-home-micro .micro-feedback-slot:empty { display: none; margin-top: 0; }
+.ef-assistant-micro-body .micro-spatial-zones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ef-assistant-micro-body .micro-spatial-zone > div { min-width: 0; }
+.ef-assistant-micro-body .micro-spatial-card { min-width: 0; }
+.ef-assistant-micro-body .micro-spatial-card > button:not(.micro-spatial-handle) { min-width: 0; overflow-wrap: anywhere; }
+
+.ef-ui-obj-foot .ef-assistant-card-foot { width: auto; flex: 1; min-width: 0; }
+.ef-ui-obj-foot .ef-assistant-card-actions { min-width: 0; }
+
+/* Stage 4 first-segment summary: stats + own-Knowledge mini map. */
+.ef-assistant-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-8);
+}
+
+.ef-assistant-summary-stats span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-12);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-assistant-summary-stats b {
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+}
+
+.ef-assistant-summary-stats small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-assistant-summary-map {
+  overflow-x: auto;
+  padding: var(--sp-8);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-assistant-summary-map svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.ef-assistant-map-edge {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.ef-assistant-map-node {
+  fill: var(--brand);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.ef-assistant-map-label {
+  fill: var(--ink-2);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+  text-anchor: middle;
+}
+
+/* The object open in the Home workspace owns one clear card highlight. */
+.ef-assistant-card-frame,
+.ef-assistant-micro-frame {
+  border-radius: var(--r-24);
+}
+
+.ef-assistant-card-frame.is-context-active::after,
+.ef-assistant-micro-frame.is-context-active::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border: 2px solid var(--brand);
+  border-radius: var(--r-24);
+  pointer-events: none;
+}
+
+.ef-assistant-card-frame.is-context-active .ef-ui-obj,
+.ef-assistant-micro-frame.is-context-active .ef-ui-obj,
+.ef-assistant-card-frame.is-context-active .ef-card-compact,
+.ef-assistant-micro-frame.is-context-active .ef-card-compact {
+  background: color-mix(in srgb, var(--brand-soft) 58%, var(--surface));
+  box-shadow: var(--sh-2);
+  transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-assistant-card-frame.is-context-active .ef-ui-obj,
+  .ef-assistant-micro-frame.is-context-active .ef-ui-obj,
+  .ef-assistant-card-frame.is-context-active .ef-card-compact,
+  .ef-assistant-micro-frame.is-context-active .ef-card-compact {
+    transition: none;
+  }
+}
+
+/* Knowledge cards keep their Micro entry and expose the real map as a second path. */
+.ef-assistant-card-map-link {
+  display: block;
+  margin: calc(-1 * var(--sp-8)) 0 var(--sp-8) var(--sp-16);
+}
+
+/* Knowledge cards use the Archive node's dot-and-label language, not a Micro. */
+.ef-assistant-knowledge-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  border: 2px solid var(--brand-soft);
+}
+
+.ef-assistant-card-frame[data-card-type="knowledge"] .ef-ui-obj-badge {
+  margin-left: auto;
+}
+
+.ef-assistant-mini-map {
+  padding: var(--sp-8);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-assistant-mini-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-node {
+  fill: var(--muted);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.ef-assistant-mini-map g.is-center .ef-assistant-map-node {
+  fill: var(--brand);
+  stroke: var(--brand-soft);
+  stroke-width: 5;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-edge {
+  stroke-width: 1.6;
+  opacity: .9;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-edge.is-prerequisite { stroke: var(--warn); }
+.ef-assistant-mini-map .ef-assistant-map-edge.is-enables { stroke: var(--brand); }
+.ef-assistant-mini-map .ef-assistant-map-edge.is-related { stroke: var(--line-strong); }
+
+.ef-assistant-mini-map .ef-assistant-map-label {
+  fill: var(--ink-2);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+  paint-order: stroke;
+  stroke: var(--page);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-label.is-center {
+  fill: var(--brand-ink);
+}
+
+.ef-assistant-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8) var(--sp-16);
+  padding: var(--sp-8) var(--sp-4) 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-assistant-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+.ef-assistant-map-legend i {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--line-strong);
+}
+
+.ef-assistant-map-legend i.is-prerequisite { border-color: var(--warn); }
+.ef-assistant-map-legend i.is-enables { border-color: var(--brand); }
+.ef-assistant-map-legend i.is-related { border-color: var(--line-strong); }
+
+/* Tool progress is an in-order one-line event, like Claude/ChatGPT. */
+.ef-assistant-tool-progress-details > p {
+  margin: var(--sp-4) 0 0;
+  padding-left: var(--sp-20);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}

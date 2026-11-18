@@ -8,6 +8,7 @@ export type AuthSession = {
   role: UserRole;
   capabilities: UserCapability[];
   createdAt: string;
+  emailVerified?: boolean;
 };
 
 /** Temporary compatibility alias while presentation components retain their original prop name. */

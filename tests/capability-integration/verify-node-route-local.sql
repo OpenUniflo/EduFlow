@@ -59,7 +59,7 @@ begin
  raise notice 'PASS Node scope: constraints, binding target, true roots, independent frontier, local ordering, Practice result lineage, all-actions reachability, explicit Repeat, UKS/facts/history unchanged';
 end $$;
 do $$
-declare u uuid; c constant text:='TEST-node-micro-local'; path constant text:='TEST-node-micro-path'; unit constant text:='TEST-node-micro-unit'; step constant text:='TEST-node-micro-step'; a uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); v uuid; snap jsonb; r edge_action_runs; before_uks jsonb; result jsonb;
+declare u uuid; c constant text:='TEST-node-micro-local'; path constant text:='TEST-node-micro-path'; unit constant text:='TEST-node-micro-unit'; step constant text:='TEST-node-micro-step'; a uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); v uuid; snap jsonb; r edge_action_runs; prior_status text; result jsonb;
 begin
  select id into strict u from auth.users order by id limit 1;
  insert into courses(id,title,description,revision,course_type,lifecycle,target_outcome) values(c,'TEST actual Node Micro','Rollback only','test','standard','published','Describe an Agent');
@@ -70,7 +70,7 @@ begin
  insert into course_action_bindings(id,course_id,action_id,micro_path_id) values(b,c,a,path);
  snap:=jsonb_build_object('valid',true,'selectedNodeIds',jsonb_build_array('AG01'),'executionSteps',jsonb_build_array(jsonb_build_object('scope','node','nodeId','AG01','actionId',a,'order',0)));
  v:=(adopt_personal_course_route(u,c,null,'initial','{}','{}',snap,'test')->>'id')::uuid;
- select coalesce(jsonb_agg(to_jsonb(s) order by s.node_id),'[]') into before_uks from user_knowledge_states s where user_id=u;
+ select status into prior_status from user_knowledge_states where user_id=u and node_id='AG01';
  r:=select_route_action_v3(u,c,a,gen_random_uuid(),(select updated_at from knowledge_edge_actions where id=a),(select updated_at from course_action_bindings where id=b),v);
  r:=transition_route_action_v3(u,r.id,'start',v);
  perform start_micro_for_route_v2(u,path,c,v,array['AG01']);
@@ -78,8 +78,13 @@ begin
  if (select status from edge_action_runs where id=r.id)<>'completed' then raise exception 'Actual Micro must complete Node Run';end if;
  if not('AG01'=any(route_execution_reachable_nodes(u,c))) then raise exception 'Actual Micro must grant execution reachability';end if;
  if not exists(select 1 from micro_step_attempts where action_run_id=r.id and step_id=step and completion_accepted) then raise exception 'Run-scoped Micro lineage missing';end if;
- if (select coalesce(jsonb_agg(to_jsonb(s) order by s.node_id),'[]') from user_knowledge_states s where user_id=u) is distinct from before_uks then raise exception 'Actual Micro changed UKS';end if;
- raise notice 'PASS actual Node Micro: start, submission, observation lineage, completion, reachability; UKS byte-equivalent';
+ if prior_status is null or prior_status in ('explore','learning') then
+  if (select status from user_knowledge_states where user_id=u and node_id='AG01')<>'learned' then raise exception 'Actual Micro must reach learned';end if;
+ elsif prior_status in ('learned','practicing','mastered') then
+  if (select status from user_knowledge_states where user_id=u and node_id='AG01')<>prior_status then raise exception 'Actual Micro downgraded %',prior_status;end if;
+ end if;
+ if prior_status is distinct from 'mastered' and exists(select 1 from user_knowledge_states where user_id=u and node_id='AG01' and status='mastered') then raise exception 'Actual Micro manufactured mastery';end if;
+ raise notice 'PASS actual Node Micro: start, submission, observation lineage, completion, reachability; state raised to learned without mastery';
 end $$;
 do $$
 declare viewer uuid; owner_user uuid; root constant text:='AG01';

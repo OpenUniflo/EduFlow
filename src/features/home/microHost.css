@@ -1,0 +1,242 @@
+/* One running Micro instance: the fixed portal container is moved between
+   the latest card slot, the side workspace and the modal dialog. */
+.ef-micro-parking { display: none; }
+
+.ef-micro-instance {
+  min-width: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.ef-micro-side-slot {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.ef-micro-side-slot > .ef-micro-instance {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* The running practice is a floating object with its own title bar. */
+.ef-micro-seg {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-8);
+  background: var(--page);
+}
+
+.ef-micro-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: 28px;
+  padding: 0 var(--sp-8);
+  border: 0;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  cursor: pointer;
+}
+
+.ef-micro-seg button:hover { color: var(--brand-ink); }
+.ef-micro-seg button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: var(--sh-1);
+}
+.ef-micro-seg button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.ef-assistant-micro-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-micro-away {
+  min-height: 52px;
+  padding: var(--sp-12) var(--sp-16);
+}
+
+.ef-micro-away-copy {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+/* Card summary: the description shares the title's text column. */
+.ef-assistant-micro-frame .ef-ui-obj-body > .ef-assistant-card-copy {
+  padding-left: calc(36px + var(--sp-12));
+}
+
+.ef-micro-foot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-8);
+  margin-left: auto;
+}
+
+.ef-micro-foot-progress-text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Immersive: a native modal dialog over the conversation, never a route. */
+.ef-micro-focus {
+  width: min(1040px, calc(100vw - 64px));
+  height: min(760px, calc(100vh - 64px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: visible;
+}
+
+.ef-micro-focus::backdrop {
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.ef-micro-focus-frame,
+.ef-micro-focus-slot {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.ef-micro-focus-slot {
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+  border-radius: var(--r-24);
+  box-shadow: var(--sh-3);
+  background: transparent;
+}
+
+/* While the one instance flies, the dialog must not show a second full-size
+   frame around it. */
+.ef-micro-focus[data-morphing="1"] .ef-micro-focus-slot {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.ef-micro-focus-slot > .ef-micro-instance {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.ef-micro-focus-slot .ef-home-micro-shell {
+  height: 100%;
+  min-height: 0;
+  /* Immersive is opaque; the conversation is seen through the blurred
+     backdrop, never through the practice material. */
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.ef-micro-instance.ef-micro-morphing,
+.ef-micro-instance.ef-micro-morphing *,
+.ef-micro-instance.ef-micro-morphing *::before,
+.ef-micro-instance.ef-micro-morphing *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+.ef-micro-focus-slot .ef-home-micro.is-panel {
+  padding: var(--sp-16) var(--sp-24) var(--sp-24);
+}
+
+.ef-micro-focus-slot .ef-ui-obj-body {
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ef-micro-focus::backdrop {
+    background: color-mix(in srgb, var(--ink) 56%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ef-micro-focus {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+  }
+
+  .ef-micro-focus-slot .ef-home-micro.is-panel {
+    padding: var(--sp-12);
+  }
+
+  .ef-assistant-micro-frame .ef-ui-obj-body > .ef-assistant-card-copy {
+    padding-left: 0;
+  }
+
+  .ef-micro-seg button {
+    padding: 0 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-micro-focus::backdrop {
+    animation: none;
+  }
+}
+
+/* Older cards referencing the same path keep a registered slot but never show
+   a second running surface. */
+.ef-micro-slot-standby { display: none !important; }
+
+/* Inline is still the same shell instance; only the shell chrome is hidden. */
+.ef-home-micro-shell.is-inline-surface,
+.ef-assistant-micro-body .ef-home-micro-shell.is-inline-surface {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.ef-home-micro-shell.is-inline-surface > .ef-ui-obj-head { display: none; }
+.ef-home-micro-shell.is-inline-surface > .ef-ui-obj-body {
+  gap: 0;
+  padding: 0;
+  overflow: visible;
+}
+
+/* A side Micro keeps its mounted runner while another panel owns the screen. */
+.ef-micro-side[hidden] {
+  display: none;
+}

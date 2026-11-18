@@ -8,7 +8,7 @@ type Row = Record<string, any>;
 export async function readPracticeContext(client: SupabaseClient, userId: string, attemptId: string): Promise<PracticeEvidenceContext> {
   const found = await client.from('learning_attempts').select('*').eq('id', attemptId).eq('user_id', userId).maybeSingle();
   const attempt = dataOrThrow(found.data, found.error, 'Practice Attempt') as Row | null;
-  if (!attempt) throw new ApiError(404, 'practice_attempt_unavailable', '本人正式成果不可用。');
+  if (!attempt || attempt.withdrawn_at) throw new ApiError(404, 'practice_attempt_unavailable', '本人正式成果不可用。');
   const [task, evaluated, runResult, coverage] = await Promise.all([
     client.from('course_assignments').select('id,title,description,requirements,expected_output,acceptance_criteria,experience').eq('course_id', attempt.course_id).eq('id', attempt.assignment_id).maybeSingle(),
     client.from('performance_results').select('id,version,outcome,score,feedback,evaluator_kind,evaluated_at').eq('attempt_id', attempt.id).eq('user_id', userId).order('version', { ascending: false }).limit(1).maybeSingle(),
@@ -43,7 +43,7 @@ export async function practiceContextsForSource(client: SupabaseClient, userId: 
     return [context];
   }
   // An attachment may participate in several immutable attempts. Keep every actual association.
-  const attempts = await allRows(client.from('learning_attempts').select('id').eq('user_id',userId).contains('response',{attachmentSourceIds:[source.id]}).order('submitted_at'), 'Practice file lineage');
+  const attempts = await allRows(client.from('learning_attempts').select('id').eq('user_id',userId).is('withdrawn_at',null).contains('response',{attachmentSourceIds:[source.id]}).order('submitted_at'), 'Practice file lineage');
   return Promise.all(attempts.map(attempt=>readPracticeContext(client,userId,String(attempt.id))));
 }
 

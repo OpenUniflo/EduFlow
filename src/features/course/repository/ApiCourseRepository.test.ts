@@ -38,6 +38,15 @@ describe("ApiCourseRepository route-only discovery", () => {
     expect(repository.getCourse("empty-draft")).toEqual(draft);
   });
 
+  it("applies a server-confirmed lifecycle to the shared cached projection", async () => {
+    apiRequest.mockResolvedValue({ courses: [routeOnlyRuntime] });
+    const repository = new ApiCourseRepository(new InMemoryKnowledgeRepository(routeOnlyKnowledgeGraph));
+    await repository.hydrate("admin");
+    expect(repository.updateLifecycle("route-only-course", "archived")).toBe(true);
+    expect(repository.getCourse("route-only-course")?.course.lifecycle).toBe("archived");
+    expect(repository.updateLifecycle("missing", "archived")).toBe(false);
+  });
+
   it("rejects a Draft with a broken owned reference", async () => {
     const draft = {
       ...routeOnlyRuntime,

@@ -41,11 +41,15 @@ describe("server environment", () => {
     expect(() => readServerEnvironment({ SUPABASE_URL: "url", VITE_SUPABASE_PUBLISHABLE_KEY: "public" })).toThrow(/SUPABASE_SECRET_KEY/);
   });
 
-  it("validates the existing server-only DeepSeek variable contract", () => {
+  it("accepts any non-empty OpenAI-compatible LLM provider label", () => {
     expect(readLlmEnvironment({
       LLM_PROVIDER: "deepseek", LLM_BASE_URL: "https://api.deepseek.com/", LLM_API_KEY: "server-only", LLM_MODEL: "deepseek-v4-flash"
     })).toEqual({ llmProvider: "deepseek", llmBaseUrl: "https://api.deepseek.com", llmApiKey: "server-only", llmModel: "deepseek-v4-flash" });
-    expect(() => readLlmEnvironment({ LLM_PROVIDER: "other", LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "x", LLM_MODEL: "model" })).toThrow(/LLM_PROVIDER/);
+    expect(readLlmEnvironment({
+      LLM_PROVIDER: "opencode", LLM_BASE_URL: "https://opencode.ai/inference/go/openai/v1", LLM_API_KEY: "server-only", LLM_MODEL: "deepseek-v4.1-flash"
+    })).toEqual({ llmProvider: "opencode", llmBaseUrl: "https://opencode.ai/inference/go/openai/v1", llmApiKey: "server-only", llmModel: "deepseek-v4.1-flash" });
+    expect(() => readLlmEnvironment({ LLM_PROVIDER: "", LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "x", LLM_MODEL: "model" })).toThrow(/LLM_PROVIDER/);
+    expect(() => readLlmEnvironment({ LLM_PROVIDER: "   ", LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "x", LLM_MODEL: "model" })).toThrow(/LLM_PROVIDER/);
     expect(() => readLlmEnvironment({ LLM_PROVIDER: "deepseek", LLM_BASE_URL: "not-a-url", LLM_API_KEY: "x", LLM_MODEL: "model" })).toThrow(/LLM_BASE_URL/);
   });
 

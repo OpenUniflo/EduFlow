@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectionReferenceRows, connectionRefName, connectionRefVersion, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References";
+import { connectionReferenceRows, connectionRefName, connectionRefVersion, functionReferenceRows, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References";
 
 type Row = Record<string, unknown>;
 
@@ -129,6 +129,41 @@ describe("variable references", () => {
   });
 });
 
+
+const functionDefinition: Row = {
+  name: "函数流程",
+  revision: 6,
+  nodes: [
+    { id: "fn", label: "清理", type: "core.function", config: { implementation: "registered", functionRef: "cleanup", functionVersion: 2 }, inputs: {}, writes: {} },
+    { id: "model", label: "模型", type: "core.llm", config: { authoring: { errorHandler: { functionRef: "cleanup", functionVersion: 3 } } }, inputs: {}, writes: {} },
+    { id: "sub", label: "子图", type: "core.subgraph", config: { graph: { nodes: [
+      { id: "inner", label: "内部函数", type: "core.function", config: { implementation: "registered", functionRef: "cleanup", functionVersion: 4 }, inputs: {}, writes: {} },
+    ] } }, inputs: {}, writes: {} },
+    { id: "other", label: "其他", type: "core.function", config: { implementation: "registered", functionRef: "other", functionVersion: 1 }, inputs: {}, writes: {} },
+  ],
+};
+
+describe("function references", () => {
+  it("reports registered nodes, error handlers and nested subgraphs with their pinned versions", () => {
+    expect(functionReferenceRows([workflow({ workflowId: "wf-fn", workflowName: "函数流程", revision: 6, definition: functionDefinition })], "cleanup")).toEqual([
+      { workflowId: "wf-fn", workflowName: "函数流程", revision: 6, graphPath: [], nodeId: "fn", nodeLabel: "清理", version: 2 },
+      { workflowId: "wf-fn", workflowName: "函数流程", revision: 6, graphPath: [], nodeId: "model", nodeLabel: "模型", version: 3 },
+      { workflowId: "wf-fn", workflowName: "函数流程", revision: 6, graphPath: ["sub"], nodeId: "inner", nodeLabel: "内部函数", version: 4 },
+    ]);
+    expect(functionReferenceRows([workflow({ definition: functionDefinition })], "other")).toHaveLength(1);
+    expect(functionReferenceRows([workflow({ definition: functionDefinition })], "unknown")).toEqual([]);
+    expect(functionReferenceRows([workflow({ archived: true, definition: functionDefinition })], "cleanup")).toEqual([]);
+  });
+
+  it("deduplicates the same node using one function as body and handler and ignores code implementations", () => {
+    const definition: Row = { nodes: [
+      { id: "fn", label: "函数", type: "core.function", config: { implementation: "registered", functionRef: "cleanup", functionVersion: 2, authoring: { errorHandler: { functionRef: "cleanup", functionVersion: 2 } } } },
+      { id: "code", label: "代码", type: "core.function", config: { implementation: "code", functionRef: "cleanup", functionVersion: 2 } },
+    ] };
+    expect(functionReferenceRows([workflow({ definition })], "cleanup")).toHaveLength(1);
+  });
+});
+
 const dependencies = vi.hoisted(() => ({ server: undefined as SupabaseClient | undefined, compiler: vi.fn() }));
 vi.mock("./supabase.js", () => ({ createServerSupabase: () => dependencies.server }));
 vi.mock("./workflowV2Protocol.js", async (original) => ({ ...await original<typeof import("./workflowV2Protocol.js")>(), workflowCompiler: dependencies.compiler }));
@@ -137,6 +172,11 @@ import { handleWorkflowV2 } from "./workflowV2.js";
 type Fixture = { workflowId: string; currentRevision: number; archived?: boolean; definition: Row };
 
 function mockClient(fixtures: Fixture[], configuration?: Row, rpcHandlers: Record<string, (args: Row) => unknown> = {}) {
+  const defaultRpc: Record<string, (args: Row) => unknown> = {
+    // Phase 3 scans append current-root reachable fixed revisions; root-only
+    // fixtures have none, so the closure projection is empty here.
+    workflow_v2_reference_closure: () => ({ version: 1, targets: [], edges: [] }),
+  };
   const reads: { table: string; filters: Row }[] = [];
   const writes: { operation: string; value: unknown }[] = [];
   const client = {
@@ -181,7 +221,7 @@ function mockClient(fixtures: Fixture[], configuration?: Row, rpcHandlers: Recor
       return query;
     },
     rpc(name: string, args: Row) {
-      const handler = rpcHandlers[name];
+      const handler = rpcHandlers[name] ?? defaultRpc[name];
       if (!handler) throw new Error(`unexpected rpc: ${name}`);
       return Promise.resolve({ data: handler(args), error: null });
     },
@@ -213,6 +253,44 @@ describe("resource reference endpoints", () => {
     expect(reads.map((read) => read.table)).toEqual(["workflow_v2_definitions", "workflow_revisions"]);
     expect(reads[0].filters).toMatchObject({ owner_user_id: "owner", archived: false });
     expect(reads[1].filters).toMatchObject({ owner_user_id: "owner", workflow_id: "wf-a", revision: 4 });
+  });
+
+
+  it("returns function references when the caller asks for the function kind", async () => {
+    const { client } = mockClient([{ workflowId: "wf-fn", currentRevision: 6, definition: functionDefinition }]);
+    const state = vercelResponse();
+    await handleWorkflowV2(request("GET", "extensions", { view: "references", ref: "cleanup", kind: "function" }), state.response, "owner", client);
+    expect((state.output().items as Row[])).toMatchObject([
+      { workflowId: "wf-fn", nodeId: "fn", version: 2 },
+      { workflowId: "wf-fn", nodeId: "model", version: 3 },
+      { workflowId: "wf-fn", nodeId: "inner", graphPath: ["sub"], version: 4 },
+    ]);
+  });
+
+  it("appends the fixed old revisions reachable from a current root", async () => {
+    const parent = {
+      name: "父流程", revision: 1, nodes: [{
+        id: "call", label: "调用", type: "core.subgraph",
+        config: { workflowRef: { workflowId: "child", revision: 1 }, environmentRef: "local" }, inputs: {}, writes: {},
+      }],
+    };
+    const target = {
+      name: "目标旧版", revision: 1, nodes: [{
+        id: "model", label: "旧模型", type: "core.llm",
+        config: { providerRef: "p4:owner:price:1", modelRef: "deepseek-chat" }, inputs: {}, writes: {},
+      }],
+    };
+    const calls: Row[] = [];
+    const { client } = mockClient([{ workflowId: "parent", currentRevision: 1, definition: parent }], undefined, {
+      workflow_v2_reference_closure: (args) => {
+        calls.push(args);
+        return { version: 1, root: { workflowId: "parent", revision: "1" }, edges: [], targets: [{ workflowId: "child", revision: 1, environmentRef: "local", definition: target }] };
+      },
+    });
+    const state = vercelResponse();
+    await handleWorkflowV2(request("GET", "extensions", { view: "references", ref: "price" }), state.response, "owner", client);
+    expect(calls).toEqual([{ p_owner: "owner", p_workflow: "parent", p_revision: 1 }]);
+    expect(state.output().items).toContainEqual(expect.objectContaining({ workflowId: "child", revision: 1, graphPath: [], nodeId: "model", version: 1 }));
   });
 
   it("accepts a full stored connection key", async () => {
@@ -323,6 +401,45 @@ describe("variable configuration", () => {
   });
 });
 
+describe("provider lifecycle endpoints", () => {
+  const body = (action: string, extra: Row = {}) => ({
+    environmentRef: "local-env", action, kind: "connection", ref: "price", version: 2, ...extra,
+  });
+
+  it("blocks deletion while a current Workflow still references the connection", async () => {
+    const { client } = mockClient([{ workflowId: "wf-a", currentRevision: 4, definition: { name: "流程 A", revision: 4, nodes: [{ id: "model", label: "模型", type: "core.llm", config: { providerRef: "p4:owner:price:2" } }] } }]);
+    await expect(handleWorkflowV2(request("POST", "extensions", {}, body("delete")), vercelResponse().response, "owner", client))
+      .rejects.toMatchObject({ status: 409, code: "CONNECTION_IN_USE", details: { referenceCount: 1, workflowCount: 1 } });
+    expect(dependencies.compiler).not.toHaveBeenCalled();
+  });
+
+
+  it("blocks function deletion while a current Workflow or error handler references it", async () => {
+    const { client } = mockClient([{ workflowId: "wf-fn", currentRevision: 6, definition: functionDefinition }]);
+    await expect(handleWorkflowV2(request("POST", "extensions", {}, { environmentRef: "local-env", action: "delete", kind: "function", ref: "cleanup", version: 4 }), vercelResponse().response, "owner", client))
+      .rejects.toMatchObject({ status: 409, code: "FUNCTION_IN_USE", details: { referenceCount: 3, workflowCount: 1 } });
+    expect(dependencies.compiler).not.toHaveBeenCalled();
+  });
+
+  it("delegates deletion to the Worker after the owner-scoped reference scan is clear", async () => {
+    const { client } = mockClient([]);
+    dependencies.compiler.mockResolvedValue({ ref: "price", deleted: 2, version: 2 });
+    const state = vercelResponse();
+    await handleWorkflowV2(request("POST", "extensions", {}, body("delete")), state.response, "owner", client);
+    expect(dependencies.compiler).toHaveBeenCalledWith("/v1/extensions", { ...body("delete"), ownerId: "owner" }, undefined);
+    expect(state.output()).toEqual({ ref: "price", deleted: 2, version: 2 });
+  });
+
+  it("passes rename and restore through without changing the stable ref", async () => {
+    const { client } = mockClient([]);
+    dependencies.compiler.mockResolvedValue({ ok: true });
+    await handleWorkflowV2(request("POST", "extensions", {}, body("rename", { version: 3, content: { name: "Team Gateway" } })), vercelResponse().response, "owner", client);
+    await handleWorkflowV2(request("POST", "extensions", {}, body("restore", { version: 3 })), vercelResponse().response, "owner", client);
+    expect(dependencies.compiler).toHaveBeenNthCalledWith(1, "/v1/extensions", { ...body("rename", { version: 3, content: { name: "Team Gateway" } }), ownerId: "owner" }, undefined);
+    expect(dependencies.compiler).toHaveBeenNthCalledWith(2, "/v1/extensions", { ...body("restore", { version: 3 }), ownerId: "owner" }, undefined);
+  });
+});
+
 describe("extension test response", () => {
   it("passes Worker test fields through without trimming models, tools or preview", async () => {
     const result = { ok: true, elapsedMs: 321, status: 200, preview: "{\"answer\":42}", models: ["deepseek-chat", "deepseek-reasoner"], tools: [{ name: "lookup", description: "查询价格" }] };
@@ -331,6 +448,6 @@ describe("extension test response", () => {
     const body = { environmentRef: "local-env", action: "test", kind: "connection", ref: "price", version: 2, arguments: { query: "a" }, confirmExternalEffect: false };
     await handleWorkflowV2(request("POST", "extensions", {}, body), state.response, "owner");
     expect(state.output()).toEqual(result);
-    expect(dependencies.compiler).toHaveBeenCalledWith("/v1/extensions", { ...body, ownerId: "owner" });
+    expect(dependencies.compiler).toHaveBeenCalledWith("/v1/extensions", { ...body, ownerId: "owner" }, undefined);
   });
 });

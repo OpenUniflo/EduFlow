@@ -122,7 +122,7 @@ export function buildPersonalKnowledgeGraph(
       assignmentContexts,
       evidence: [
         ...(record?.evidence?.map((evidence) => evidence.label) ?? []),
-        ...assignmentContexts.filter((context) => context.status === "accepted" || context.status === "completed").map((context) => `已验收实训 · ${context.title}`)
+        ...assignmentContexts.filter((context) => context.status === "accepted" || context.status === "completed").map((context) => `已验收动手任务 · ${context.title}`)
       ]
     }];
   });

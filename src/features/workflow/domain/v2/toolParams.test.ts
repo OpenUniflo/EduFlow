@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Binding, JsonSchema } from "./types";
-import { assembleToolArguments, reconcileToolInputs, toolParamRows } from "./toolParams";
+import { assembleToolArguments, reconcileToolInputs, refreshToolContract, toolContractRefreshMessage, toolParamRows } from "./toolParams";
 
 const literalBinding = (value: string | number | boolean): Binding => ({ source: "literal", value });
 const stateBinding = (pointer: string): Binding => ({ source: "state", pointer, onMissing: { mode: "error" } });
@@ -120,5 +120,61 @@ describe("reconcileToolInputs", () => {
     );
     expect(Object.keys(result.inputs)).toEqual(["c", "a"]);
     expect(result.removed).toEqual(["b"]);
+  });
+});
+
+describe("refreshToolContract", () => {
+  const tool = {
+    ref: "hn_search",
+    contractDigest: "5ff7",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query", "limit"] } satisfies JsonSchema,
+  };
+
+  it("updates only the digest and keeps same-named bindings, including sources and literals", () => {
+    const inputs = {
+      query: { source: "state", pointer: "/keywords", onMissing: { mode: "error" } } as Binding,
+      limit: literalBinding(10),
+    };
+    const result = refreshToolContract({ config: { toolRef: "hn_search", contractDigest: "old", extra: "keep" }, inputs, tool });
+    expect(result.config).toEqual({ toolRef: "hn_search", contractDigest: "5ff7", extra: "keep" });
+    expect(result.inputs).toEqual(inputs);
+    expect(result.removed).toEqual([]);
+    expect(result.missingRequired).toEqual([]);
+    expect(inputs).toEqual({ query: { source: "state", pointer: "/keywords", onMissing: { mode: "error" } }, limit: literalBinding(10) });
+  });
+
+  it("removes parameters that the current Schema no longer declares and reports them", () => {
+    const result = refreshToolContract({
+      config: { toolRef: "hn_search", contractDigest: "old" },
+      inputs: { query: stateBinding("/keywords"), stale: literalBinding("x") },
+      tool,
+    });
+    expect(result.inputs).toEqual({ query: stateBinding("/keywords") });
+    expect(result.removed).toEqual(["stale"]);
+    expect(result.missingRequired).toEqual(["limit"]);
+  });
+
+  it("reports required parameters that have no binding after the refresh", () => {
+    const result = refreshToolContract({
+      config: { toolRef: "hn_search", contractDigest: "old" },
+      inputs: { query: stateBinding("/keywords") },
+      tool: { contractDigest: "5ff7", inputSchema: { type: "object", properties: { query: { type: "string" }, fresh: { type: "string" } }, required: ["query", "fresh"] } },
+    });
+    expect(result.inputs).toEqual({ query: stateBinding("/keywords") });
+    expect(result.missingRequired).toEqual(["fresh"]);
+  });
+
+  it("keeps every binding for an open Schema without properties", () => {
+    const result = refreshToolContract({ config: { toolRef: "hn_search", contractDigest: "old" }, inputs: { query: stateBinding("/keywords") }, tool: { contractDigest: "5ff7", inputSchema: { type: "object" } } });
+    expect(result.inputs).toEqual({ query: stateBinding("/keywords") });
+    expect(result.removed).toEqual([]);
+    expect(result.missingRequired).toEqual([]);
+  });
+
+  it("describes an unchanged wiring and lists removed and required parameters", () => {
+    expect(toolContractRefreshMessage({ removed: [], missingRequired: [] })).toBe("已刷新，参数接线保持不变");
+    expect(toolContractRefreshMessage({ removed: ["stale"], missingRequired: [] })).toBe("已刷新。已移除参数：stale。");
+    expect(toolContractRefreshMessage({ removed: [], missingRequired: ["fresh"] })).toBe("已刷新。需补充的必填参数：fresh，请在参数表中接上。");
+    expect(toolContractRefreshMessage({ removed: ["stale"], missingRequired: ["fresh"] })).toBe("已刷新。已移除参数：stale。需补充的必填参数：fresh，请在参数表中接上。");
   });
 });

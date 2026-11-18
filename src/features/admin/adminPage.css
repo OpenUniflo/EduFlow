@@ -1,0 +1,149 @@
+/* P7c /admin shell. Tokens and shared UI only. */
+.ef-admin-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  gap: var(--sp-16);
+  box-sizing: border-box;
+  padding: var(--sp-24);
+  color: var(--ink);
+}
+
+.ef-admin-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  flex-wrap: wrap;
+}
+
+.ef-admin-head-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-admin-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-admin-crumb button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-crumb button:hover {
+  color: var(--brand-ink);
+}
+
+.ef-admin-crumb b {
+  color: var(--ink-2);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.4px;
+}
+
+.ef-admin-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-admin-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-admin-tabs button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
+.ef-admin-tabs button:hover {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-admin-tabs button.is-on {
+  border-bottom-color: var(--brand);
+  color: var(--brand-ink);
+  font-weight: var(--fw-700);
+}
+
+.ef-admin-tabs button b {
+  padding: 1px var(--sp-8);
+  border-radius: var(--r-full);
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-tabs button.is-on b {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-admin-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ef-admin-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+}
+
+@media (max-width: 900px) {
+  .ef-admin-page {
+    padding: var(--sp-16);
+  }
+
+  .ef-admin-head h1 {
+    font-size: var(--fs-20);
+    line-height: var(--lh-20);
+  }
+}
+
+/* The sample directory has no Assistant surface; keep the trigger out of the table. */
+body[data-page="admin-users"] .course-design-assistant-trigger {
+  display: none;
+}

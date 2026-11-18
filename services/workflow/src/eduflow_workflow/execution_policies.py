@@ -77,9 +77,9 @@ async def compute(executor,node,resolved,body):
         return ExecutionError('NODE_TIMEOUT','Node exceeded configured timeout','timeout',effect=timeout_effect,reason='timeout',timeout_ms=round(timeout*1000))
     s=node['config'].get('authoring',{});retry=s.get('retry',{});calls=0
     max_attempts=retry.get('maxAttempts',1)
-    context={'ownerId':executor.run['owner_user_id'],'workflowId':executor.run.get('workflow_id',executor.root_definition['workflowId']),'nodeId':node['id'],'graphPath':(executor._invocation.get().sdk_execution or {}).get('graphPath',[])}
+    context={'ownerId':executor.run['owner_user_id'],'workflowId':executor.definition.get('workflowId',executor.run.get('workflow_id',executor.root_definition['workflowId'])),'nodeId':node['id'],'graphPath':(executor._invocation.get().sdk_execution or {}).get('graphPath',[])}
     # Only this safe, complete declared context reaches user code. No environment/credentials.
-    timeout=min(s.get('timeoutMs',executor.definition['policy']['nodeTimeoutMs'])/1000,executor.remaining())
+    timeout=min(s.get('timeoutMs',executor.policy['nodeTimeoutMs'])/1000,executor.remaining())
     async def attempt(handler=False):
         await executor.guard()
         identity=executor._invocation.get().sdk_execution or {}

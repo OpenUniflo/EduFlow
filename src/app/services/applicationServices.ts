@@ -21,6 +21,8 @@ import type { KnowledgeGraph } from "@/features/knowledge/types";
 import type { UserCourseState } from "@/features/course/types";
 import type { UserCapability, UserRole } from "@/features/auth/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
+import { previewApplicationServices, type ApplicationPreviewServices } from "./previewServices";
+import { SupabaseHomeMainlineConfigRepository, type HomeMainlineConfigRepository } from "@/features/home/HomeMainlineConfigRepository";
 
 export type ApplicationServices = {
   courseRepository: CourseRepository;
@@ -33,6 +35,9 @@ export type ApplicationServices = {
   domainGovernanceService: DomainGovernanceService;
   courseCreationService: CourseCreationService;
   courseAuthoringDraftRepository: CourseAuthoringDraftRepository;
+  homeMainlineConfigRepository: HomeMainlineConfigRepository;
+  /** Feature Preview sources are injected here; real page wiring arrives in P1+. */
+  preview?: ApplicationPreviewServices;
 };
 
 const knowledgeRepository = new ApiKnowledgeRepository();
@@ -40,8 +45,9 @@ const courseRepository = new ApiCourseRepository(knowledgeRepository);
 const userKnowledgeRepository = new ApiUserKnowledgeRepository();
 const learningProgressRepository = new ApiLearningProgressRepository();
 const microLearningRepository = new ApiMicroLearningRepository();
-const learnerStateService = new ApiLearnerStateService();
+const learnerStateService = new ApiLearnerStateService(refreshLearnerState);
 const courseAuthoringDraftRepository = new ApiCourseAuthoringDraftRepository();
+const homeMainlineConfigRepository = new SupabaseHomeMainlineConfigRepository();
 const domainGovernanceRepository = new ApiDomainGovernanceRepository();
 const domainGovernanceService = new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository);
 
@@ -55,7 +61,9 @@ export const applicationServices: ApplicationServices = {
   domainGovernanceRepository,
   domainGovernanceService,
   courseAuthoringDraftRepository,
-  courseCreationService: new BackendCourseCreationService()
+  homeMainlineConfigRepository,
+  courseCreationService: new BackendCourseCreationService(),
+  preview: previewApplicationServices
 };
 
 type KnowledgeHydration = { graph: KnowledgeGraph; governance: DomainGovernanceState; profile: { displayName: string; role: UserRole; capabilities: UserCapability[] } | null };
@@ -63,6 +71,7 @@ type KnowledgeHydration = { graph: KnowledgeGraph; governance: DomainGovernanceS
 async function hydrateCatalog(userId?: string) {
   const knowledge = await apiRequest<KnowledgeHydration>("/api/knowledge");
   knowledgeRepository.hydrate(knowledge.graph);
+  previewApplicationServices.bindKnowledgeCatalog(knowledge.graph.nodes.filter((node) => node.status === "active").map((node) => node.id));
   domainGovernanceRepository.hydrate(knowledge.governance);
   domainGovernanceService.reloadFromRepository();
   await Promise.all([courseRepository.hydrate(userId), microLearningRepository.hydrate(userId)]);

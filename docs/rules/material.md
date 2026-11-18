@@ -49,10 +49,9 @@
 
 ## Material Header Layout Invariants
 
-- Material Reader MUST reserve layout space for GlobalNav. GlobalNav and Material Header MUST NOT overlap or resolve overlap through z-index competition.
+- Material Reader MUST reserve layout space for the navigation rail. The rail and Material Header MUST NOT overlap or resolve overlap through z-index competition.
 - Material Header, Outline, PDF viewport, Knowledge panel, and bottom controls SHOULD share Material layout tokens instead of independent magic offsets.
-- Responsive GlobalNav reserve MUST contract when the global brand copy is hidden.
-- GlobalNav and Material Header MUST be visually independent floating panels; their backgrounds, borders, shadows, and panel surfaces MUST NOT overlap.
+- The navigation rail and Material Header MUST be visually independent floating panels; their backgrounds, borders, shadows, and panel surfaces MUST NOT overlap.
 
 ## Material Knowledge Context Invariants
 

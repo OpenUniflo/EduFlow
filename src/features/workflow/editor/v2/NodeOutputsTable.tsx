@@ -291,7 +291,8 @@ function OutputStructurePicker({ node, tool, writes, stateSchema, lastOutput, on
   onClose: () => void;
 }) {
   const base = node.type === "core.tool" ? "/result" : "";
-  const declaredSchema = node.type === "core.tool" ? tool?.outputSchema : node.type === "core.function" ? (node.config.outputSchema as JsonSchema | undefined) : undefined;
+  const subgraph = node.type === "core.subgraph" && node.config.graph && typeof node.config.graph === "object" && !Array.isArray(node.config.graph) ? node.config.graph as JsonSchema : undefined;
+  const declaredSchema = node.type === "core.tool" ? tool?.outputSchema : node.type === "core.function" ? (node.config.outputSchema as JsonSchema | undefined) : subgraph?.outputSchema as JsonSchema | undefined;
   const items = useMemo(() => {
     const declared = outputSchemaItems(declaredSchema, base);
     if (declared.length) return declared;

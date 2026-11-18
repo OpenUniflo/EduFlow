@@ -11,10 +11,9 @@ vi.mock('react',async()=>({...await vi.importActual<typeof import('react')>('rea
 vi.mock('react-router-dom',()=>({useNavigate:()=>vi.fn(),useLocation:()=>({state:null}),useParams:()=>({knowledgeId:'target'}),useSearchParams:()=>[new URLSearchParams(`courseId=course&pathId=path${host.actionRunId?'&actionRunId='+host.actionRunId:''}`)]}));
 vi.mock('@/shared/api/apiClient',()=>({apiRequest:api}));
 vi.mock('@/app/services/applicationServices',()=>({applicationServices:{courseRepository:{getCourse:()=>undefined}},refreshLearnerState:vi.fn()}));
-vi.mock('@/app/components/GlobalNav',()=>({GlobalNav:()=>null}));
 vi.mock('@/features/assistant/components/EduFlowAssistant',()=>({EduFlowAssistant:()=>null}));
 import { MicroLearningExperience } from './MicroLearningExperience';
-const progress=vi.fn(),start=vi.fn(),repository={subscribe:()=>()=>{},getPath:()=>({id:'path',knowledgeId:'target',units:[{id:'unit',steps:[{id:'step',kind:'explanation',body:{type:'text',text:'information'}}]}]}),getPathProgress:progress,getUnitProgress:()=>undefined,start} as unknown as MicroLearningRepository;
+const progress=vi.fn(),start=vi.fn(),repository={subscribe:()=>()=>{},getPath:()=>({id:'path',knowledgeId:'target',units:[{id:'unit',steps:[{id:'step',kind:'explanation',body:{type:'text',text:'information'}}]}]}),listPathsForKnowledge:()=>[{id:'path',knowledgeId:'target',units:[{id:'unit',steps:[{id:'step',kind:'explanation',body:{type:'text',text:'information'}}]}]}],getPathProgress:progress,getUnitProgress:()=>undefined,start} as unknown as MicroLearningRepository;
 function render(){host.index=0;const tree=MicroLearningExperience({session:null,onLogout:vi.fn(),repository});host.effects.splice(0).forEach(effect=>effect());return tree;}
 beforeEach(()=>{host.slots=[];host.effects=[];host.actionRunId='run';progress.mockReset().mockReturnValue(undefined);start.mockReset().mockResolvedValue(undefined);api.mockReset().mockImplementation((path:string)=>path.includes('runId=')?Promise.resolve({run:{status:'in_progress',micro_path_id:'path',execution_snapshot:{targetId:'target'}},microStepIds:[]}):Promise.resolve({}));});
 it('starts an Action through its owned Run without issuing the UKS-gated standalone start',async()=>{

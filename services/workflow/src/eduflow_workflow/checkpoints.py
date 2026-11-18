@@ -12,6 +12,12 @@ from .compiler import decode_state, SDK_SCOPE
 from .contracts import ExecutionError, validate_value, canonical
 
 
+def _child_budget_metadata():
+    """Import lazily: runtime imports this module only while starting a run."""
+    from .runtime import checkpoint_budget_metadata
+    return checkpoint_budget_metadata()
+
+
 def checkpoint_digest(serde, value):
     """Hash complete SDK semantics; official serde owns non-JSON leaf types.
 
@@ -58,9 +64,19 @@ class PostgresCoordinator(BaseCheckpointSaver):
             yield connection
 
     async def fenced(self, connection):
-        cursor = await connection.execute('select workflow_private.check_lease(%s,%s)',
-                (self.execution.run['run_id'], self.execution.token))
-        result = (await cursor.fetchone())['check_lease']
+        try:
+            cursor = await connection.execute('select workflow_private.check_lease(%s,%s)',
+                    (self.execution.run['run_id'], self.execution.token))
+            result = (await cursor.fetchone())['check_lease']
+        except ExecutionError:
+            raise
+        except Exception as error:
+            code = getattr(getattr(error, 'diag', None), 'message_primary', '').split(':', 1)[0]
+            if code == 'RUN_TIMEOUT':
+                raise ExecutionError('RUN_TIMEOUT', 'Thread compute budget exhausted', 'timeout', effect='unknown') from None
+            if code in ('RUN_CANCELLED', 'LEASE_LOST'):
+                raise ExecutionError(code, 'Cancellation or execution lease was lost', 'policy' if code == 'RUN_CANCELLED' else 'infrastructure', effect='unknown') from None
+            raise
         if result['cancelled']:
             raise ExecutionError('RUN_CANCELLED', 'Cancellation requested', 'policy', effect='unknown')
 
@@ -92,7 +108,7 @@ class PostgresCoordinator(BaseCheckpointSaver):
     async def _put(self, config, checkpoint, metadata, new_versions):
         execution = self.execution
         state, initialized = business_state(execution, checkpoint, metadata)
-        metadata={**metadata,'eduflowRunId':str(execution.run['run_id'])}
+        metadata={**metadata,'eduflowRunId':str(execution.run['run_id']),**_child_budget_metadata()}
         async with self.connection() as connection:
             async with connection.transaction():
                 await self.fenced(connection)
@@ -128,6 +144,7 @@ class MemoryCoordinator(InMemorySaver):
     async def _put(self, config, checkpoint, metadata, new_versions):
         execution = self.execution
         state, initialized = business_state(execution, checkpoint, metadata)
+        metadata={**metadata, **_child_budget_metadata()}
         parent = config['configurable'].get('checkpoint_id')
         receipts = [r for r in execution._prepared.values() if r['checkpoint_id'] == parent and not r.get('committed')]
         before = copy.deepcopy(execution.storage.__dict__)

@@ -39,7 +39,7 @@
 
 截图：[20:47:04，场景 A 运行输入](assets/workflow-user-review-20261020/01-scenario-a-input.png)。图中订单号/客户诉求为空，二者当前均有 `minLength: 1`，提示非空是符合现有契约的；这张图本身不证明“可留空字段被错误拒绝”。
 
-来源：[场景 A 定义](../../src/demo/workflow/scenarios/order-service.json)、[创建脚本](../../scripts/workflow/examples/create-agent-scenarios.mjs:37)。本次另以普通认证 GET 核对数据库当前定义，仍为 revision 1，与上述输入及绑定一致。
+来源：历史场景 A 定义 `src/demo/workflow/scenarios/order-service.json`（已随演示 seed 移除）、[创建脚本](../../scripts/workflow/examples/create-agent-scenarios.mjs:37)。本次另以普通认证 GET 核对数据库当前定义，仍为 revision 1，与上述输入及绑定一致。
 
 ### 未来验收意图，尚未实施
 

@@ -2,12 +2,6 @@ import { assignmentEligibility } from '@/shared/learning/assignmentEligibility';
 import type { CourseRuntimeData } from './runtime/courseRuntime';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
 import type { UserCourseState } from './types';
-import type { AssignmentExperience } from "@/features/course/types";
-
-export function evaluateTraceSelection(experience: AssignmentExperience, selectedStepId: string) {
-  return Boolean(experience.faultyStepId && selectedStepId === experience.faultyStepId);
-}
-
 
 /** Adapt persisted course definitions and learner state to the shared eligibility rule. */
 export function courseAssignmentEligibility(runtime: CourseRuntimeData, assignmentId: string, knowledge: UserKnowledgeRecord[], courseState?: UserCourseState) {

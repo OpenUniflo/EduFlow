@@ -39,6 +39,14 @@ export type NodeParamsTableProps = {
   /** Tool whose API resource the footer's 编辑工具 action opens. */
   tool?: WorkflowTool;
   onEditTool?: () => void;
+  /** Footer source label; defaults to 工具. A fixed Workflow reference names the target instead. */
+  paramSourceLabel?: string;
+  /** Show the footer's edit action only when the caller can edit the source. */
+  showSourceAction?: boolean;
+  /** Report bindings outside the Schema as unused; disable while that Schema is still loading. */
+  flagUnknownInputs?: boolean;
+  /** Empty-state copy; the default names a tool, which is wrong for a target Workflow. */
+  emptyLabel?: string;
   /** Accepts bindings dragged from the workbench; null targets create a new parameter. */
   onDropBinding?: (target: string | null, binding: Binding) => void;
   /** Creates the State field and binds this parameter in one caller-owned edit. */
@@ -174,7 +182,7 @@ function LiteralControl({ schema, value, label, readOnly, onChange }: { schema: 
 type ParamRow = { name: string; title: string; description?: string; schema: JsonSchema; required: boolean; binding?: Binding };
 
 export function NodeParamsTable(props: NodeParamsTableProps) {
-  const { mode, inputs, onChangeInputs, paramSchema, startInputSchema, stateSchema, environmentSchema, environmentVariables, producers, laterProducerFields, nodeLabels, samples, inputInitializedFields, readOnly = false, onDropBinding, onCreateStateField, showAdd = true, tool, onEditTool } = props;
+  const { mode, inputs, onChangeInputs, paramSchema, startInputSchema, stateSchema, environmentSchema, environmentVariables, producers, laterProducerFields, nodeLabels, samples, inputInitializedFields, readOnly = false, onDropBinding, onCreateStateField, showAdd = true, tool, onEditTool, paramSourceLabel, showSourceAction = true, flagUnknownInputs = true, emptyLabel } = props;
   const [nameDrafts, setNameDrafts] = useState<Record<string, string>>({});
   const [nameErrors, setNameErrors] = useState<Record<string, string>>({});
   const rowIds = useRef(new Map<string, string>());
@@ -256,7 +264,7 @@ export function NodeParamsTable(props: NodeParamsTableProps) {
     : Object.entries(inputs).map(([name, binding]) => ({ name, title: String(asSchema(inputProperties[name]).title ?? name), schema: asSchema(inputProperties[name]), required: false, binding }));
 
   const knownNames = new Set(rows.map(row => row.name));
-  const extraInputs = mode === "schema" ? Object.keys(inputs).filter(name => !knownNames.has(name)) : [];
+  const extraInputs = mode === "schema" && flagUnknownInputs ? Object.keys(inputs).filter(name => !knownNames.has(name)) : [];
 
   function changeBinding(name: string, binding: Binding, rename = mode === "declared") {
     if (rename) {
@@ -332,7 +340,7 @@ export function NodeParamsTable(props: NodeParamsTableProps) {
                     }
                   }}
                 />
-                : <div className="wf-params-name-line"><code className="wf-params-name-readonly">{row.name}</code><span className="wf-params-type-badge">{typeLabel(types(row.schema, paramSchema))}</span>{row.required ? <span className="wf-params-required-badge">必填</span> : <span className="wf-params-optional-badge">可选</span>}</div>}
+                : <div className="wf-params-name-line"><code className="wf-params-name-readonly">{row.name}</code><span className="wf-params-type-badge">{typeLabel(types(row.schema, paramSchema))}</span>{row.required ? <span className="wf-params-required-badge">必填</span> : <span className="wf-params-optional-badge">可选</span>}{row.schema.default !== undefined ? <span className="wf-params-default">默认 {JSON.stringify(row.schema.default)}</span> : null}</div>}
               {rowError ? <span role="alert" className="wf-params-name-error">{rowError}</span> : null}
               {requiredMissing ? <span role="alert" className="wf-params-required-missing">必填参数尚未填写</span> : null}
             </div>
@@ -364,11 +372,10 @@ export function NodeParamsTable(props: NodeParamsTableProps) {
           </div>
         );
       })}
-      {!rows.length ? <p className="wf-params-empty">{mode === "schema" ? "这个工具没有输入参数。" : "此节点还没有参数。"}</p> : null}
+      {!rows.length ? <p className="wf-params-empty">{emptyLabel ?? (mode === "schema" ? "这个工具没有输入参数。" : "此节点还没有参数。")}</p> : null}
       {mode === "declared" && !readOnly && showAdd ? <div className="wf-params-add" onDragOver={onDropBinding ? event => { if (event.dataTransfer.types.includes(DROP_BINDING_TYPE)) event.preventDefault(); } : undefined} onDrop={onDropBinding ? event => { const binding = readDroppedBinding(event); if (!binding) return; event.preventDefault(); onDropBinding(null, binding); } : undefined}><button type="button" onClick={add}>＋ 添加输入</button>{onDropBinding ? <small>也可以把左侧字段拖到参数行或这里。</small> : null}</div> : null}
       {mode === "schema" ? <div className="wf-params-tool-footer" title={tool ? `${tool.name} 的参数` : undefined}>
-        <span>参数由工具定义</span><span aria-hidden="true">·</span>
-        <button type="button" title="打开 API 资源编辑器" disabled={!onEditTool || readOnly} onClick={() => onEditTool?.()}>编辑工具</button>
+        <span>参数由{paramSourceLabel ?? "工具"}定义</span>{showSourceAction ? <><span aria-hidden="true">·</span><button type="button" title="打开 API 资源编辑器" disabled={!onEditTool || readOnly} onClick={() => onEditTool?.()}>编辑工具</button></> : null}
         <span className="wf-params-tool-footer-spacer" />
         <span>{rows.length} 个参数</span>
       </div> : null}

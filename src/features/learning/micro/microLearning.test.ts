@@ -1,19 +1,44 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
+import { syntheticMicroProvider } from "../../../../tests/fixtures/micro";
 import {
   canCompleteMicroLesson,
   createMicroLearningNavigation,
   isMicroInteractionCorrect,
   resolveMicroLearningReturnTarget,
+  resolveDisplayedMicroStep,
   firstMicroReviewStep,
   previousMicroReviewStep,
   nextMicroReviewStep,
   isMicroReviewSubmissionCorrect,
+  microStepPosition,
+  microStepPositionDetailLabel,
+  microStepPositionLabel,
+  microUnitStepPositionLabel,
   type MicroLearningPath,
   type MicroStep
 } from "./microLearning";
+
+describe("Micro Learning step progress", () => {
+  const path: MicroLearningPath = { id: "path", knowledgeId: "knowledge", scope: "global", title: "Progress", estimatedMinutes: 5, mode: "learn", required: true, status: "published", units: [
+    { id: "unit-a", pathId: "path", title: "A", position: 0, estimatedMinutes: 2, required: true, steps: [{ id: "a1", kind: "summary", title: "A1", body: "A1" }, { id: "a2", kind: "summary", title: "A2", body: "A2" }] },
+    { id: "unit-b", pathId: "path", title: "B", position: 1, estimatedMinutes: 3, required: true, steps: [{ id: "b1", kind: "summary", title: "B1", body: "B1" }, { id: "b2", kind: "summary", title: "B2", body: "B2" }, { id: "b3", kind: "summary", title: "B3", body: "B3" }] }
+  ] };
+
+  it("counts the current step in both the unit and the whole path", () => {
+    const position = microStepPosition(path, "unit-b", "b2")!;
+    expect(position).toEqual({ unitIndex: 2, unitCount: 2, stepIndex: 2, stepCount: 3, globalStepIndex: 4, globalStepCount: 5 });
+    expect(microStepPositionLabel(position)).toBe("第 4 / 5 步");
+    expect(microUnitStepPositionLabel(position)).toBe("第 2 / 2 单元 · 第 2 / 3 步");
+    expect(microStepPositionDetailLabel(position)).toBe("第 4 / 5 步 · 第 2 / 2 单元 · 第 2 / 3 步");
+  });
+
+  it("does not invent progress for a missing unit or step", () => {
+    expect(microStepPosition(path, "missing", "b2")).toBeNull();
+    expect(microStepPosition(path, "unit-b", "missing")).toBeNull();
+  });
+});
 
 describe("Micro Learning navigation", () => {
   it("replays required steps locally without changing persisted completion", () => {
@@ -32,47 +57,49 @@ describe("Micro Learning navigation", () => {
     expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/review",completionPolicy:"passed"},completedH5p)).toBe(false);
     expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/other"},completedH5p)).toBe(false);
   });
-  it("carries Learning Home as the explicit return target", () => {
-    expect(createMicroLearningNavigation("AG01", { courseId: "agentic-ai", returnTo: "/" })).toEqual({
-      to: "/learn/micro/AG01?courseId=agentic-ai",
+  it("keeps Learning Home as the return target and opens simple Micro in the conversation", () => {
+    expect(createMicroLearningNavigation("syn-a", { courseId: "fixture-course-alpha", returnTo: "/" })).toEqual({
+      to: "/learn/micro/syn-a?courseId=fixture-course-alpha",
       state: { returnTo: "/" }
     });
     const learningPage = readFileSync(join(process.cwd(), "src/features/learning/pages/LearningPage.tsx"), "utf8");
-    expect(learningPage).toContain('createMicroLearningNavigation(current.knowledgeId,{courseId,returnTo:"/"})');
+    expect(learningPage).toContain("microHost.open({\n      pathId: step.pathId");
+    expect(learningPage).not.toContain('kind: "micro-opened"');
+    expect(learningPage).not.toContain("recordAction");
   });
 
   it("carries the current Course route as the explicit return target", () => {
-    expect(createMicroLearningNavigation("AG01", { courseId: "agentic-ai", returnTo: "/courses/agentic-ai" })).toEqual({
-      to: "/learn/micro/AG01?courseId=agentic-ai",
-      state: { returnTo: "/courses/agentic-ai" }
+    expect(createMicroLearningNavigation("syn-a", { courseId: "fixture-course-alpha", returnTo: "/courses/fixture-course-alpha" })).toEqual({
+      to: "/learn/micro/syn-a?courseId=fixture-course-alpha",
+      state: { returnTo: "/courses/fixture-course-alpha" }
     });
-    expect(resolveMicroLearningReturnTarget({ returnTo: "/courses/agentic-ai/chapters/chapter-1?mode=knowledge" }, "agentic-ai"))
-      .toBe("/courses/agentic-ai/chapters/chapter-1?mode=knowledge");
-    const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
-    expect(coursePage).toContain("returnTo:`${location.pathname}${location.search}`");
+    expect(resolveMicroLearningReturnTarget({ returnTo: "/courses/fixture-course-alpha/chapters/fixture-chapter?mode=knowledge" }, "fixture-course-alpha"))
+      .toBe("/courses/fixture-course-alpha/chapters/fixture-chapter?mode=knowledge");
+    const coursePage = readFileSync(join(process.cwd(), "src/features/course/immersive/CourseImmersivePage.tsx"), "utf8");
+    expect(coursePage).toContain("returnTo: `${location.pathname}${location.search}`");
   });
 
   it("uses deterministic safe fallbacks for refreshes and rejects external targets", () => {
-    expect(resolveMicroLearningReturnTarget(undefined, "agentic-ai")).toBe("/courses/agentic-ai");
+    expect(resolveMicroLearningReturnTarget(undefined, "fixture-course-alpha")).toBe("/courses/fixture-course-alpha");
     expect(resolveMicroLearningReturnTarget(undefined)).toBe("/");
-    expect(resolveMicroLearningReturnTarget({ returnTo: "https://evil.example.com" }, "agentic-ai")).toBe("/courses/agentic-ai");
+    expect(resolveMicroLearningReturnTarget({ returnTo: "https://evil.example.com" }, "fixture-course-alpha")).toBe("/courses/fixture-course-alpha");
     expect(resolveMicroLearningReturnTarget({ returnTo: "//evil.example.com" })).toBe("/");
     expect(resolveMicroLearningReturnTarget({ returnTo: "/\\evil.example.com" })).toBe("/");
   });
 
   it("exposes executable Micro navigation only for Provider-supported knowledge", () => {
-    expect(demoMicroLearningProvider.getLesson("AG01", { courseId: "agentic-ai-golden" })).not.toBeNull();
-    expect(demoMicroLearningProvider.getLesson("CDS525-K056", { courseId: "cds525-deep-learning" })).toBeNull();
+    expect(syntheticMicroProvider.getLesson("syn-a", { courseId: "fixture-course-alpha" })).not.toBeNull();
+    expect(syntheticMicroProvider.getLesson("missing-node", { courseId: "fixture-course-alpha" })).toBeNull();
 
-    const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
-    expect(coursePage).toContain("selectedMicroLesson ? <button");
-    expect(coursePage).toContain("microLearningProvider?.getLesson(nodeId,{courseId:runtime.course.id})");
+    const coursePage = readFileSync(join(process.cwd(), "src/features/course/immersive/CourseImmersivePage.tsx"), "utf8");
+    expect(coursePage).toContain("selectedStageKnowledge && selectedMicro ? <button");
+    expect(coursePage).toContain("microLearningProvider?.getLesson(selectedStageKnowledge.id, { courseId })");
   });
 
   it("renders an honest unsupported deep-link fallback inside the Micro page", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
     expect(source).toContain('className="micro-unsupported"');
-    expect(source).toContain("该知识暂不支持快速学习");
+    expect(source).toContain("该知识暂不支持小练习");
     expect(source).toContain("返回来源");
   });
 });
@@ -104,8 +131,8 @@ describe("Micro Learning assessment integrity", () => {
   it("keeps Assistant actions separate from grading and persisted progress writes", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
     const assistant = source.slice(source.indexOf("<EduFlowAssistant"),source.indexOf("function MicroStepPanel"));
-    expect(assistant).toContain("microPathId:path.id");
-    expect(assistant).toContain("microStepId:step.id");
+    expect(assistant).toMatch(/microPathId:\s*path\.id/);
+    expect(assistant).toMatch(/microStepId:\s*step\.id/);
     expect(assistant).not.toMatch(/setGradingFeedback|completeCurrent\(/);
     expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
     expect(source).toContain("refreshLearnerState(session.userId)");
@@ -118,12 +145,9 @@ describe("Micro Learning assessment integrity", () => {
     expect(reviewBranch).not.toContain("repository.completeStep");
     expect(reviewBranch).not.toContain("refreshLearnerState");
     expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
-    expect(source).toContain("主动复习不会清空进度、重复完成证据或降低学习状态");
-  });
-
-  it("does not expose the deferred fake Matching interaction in Golden lessons", () => {
-    const demoProvider = readFileSync(join(process.cwd(), "src/demo/learning/demoMicroLearningProvider.ts"), "utf8");
-    expect(demoProvider).not.toMatch(/type:\s*["']matching["']/);
+    expect(source).toContain("MicroStepList");
+    expect(source).toContain("setReviewCursor({ unitId, stepId })");
+    expect(source).not.toContain("micro-card micro-complete");
   });
 
   it("keeps the production Micro composition root database-backed without a Demo fallback", () => {
@@ -132,5 +156,28 @@ describe("Micro Learning assessment integrity", () => {
     expect(services).toContain("new ApiMicroLearningRepository()");
     expect(services).not.toContain("demoMicroLearningProvider");
     expect(runtime).not.toMatch(/(?:@\/demo|src\/demo|demoMicroLearningProvider)/);
+  });
+});
+
+describe("displayed step pinning", () => {
+  const path: MicroLearningPath = { id: "path", knowledgeId: "knowledge", scope: "global", title: "Pin", estimatedMinutes: 2, mode: "learn", required: true, status: "published", units: [
+    { id: "unit-1", pathId: "path", title: "One", position: 0, estimatedMinutes: 1, required: true, steps: [
+      { id: "step-1", kind: "interaction", title: "One", body: "One" },
+      { id: "step-2", kind: "interaction", title: "Two", body: "Two" }
+    ] },
+    { id: "unit-2", pathId: "path", title: "Two", position: 1, estimatedMinutes: 1, required: true, steps: [
+      { id: "step-3", kind: "interaction", title: "Three", body: "Three" }
+    ] }
+  ] };
+  it("keeps the submitted step while persisted progress has already advanced", () => {
+    const displayed = resolveDisplayedMicroStep(path, path.units[1], path.units[1].steps[0], { unitId: "unit-1", stepId: "step-1" });
+    expect(displayed.unit?.id).toBe("unit-1");
+    expect(displayed.step?.id).toBe("step-1");
+  });
+  it("falls back to the resume step after continue or when the pin is stale", () => {
+    expect(resolveDisplayedMicroStep(path, path.units[1], path.units[1].steps[0], null).step?.id).toBe("step-3");
+    const stale = resolveDisplayedMicroStep(path, path.units[1], path.units[1].steps[0], { unitId: "unit-1", stepId: "missing" });
+    expect(stale.unit?.id).toBe("unit-1");
+    expect(stale.step).toBeUndefined();
   });
 });

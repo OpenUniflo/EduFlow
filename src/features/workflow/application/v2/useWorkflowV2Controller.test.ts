@@ -8,7 +8,7 @@ vi.mock("react", () => ({
   useCallback(fn: any, deps: any[]) { const i = host.index++; const old = host.slots[i]; if (!old || deps.some((d, j) => d !== old.deps[j])) host.slots[i] = { fn, deps }; return host.slots[i].fn; },
   useEffect(fn: any, deps: any[]) { const i = host.index++; const old = host.slots[i]; if (!old || deps.some((d, j) => d !== old.deps[j])) { host.effects.push(() => { old?.cleanup?.(); host.slots[i].cleanup = fn(); }); host.slots[i] = { deps }; } },
 }));
-const api = vi.hoisted(() => ({ environments: vi.fn(), history: vi.fn(), tools: vi.fn(), get: vi.fn(), run: vi.fn(), events: vi.fn(), steps: vi.fn(), save: vi.fn(), saveEditor: vi.fn(), validateDraft: vi.fn(), createRun: vi.fn(), cancel: vi.fn(), resumeThread:vi.fn(), threads:vi.fn(), thread:vi.fn(), cancelThread:vi.fn(), discover: vi.fn() }));
+const api = vi.hoisted(() => ({ environments: vi.fn(), history: vi.fn(), tools: vi.fn(), get: vi.fn(), run: vi.fn(), events: vi.fn(), steps: vi.fn(), save: vi.fn(), saveEditor: vi.fn(), validateDraft: vi.fn(), createRun: vi.fn(), cancel: vi.fn(), resumeThread:vi.fn(), threads:vi.fn(), thread:vi.fn(), cancelThread:vi.fn(), discover: vi.fn(), evaluations: vi.fn(), retryEvaluation: vi.fn() }));
 vi.mock("@/shared/api/supabaseClient", () => ({ supabaseClient: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "test-bearer" } } }), signOut: vi.fn() } } }));
 vi.mock("../../repository/v2/WorkflowApiV2", () => ({
   WorkflowApiV2: class { constructor() { return api; } },
@@ -27,14 +27,15 @@ const oldRun: WorkflowRunV2 = { runId: "old", workflowId: "workflow", revision: 
 let hookDocument = initial;
 let hookRecovery: WorkflowControllerRecovery | undefined;
 let hookContext: WorkflowLaunchContext | undefined;
+let hookEnvironment: string | undefined;
 const recoveryRejected = vi.fn();
 const authenticationFailure = { sessionUserId: "owner", method: "POST", path: "/api/workflows", status: 401 as const, occurredAt: 0, requestId: "request-401" };
 function remountRecovery(recovery: WorkflowControllerRecovery, document = initial, context?: WorkflowLaunchContext) {
   dispose(); host.slots = []; host.index = 0; host.effects = [];
-  hookRecovery = structuredClone(recovery); hookDocument = document; hookContext = context;
+  hookRecovery = structuredClone(recovery); hookDocument = document; hookContext = context; hookEnvironment = undefined;
   return render();
 }
-function render() { host.index = 0; const control = useWorkflowV2Controller(hookDocument, hookContext, hookRecovery, recoveryRejected); host.effects.splice(0).forEach(effect => effect()); return control; }
+function render() { host.index = 0; const control = useWorkflowV2Controller(hookDocument, hookContext, hookRecovery, recoveryRejected, hookEnvironment); host.effects.splice(0).forEach(effect => effect()); return control; }
 async function flush() { for (let i = 0; i < 8; i += 1) await Promise.resolve(); }
 async function boot() { render(); await flush(); return render(); }
 function dispose() { host.slots.forEach(slot => slot?.cleanup?.()); }
@@ -46,7 +47,7 @@ function deferred<T>() {
 }
 beforeEach(() => {
   dispose(); host.slots = []; host.index = 0; host.effects = [];
-  hookDocument = initial; hookRecovery = undefined; hookContext = undefined; recoveryRejected.mockReset();
+  hookDocument = initial; hookRecovery = undefined; hookContext = undefined; hookEnvironment = undefined; recoveryRejected.mockReset();
   Object.values(api).forEach(mock => mock.mockReset());
   vi.useFakeTimers(); vi.stubGlobal("document", { visibilityState: "visible" });
   api.environments.mockResolvedValue({ items: [{ environmentRef: "local" }] });
@@ -54,6 +55,8 @@ beforeEach(() => {
   api.thread.mockResolvedValue(null);
   api.history.mockResolvedValue({ items: [oldRun], legacyItems: [] });
   api.tools.mockResolvedValue({ items: [] });
+  api.evaluations.mockResolvedValue({ items: [], runStatus: "success", runId: "old" });
+  api.retryEvaluation.mockResolvedValue({ evaluation: { evaluationId: "evaluation", runId: "old", status: "queued" } });
   api.get.mockResolvedValue(initial);
   api.run.mockImplementation(async (id: string) => ({ ...oldRun, runId: id }));
   api.events.mockImplementation(async (id: string) => ({ events: [{ protocolVersion: "1", eventId: `event-${id}`, runId: id, seq: 1, type: "run.success", occurredAt: oldRun.createdAt, payload: {} }], nextSeq: 1, hasMore: false }));
@@ -65,6 +68,24 @@ beforeEach(() => {
 afterEach(() => { dispose(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("initial data and submission feedback", () => {
+  it("starts a fixed-reference target on the environment selected by its caller, not the catalog default", async () => {
+    api.environments.mockResolvedValue({ items: [{ environmentRef: "local" }, { environmentRef: "secondary" }] });
+    hookEnvironment = "secondary";
+    await boot();
+    expect(render().environmentRef).toBe("secondary");
+    expect(api.tools).toHaveBeenCalledWith("secondary");
+    expect(api.tools).not.toHaveBeenCalledWith("local");
+  });
+
+  it("keeps an explicitly selected but unavailable environment instead of silently falling back to the first one", async () => {
+    api.environments.mockResolvedValue({ items: [{ environmentRef: "local" }] });
+    hookEnvironment = "removed-environment";
+    await boot();
+    expect(render().environmentRef).toBe("removed-environment");
+    expect(render().environmentRef).not.toBe("local");
+    expect(api.tools).not.toHaveBeenCalled();
+    expect(render().toolsLoading).toBe(false);
+  });
   it("distinguishes a pending environment read from an empty configured catalog", async () => {
     const catalog = deferred<{ items: { environmentRef: string }[] }>();
     api.environments.mockReturnValueOnce(catalog.promise);
@@ -83,6 +104,38 @@ describe("initial data and submission feedback", () => {
     expect(render().environmentError).toBe("环境读取中断");
     expect(render().error).toBe("环境读取中断");
     expect(api.createRun).not.toHaveBeenCalled();
+  });
+
+  it("waits for the tool catalog before starting a run instead of reporting authorization", async () => {
+    const catalog = deferred<{ items: WorkflowTool[] }>();
+    api.tools.mockImplementation((ref: string) => ref ? catalog.promise : Promise.resolve({ items: [] }));
+    await boot();
+    expect(render().initialLoadStatus).toBe("ready");
+    expect(render().toolsLoading).toBe(true);
+    expect(render().toolsLoaded).toBe(false);
+    await render().startRun(); await flush();
+    expect(api.validateDraft).not.toHaveBeenCalled();
+    expect(api.createRun).not.toHaveBeenCalled();
+    expect(render().error).toContain("正在加载资源与工具目录");
+    expect(render().error).not.toContain("授权");
+    catalog.resolve({ items: [] }); await flush(); render();
+    expect(render().toolsLoaded).toBe(true);
+    await render().startRun(); await flush();
+    expect(api.validateDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a tool catalog failure and offers a state-backed retry", async () => {
+    const tool = { ref: "http-tool", name: "HTTP tool" } as WorkflowTool;
+    api.tools.mockRejectedValueOnce(new Error("目录读取中断")).mockResolvedValue({ items: [tool] });
+    await boot();
+    expect(render().toolsError).toContain("目录读取中断");
+    await render().startRun(); await flush();
+    expect(render().error).toContain("工具目录加载失败");
+    expect(api.createRun).not.toHaveBeenCalled();
+    await render().refreshTools(); await flush(); render();
+    expect(render().toolsError).toBe("");
+    expect(render().toolsLoaded).toBe(true);
+    expect(render().tools).toEqual([tool]);
   });
 
   it("refreshes tools with environment resources without changing the selected environment", async () => {
@@ -113,6 +166,25 @@ describe("initial data and submission feedback", () => {
     await vi.advanceTimersByTimeAsync(1000); render(); await flush();
     expect(render().run?.status).toBe("failed");
     expect(render().notice).not.toContain("运行已提交");
+    expect(api.createRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("converges a live Run to waiting and retires the accepted-submission notice without a history refresh", async () => {
+    api.history.mockResolvedValue({ items: [] });
+    let observed: WorkflowRunV2 = { ...oldRun, runId: "new", threadId: "new", status: "running" };
+    api.run.mockImplementation(async () => observed);
+    await boot(); await render().startRun(); render(); await flush();
+    expect(render().notice).toContain("运行已提交");
+    observed = { ...observed, status: "waiting" };
+    const waitingThread = { threadId: "new", workflowId: "workflow", revision: 3, status: "waiting" as const, currentRunId: "new", checkpointId: "checkpoint", state: {}, stateVersion: 1, interrupts: [{ id: "interrupt", nodeId: "correct", title: "请补件", schema: { type: "object" } }], updatedAt: "2026-01-01T00:00:00Z", nodeExecutions: 1, toolCalls: 0, computeMs: 0 };
+    api.threads.mockResolvedValue({ items: [waitingThread] });
+    api.thread.mockResolvedValue(waitingThread);
+    await vi.advanceTimersByTimeAsync(1000); render(); await flush();
+    expect(render().run?.status).toBe("waiting");
+    expect(render().notice).not.toContain("运行已提交");
+    expect(render().observedRunId).toBe("new");
+    await vi.advanceTimersByTimeAsync(2000); render(); await flush();
+    expect(render().currentThread?.interrupts[0]?.nodeId).toBe("correct");
     expect(api.createRun).toHaveBeenCalledTimes(1);
   });
 });
@@ -288,7 +360,7 @@ describe("restore only commits after acceptance", () => {
     expect(rejected.inputResetVersion).toBe(before.inputResetVersion); expect(rejected.canUndo).toBe(before.canUndo); expect(rejected.canRedo).toBe(true);
     expect(rejected.saveConflict).toBe(true); expect(rejected.dirty).toBe(true);
     rejected.redo(); expect(render().definition.name).toBe("B"); render().undo(); expect(render().definition.name).toBe("A");
-    await render().saveDocument(); expect(api.save.mock.calls[1].slice(2)).toEqual([3, 8]);
+    await render().saveDocument(); expect(api.save.mock.calls[1].slice(2)).toEqual([3, 8, "local"]);
   });
 
   it("creates a Definition revision even for a layout-only restore and makes it undoable", async () => {
@@ -357,7 +429,7 @@ describe("same-tab recovery after authentication interruption", () => {
     expect(render().notice).toContain("服务端版本已更新");
     api.save.mockRejectedValueOnce(new ApiRequestError("REVISION_CONFLICT", "conflict", 409));
     await render().saveDocument();
-    expect(api.save.mock.calls[0].slice(2)).toEqual([3, 8]);
+    expect(api.save.mock.calls[0].slice(2)).toEqual([3, 8, "local"]);
     expect(render().definition.name).toBe("local draft"); expect(render().dirty).toBe(true);
     expect(render().saveConflict).toBe(true); render().undo(); expect(render().definition.name).toBe("saved");
   });
@@ -480,4 +552,44 @@ it('a late accepted response does not replace a history selection made during su
   control.selectRun({...oldRun,runId:'chosen-history'});control=render();
   gate.resolve({runId:'continuation',revision:3,status:'queued'});expect(await pending).toBe(true);control=render();
   expect(control.observedRunId).toBe('chosen-history');expect(control.runOrigin).toBe('history');
+});
+
+describe("evaluation observation recovery", () => {
+  it("polls an initially empty terminal evaluation response until the automatic task appears", async () => {
+    const evaluator = { evaluationId: "eval-1", runId: "old", workflowId: "workflow", revision: 3, trigger: "automatic", status: "queued", outcome: null, mode: "rules", semanticStatus: "not_configured", rubricVersion: 0, providerRef: null, modelRef: null, report: null, error: null, attemptCount: 0, maxAttempts: 3, supersedesId: null, createdAt: "2026-01-01T00:00:00Z", startedAt: null, finishedAt: null };
+    api.evaluations.mockResolvedValueOnce({ items: [], runStatus: "success", runId: "old" }).mockResolvedValue({ items: [evaluator], runStatus: "success", runId: "old" });
+    const control = await boot();
+    control.selectRun(oldRun); render(); await flush();
+    expect(api.evaluations).toHaveBeenCalled();
+    expect(render().evaluations).toEqual([]);
+    await vi.advanceTimersByTimeAsync(3000);
+    await flush();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-1");
+  });
+
+  it("re-reads a completed evaluation when the same terminal run is selected again", async () => {
+    const completed = { evaluationId: "eval-done", runId: "old", workflowId: "workflow", revision: 3, trigger: "automatic", status: "completed", outcome: "rules_passed", mode: "rules", semanticStatus: "not_configured", rubricVersion: 0, providerRef: null, modelRef: null, report: null, error: null, attemptCount: 1, maxAttempts: 3, supersedesId: null, createdAt: "2026-01-01T00:00:00Z", startedAt: "2026-01-01T00:00:01Z", finishedAt: "2026-01-01T00:00:02Z" };
+    api.evaluations.mockResolvedValue({ items: [completed], runStatus: "success", runId: "old" });
+    const control = await boot();
+    control.selectRun(oldRun); render(); await flush(); render(); await flush();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-done");
+    api.evaluations.mockClear();
+    render().selectRun(oldRun); render(); await flush(); render(); await flush();
+    expect(api.evaluations).toHaveBeenCalledTimes(1);
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-done");
+  });
+
+  it("does not let an old evaluation read overwrite a newer selection observation", async () => {
+    const stale = { evaluationId: "eval-stale", runId: "old", workflowId: "workflow", revision: 3, trigger: "automatic", status: "queued", outcome: null, mode: "rules", semanticStatus: "not_configured", rubricVersion: 0, providerRef: null, modelRef: null, report: null, error: null, attemptCount: 0, maxAttempts: 3, supersedesId: null, createdAt: "2026-01-01T00:00:00Z", startedAt: null, finishedAt: null };
+    const fresh = { ...stale, evaluationId: "eval-fresh", status: "completed", outcome: "rules_passed" };
+    const pending = deferred<{ items: typeof stale[]; runStatus: string; runId: string }>();
+    api.evaluations.mockReturnValueOnce(pending.promise);
+    const control = await boot();
+    control.selectRun(oldRun); render(); await flush();
+    api.evaluations.mockResolvedValue({ items: [fresh], runStatus: "success", runId: "old" });
+    render().selectRun(oldRun); render(); await flush(); render(); await flush();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-fresh");
+    pending.resolve({ items: [stale], runStatus: "success", runId: "old" }); await flush(); render();
+    expect(render().evaluations[0]?.evaluationId).toBe("eval-fresh");
+  });
 });

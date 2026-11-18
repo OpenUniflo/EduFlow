@@ -33,10 +33,10 @@ export function connectionDisplayName(ref: string, connections: readonly Connect
  * Resources are created and edited in the resource center, never here (R13 keeps the
  * platform runtime environment invisible to users).
  */
-export function EnvironmentPanel({ definition, environment, tools, locked, onApplyBindings, onOpenResourceCenter }: {
+export function EnvironmentPanel({ definition, environment, tools = [], locked, onApplyBindings, onOpenResourceCenter }: {
   definition: WorkflowDefinitionV2;
   environment?: WorkflowEnvironment;
-  tools: WorkflowTool[];
+  tools?: WorkflowTool[];
   locked: boolean;
   onApplyBindings: (bindings: CapabilityBinding[]) => void;
   onOpenResourceCenter: () => void;

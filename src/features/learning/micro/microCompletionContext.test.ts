@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { routeOnlyRuntime } from "@/features/course/runtime/courseFoundation.fixture";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { NAVIGATION_POLICY_VERSION, type NavigationDecision } from "@/shared/learning/navigation";
-import { resolveMicroCompletionContext } from "./microCompletionContext";
+import { microCompletionPrimaryLabel, resolveMicroCompletionContext, resolveMicroCompletionPrimary } from "./microCompletionContext";
 import { resolveMicroLearningReturnTarget } from "./microLearning";
 
 const runtime: CourseRuntimeData = {
@@ -41,6 +41,37 @@ describe("Micro optional completion context", () => {
     const materialDecision = { ...decision, nextAction: { ...decision.nextAction, resourceKind: "material" as const, resourceId: "book" } };
     expect(resolveMicroCompletionContext({ ...input, runtime: materialRuntime, decision: materialDecision }).find((action) => action.kind === "next")).toEqual({ kind: "next", title: "Next Knowledge", href: "/courses/route-only-course/materials/book?segment=page-15" });
   });
+  it("maps a server-selected Assignment to the real Assignment route", () => {
+    const assignmentDecision = { ...decision, nextAction: { ...decision.nextAction, resourceKind: "assignment" as const, resourceId: "practice" } };
+    const actions = resolveMicroCompletionContext({ ...input, decision: assignmentDecision });
+    expect(actions.find((action) => action.kind === "next")).toEqual({ kind: "next", title: "Practice", href: "/courses/route-only-course/assignments/practice" });
+    const primary = resolveMicroCompletionPrimary({ actions, courseId: runtime.course.id, returnTo: "/" });
+    expect(primary).toEqual({ kind: "next", title: "Practice", href: "/courses/route-only-course/assignments/practice" });
+    expect(microCompletionPrimaryLabel(primary)).toBe("下一步：Practice");
+  });
+
+  it("continues into a same-Knowledge Assignment without duplicating it as a related action", () => {
+    const sameKnowledge = { ...decision, path: [{ nodeId: "route-knowledge", title: "Course Knowledge", state: "learned" as const, blockedBy: [] }], nextAction: { ...decision.nextAction, nodeId: "route-knowledge", resourceKind: "assignment" as const, resourceId: "practice" } };
+    const actions = resolveMicroCompletionContext({ ...input, decision: sameKnowledge });
+    expect(actions.filter((action) => action.href === "/courses/route-only-course/assignments/practice")).toEqual([
+      { kind: "next", title: "Practice", href: "/courses/route-only-course/assignments/practice" }
+    ]);
+  });
+
+  it("falls back to the route only when no next step is available", () => {
+    expect(resolveMicroCompletionPrimary({ actions: [], courseId: runtime.course.id, returnTo: "/" })).toEqual({
+      kind: "route",
+      title: "回到路线",
+      href: "/courses/route-only-course"
+    });
+    expect(resolveMicroCompletionPrimary({ actions: [], returnTo: "/learn/micro/route-knowledge" })).toEqual({
+      kind: "route",
+      title: "回到路线",
+      href: "/learn/micro/route-knowledge"
+    });
+    expect(microCompletionPrimaryLabel(resolveMicroCompletionPrimary({ actions: [], courseId: runtime.course.id, returnTo: "/" }))).toBe("回到路线");
+  });
+
   it("omits absent assets, unavailable Micro, and completed or foreign decisions", () => {
     expect(resolveMicroCompletionContext({ ...input, runtime: routeOnlyRuntime, decision: null })).toEqual([]);
     expect(resolveMicroCompletionContext({ ...input, hasMicro: () => false }).some((action) => action.kind === "next")).toBe(false);
